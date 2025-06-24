@@ -77,7 +77,7 @@ python anp_open_sdk_framework_demo/agent_user_binding.py
 python anp_open_sdk_framework_demo/framework_demo.py
 ```
 
-逐个取消main函数中如下代码的注释，体验插件Agent调用其他插件Agent的web服务和本地api的方法
+逐个调试main函数中如下代码，体验插件Agent调用其他插件Agent的web服务和本地api的方法
 
 ```python
     if discovery_agent:
@@ -85,20 +85,21 @@ python anp_open_sdk_framework_demo/framework_demo.py
         # 直接调用 agent 实例上的方法
         publisher_url = "http://localhost:9527/publisher/agents"
         # agent中的自动抓取函数，自动从主地址搜寻所有did/ad/yaml文档
-        #result = await discovery_agent.discover_and_describe_agents(publisher_url)
+        result = await discovery_agent.discover_and_describe_agents(publisher_url)
         # agent中的联网调用函数，调用计算器
-        #result = await discovery_agent.run_calculator_add_demo()
+        result = await discovery_agent.run_calculator_add_demo()
         # agent中的联网调用函数，相当于发送消息
-        #result = await discovery_agent.run_hello_demo()
+        result = await discovery_agent.run_hello_demo()
         # agent中的AI联网爬取函数，从一个did地址开始爬取
-        #result = await discovery_agent.run_ai_crawler_demo()
+        result = await discovery_agent.run_ai_crawler_demo()
         # agent中的AI联网爬取函数，从多个did汇总地址开始爬取
-        #result = await discovery_agent.run_ai_root_crawler_demo()
+        result = await discovery_agent.run_ai_root_crawler_demo()
         # agent中的本地api去调用另一个agent的本地api
         result = await discovery_agent.run_agent_002_demo(sdk)
         print(result)
         # agent中的本地api通过搜索本地api注册表去调用另一个agent的本地api
         result = await discovery_agent.run_agent_002_demo_new()
+        print(result)
 ```
 
 ---
