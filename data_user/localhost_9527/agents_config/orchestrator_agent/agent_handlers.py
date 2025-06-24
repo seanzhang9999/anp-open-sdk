@@ -25,6 +25,7 @@ async def initialize_agent(agent, sdk_instance):
     global my_agent_instance,caller
     logger.debug(f" -> Self-initializing Orchestrator Agent from its own module...")
 
+    my_agent_instance = agent
     caller = LocalMethodsCaller(sdk_instance)
 
     # 关键步骤：将函数作为方法动态地附加到创建的 Agent 实例上
