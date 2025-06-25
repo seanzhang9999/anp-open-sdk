@@ -131,3 +131,7 @@ yarn-error.log*
 # 前端构建产物 
 /public/build
 /dist
+
+
+# 10 其他
+.aider*
