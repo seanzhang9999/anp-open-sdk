@@ -339,7 +339,7 @@ def get_response_DIDAuthHeader_Token(response_header: Dict) -> Tuple[Optional[st
         if isinstance(auth_value, str) and auth_value.startswith('Bearer '):
                 token = auth_value[7:]  # Extract token after 'Bearer '
                 logger.debug("获得单向认证令牌，兼容无双向认证的服务")
-                return "单向认证", token
+                return "OneWayAuth", token
         # If Authorization is a dict, execute existing logic
         else:
             try:
@@ -349,7 +349,7 @@ def get_response_DIDAuthHeader_Token(response_header: Dict) -> Tuple[Optional[st
                 did_auth_header =auth_value[0].get("resp_did_auth_header", {}).get("Authorization")
                 if did_auth_header and token:
                     logger.debug("令牌包含双向认证信息，进行双向校验")
-                    return "双向认证", token
+                    return "TwoWayAuth", token
                 else:
                     logger.error("[错误] 解析失败，缺少必要字段" + str(auth_value))
                     return None, None

@@ -56,14 +56,14 @@ class DIDWbaAuthHeader:
         # logger.debug("DIDWbaAuthHeader initialized")
     
     def _get_domain(self, server_url: str) -> str:
-        """从URL中提取域名，兼容FastAPI/Starlette的Request对象"""
-        # 兼容FastAPI/Starlette的Request对象
+        # Translation: Extract domain from URL, compatible with FastAPI/Starlette Request object
+
         try:
             from starlette.requests import Request
         except ImportError:
             Request = None
         if Request and isinstance(server_url, Request):
-            # 优先使用base_url（去除路径），否则用url
+            # Translation: Prefer base_url (remove path), otherwise use url
             url_str = str(getattr(server_url, "base_url", None) or getattr(server_url, "url", None))
         else:
             url_str = str(server_url)

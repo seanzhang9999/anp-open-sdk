@@ -66,7 +66,7 @@ class AgentAuthManager:
                 if status_code != 401 and status_code != 403:
                     auth_value, token = get_response_DIDAuthHeader_Token(response_auth_header)
                     if token:
-                        if auth_value != "单向认证":
+                        if auth_value != "OneWayAuth":
                             response_auth_header = json.loads(response_auth_header.get("Authorization"))
                             response_auth_header = response_auth_header[0].get("resp_did_auth_header")
                             response_auth_header = response_auth_header.get("Authorization")
@@ -90,7 +90,7 @@ class AgentAuthManager:
                 if status_code != 401 and status_code != 403:
                     auth_value, token = get_response_DIDAuthHeader_Token(response_auth_header)
                     if token:
-                        if auth_value != "单向认证":
+                        if auth_value != "OneWayAuth":
                             response_auth_header = json.loads(response_auth_header.get("Authorization"))
                             response_auth_header = response_auth_header[0].get("resp_did_auth_header")
                             response_auth_header = response_auth_header.get("Authorization")
