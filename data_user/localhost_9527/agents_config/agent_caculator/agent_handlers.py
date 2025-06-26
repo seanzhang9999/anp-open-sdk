@@ -9,6 +9,6 @@ async def add(a: float, b: float):
     except (ValueError, TypeError) as e:
         params = {"a": 2.88888, "b": 999933.4445556}
         return {
-            "error": f'use: {{"params": {params}}} 来调用'
+            "error": f'use: {{"params": {params}}} Invoke'
         }
-# 这个简单的Agent不需要初始化或清理，所以我们省略了这些函数
+# This is simple.AgentNo initialization or cleanup is required.，Therefore, we have omitted these functions.

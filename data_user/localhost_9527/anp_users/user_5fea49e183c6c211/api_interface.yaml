@@ -21,7 +21,8 @@ paths:
               schema:
                 type: object
           description: 返回结果
-      summary: "\n    这是一个打招呼的API，传入message参数即可返回问候语。\n    "
+      summary: "\n    This is a greeting.API，InputmessageThe parameter can return\
+        \ a greeting.。\n    "
   /info:
     post:
       requestBody:
