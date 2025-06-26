@@ -88,8 +88,27 @@ async def main():
         sdk.start_server()
     server_thread = threading.Thread(target=run_server, daemon=True)
     server_thread.start()
+    # 等待服务器端口就绪
+    import time
+    import socket
 
-    logger.info("\n🔥 Server is running. Press Ctrl+C to stop.")
+    def wait_for_port(host, port, timeout=10.0):
+        """等待端口开放，超时抛异常"""
+        start = time.time()
+        while time.time() - start < timeout:
+            try:
+                with socket.create_connection((host, port), timeout=1):
+                    return True
+            except (OSError, ConnectionRefusedError):
+                time.sleep(0.2)
+        raise RuntimeError(f"Server on {host}:{port} did not start within {timeout} seconds")
+
+    # 读取配置
+    host = config.anp_sdk.host
+    port = config.anp_sdk.port
+    logger.info(f"Waiting for server to start on {host}:{port} ...")
+    wait_for_port(host, port, timeout=15)
+    logger.info("Server is ready, proceeding with agent tasks.")
 
 
     # 生成本地方法文档供查看，如果只是调用，不需要
@@ -117,32 +136,22 @@ async def main():
         # agent中的AI联网爬取函数，从一个did地址开始爬取
         # result = await discovery_agent.run_ai_crawler_demo()
         # agent中的AI联网爬取函数，从多个did汇总地址开始爬取
-        result = await discovery_agent.run_ai_root_crawler_demo()
+        # result = await discovery_agent.run_ai_root_crawler_demo()
         # print(result)
-        # agent中的本地api去调用另一个agent的本地api
-        # result = await discovery_agent.run_agent_002_demo(sdk)
-        #print(result)
+        #agent中的本地api去调用另一个agent的本地api
+        result = await discovery_agent.run_agent_002_demo(sdk)
+        print(result)
         # agent中的本地api通过搜索本地api注册表去调用另一个agent的本地api
-        #result = await discovery_agent.run_agent_002_demo_new()
-        #print(result)
+        result = await discovery_agent.run_agent_002_demo_new()
+        print(result)
 
     else:
         logger.debug("⚠️ No agent with discovery capabilities was found.")
 
-    input("按任意键停止服务")
+    input("\n🔥 Server is still running. Press any key to stop.")
 
     # --- 清理 ---
     logger.debug("\n🛑 Shutdown signal received. Cleaning up...")
-
-    # 停止服务器
-    # 注意：start_server() 是在单独线程中调用的，sdk.stop_server() 只有在 ANPSDK 实现了对应的停止机制时才有效
-    if 'sdk' in locals():
-        logger.debug("  - Stopping server...")
-        if hasattr(sdk, "stop_server"):
-            sdk.stop_server()
-            logger.debug("  - Server stopped.")
-        else:
-            logger.debug("  - sdk 实例没有 stop_server 方法，无法主动停止服务。")
 
     # 清理 Agent
     cleanup_tasks = []
@@ -155,6 +164,20 @@ async def main():
     if cleanup_tasks:
         await asyncio.gather(*cleanup_tasks)
     logger.debug("✅ All agents cleaned up. Exiting.")
+
+    # 停止服务器
+    # 注意：start_server() 是在单独线程中调用的，sdk.stop_server() 只有在 ANPSDK 实现了对应的停止机制时才有效
+    if 'sdk' in locals():
+        logger.debug("  - Stopping server...")
+        if hasattr(sdk, "stop_server"):
+            sdk.stop_server()
+            logger.debug("  - Server stopped.")
+        else:
+            logger.debug("  - sdk 实例没有 stop_server 方法，无法主动停止服务。")
+
+    import signal
+    os.kill(os.getpid(), signal.SIGKILL)
+
 
 
 

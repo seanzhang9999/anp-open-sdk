@@ -479,7 +479,7 @@ class ANPToolCrawler:
                  {{task_description}}
 
                  ## 重要提示
-                 1. 你使用的anp_tool非常强大，可以访问内网和外网地址，你将用它访问初始URL（{{initial_url}}），它是一个agent列表文件，
+                 1. 你使用的anp_tool非常强大，可以访问内网和外网地址，它已经帮你访问初始URL（{{initial_url}}）并获取了agent列表文件附在最后，
                  2. 每个agent的did格式为 'did:wba:localhost%3A9527:wba:user:5fea49e183c6c211'，从 did格式可以获取agent的did文件地址
                  例如 'did:wba:localhost%3A9527:wba:user:5fea49e183c6c211' 的did地址为 
                  http://localhost:9527/wba/user/5fea49e183c6c211/did.json
