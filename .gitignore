@@ -9,6 +9,11 @@ anp_open_sdk_framework_demo/*local_methods_doc.json
 data_demo_simulate/
 data_tmp_log/
 
+# 测试用户私钥和证书需要被同步
+!data_user/
+!data_user/**/*.pem
+!data_user/**/*.key
+
 
 
 
