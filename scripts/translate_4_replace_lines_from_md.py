@@ -15,7 +15,6 @@ def parse_md(md_file):
             if line_match:
                 lineno = int(line_match.group(1))
                 orig = line_match.group(2)
-                # 读取下一行的 Translation
                 translation_line = next(f)
                 trans_match = re.match(r'\s*- Translation:\s*(.*)', translation_line)
                 translation = trans_match.group(1) if trans_match else ''
@@ -23,15 +22,18 @@ def parse_md(md_file):
                     replacements.setdefault(current_file, []).append((lineno, orig, translation.strip()))
     return replacements
 
+
+
 def replace_lines(replacements):
     for file, items in replacements.items():
         with open(file, 'r', encoding='utf-8') as f:
             lines = f.readlines()
         for lineno, orig, trans in items:
             idx = lineno - 1
-            # 只替换完全匹配的行
-            if lines[idx].strip() == orig.strip():
-                lines[idx] = trans + '\n'
+            orig_line = lines[idx]
+            if orig_line.strip() == orig.strip():
+                leading_ws = re.match(r'^(\s*)', orig_line).group(1)
+                lines[idx] = f"{leading_ws}{trans}\n"
             else:
                 print(f"[WARN] Line {lineno} in {file} does not match, skipped.")
         with open(file, 'w', encoding='utf-8') as f:

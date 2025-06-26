@@ -1,17 +1,22 @@
 import os
 import re
 
-SRC_DIR = '.'  # 根目录，可自定义
+SRC_DIRS = [
+    'anp_open_sdk_framework_demo/', 
+    'data_user/localhost_9527/',
+]
 MD_FILE = 'zh_lines_for_translation.md'
 
-def is_chinese(s):
-    return re.search(r'[\u4e00-\u9fa5]', s) is not None
+def is_chinese(line):
+    return re.search('[\u4e00-\u9fff]', line)
+
 
 def scan_py_files(src_dir):
     zh_lines = []
     for root, dirs, files in os.walk(src_dir):
         # Exclude .venv directory
         dirs[:] = [d for d in dirs if d != '.venv']
+        print(f"Scanning {root}")  # <-- 添加这一行
         for f in files:
             if f.endswith('.py'):
                 full_path = os.path.join(root, f)
@@ -32,6 +37,8 @@ def write_md(zh_lines, md_file):
             f.write(f'  - Translation: \n\n')
 
 if __name__ == '__main__':
-    zh_lines = scan_py_files(SRC_DIR)
-    write_md(zh_lines, MD_FILE)
-    print(f"Extracted {len(zh_lines)} Chinese lines. See {MD_FILE}")
+    all_zh_lines = []
+    for src_dir in SRC_DIRS:
+        all_zh_lines.extend(scan_py_files(src_dir))
+    write_md(all_zh_lines, MD_FILE)
+    print(f"Extracted {len(all_zh_lines)} Chinese lines. See {MD_FILE}")
