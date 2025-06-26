@@ -23,6 +23,7 @@ class AnpSdkConfig(Protocol):
     port: int
     user_did_path: str
     user_hosted_path: str
+    hosted_did_domain: str
     auth_virtual_dir: str
     msg_virtual_dir: str
     token_expire_time: int

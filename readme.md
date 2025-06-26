@@ -54,7 +54,16 @@ cp .env.example .env
 python -m venv .venv
 source .venv/bin/activate 
 poetry install
-pip install agent-connect
+python -m ensurepip --upgrade  
+python -m pip install --upgrade pip
+ensurepip install agent_connect   
+```
+
+windows下可能需要手动添加根目录才能正确找到包地址
+
+```
+   $env:PYTHONPATH += ";d:\seanwork\anp-open-sdk"
+
 ```
 
 ### 3. 运行 SDK 测试和 Demo
@@ -101,6 +110,25 @@ python anp_open_sdk_framework_demo/framework_demo.py
         result = await discovery_agent.run_agent_002_demo_new()
         print(result)
 ```
+
+
+9527服务器不关闭时,启动9528服务器
+```bash
+# 检查所有 Agent 插件的 DID 是否绑定，未绑定可新建 DID
+python anp_open_sdk_framework_demo/agent_user_binding.py --config anp_open_sdk_framework_demo_agent_9528_unified_config.yaml
+# 启动智能体网络测试
+python anp_open_sdk_framework_demo/framework_demo.py --config anp_open_sdk_framework_demo_agent_9528_unified_config.yaml
+```
+注意观察run_ai_root_crawler_demo 的爬取仍然指向9527服务器,跨服通过did认证后爬取服务
+```python
+   async def run_ai_root_crawler_demo():
+      crawler = ANPToolCrawler()
+      initial_url = "http://localhost:9527/publisher/agents"
+      target_did= "did:wba:localhost%3A9527:wba:user:28cddee0fade0258"
+      # 协作智能体通过爬虫向组装后的智能体请求服务
+      task_description = "我需要计算两个浮点数相加 3.88888+999933.4445556"
+```
+
 
 ---
 

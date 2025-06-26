@@ -3,11 +3,11 @@
 # ===================================================================
 
 # 0. 项目临时文件
-anp_open_sdk_demo/demo_data/
+anp_open_sdk_demo/demo_tmp_result/
 anp_open_sdk_demo/demo_data_tmp/
-anp_open_sdk_framework_demo/local_methods_doc.json
+anp_open_sdk_framework_demo/*local_methods_doc.json
 data_demo_simulate/
-data_tmp_result/
+data_tmp_log/
 
 
 

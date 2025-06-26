@@ -1,6 +1,6 @@
 # anp_open_sdk/agents_config/orchestrator_agent/agent_handlers.py
 
-import httpx  # Installation required httpx: pip install httpx
+import httpx  # 需要安装 httpx: pip install httpx
 import json
 
 from anp_open_sdk.service.interaction.agent_api_call import agent_api_call_get
@@ -13,22 +13,22 @@ from anp_open_sdk.auth.auth_client import agent_auth_request
 from anp_open_sdk_framework.local_methods.local_methods_caller import LocalMethodsCaller
 from anp_open_sdk_framework.local_methods.local_methods_doc import LocalMethodsDocGenerator
 
-# Create an invoker during initialization.
+# 在初始化时创建调用器
 caller = None
-# --- Module-level variable ---
+# --- 模块级变量 ---
 my_agent_instance = None
 
 async def initialize_agent(agent, sdk_instance):
     """
-    Initialization hook，Create and configureAgentExample，And attach special abilities.。
+    初始化钩子，创建和配置Agent实例，并附加特殊能力。
     """
     global my_agent_instance,caller
     logger.debug(f" -> Self-initializing Orchestrator Agent from its own module...")
-
     my_agent_instance = agent
+
     caller = LocalMethodsCaller(sdk_instance)
 
-    # Key steps：Dynamically attach functions as methods to the created object. Agent In practice
+    # 关键步骤：将函数作为方法动态地附加到创建的 Agent 实例上
     agent.discover_and_describe_agents = discover_and_describe_agents
     agent.run_calculator_add_demo = run_calculator_add_demo
     agent.run_hello_demo = run_hello_demo
@@ -42,8 +42,8 @@ async def initialize_agent(agent, sdk_instance):
 
 async def discover_and_describe_agents(publisher_url):
     """
-    Discover and obtain all published items.AgentDetailed description。
-    This function will be attached to Agent Instance as a method。
+    发现并获取所有已发布Agent的详细描述。
+    这个函数将被附加到 Agent 实例上作为方法。
     """
     logger.debug("\n🕵️  Starting agent discovery process (from agent method)...")
 
@@ -51,7 +51,7 @@ async def discover_and_describe_agents(publisher_url):
 
     async with httpx.AsyncClient() as client:
         try:
-            # 1. Visit  Obtain publicly available agent List
+            # 1. 访问  获取公开的 agent 列表
             logger.debug("  - Step 1: Fetching public agent list...")
             response = await client.get(publisher_url)
             response.raise_for_status()
@@ -66,14 +66,14 @@ async def discover_and_describe_agents(publisher_url):
 
                 logger.debug(f"\n  🔎 Processing Agent DID: {did}")
 
-                # 2. Obtain each agent Of DID Document
+                # 2. 获取每个 agent 的 DID Document
                 user_id = did.split(":")[-1]
                 host , port = ANPSDK.get_did_host_port_from_did(user_id)
                 did_doc_url = f"http://{host}:{port}/wba/user/{user_id}/did.json"
 
                 logger.debug(f"    - Step 2: Fetching DID Document from {did_doc_url}")
                 status, did_doc_data, msg, success = await agent_auth_request(
-                    caller_agent=my_agent_instance.id,  # Use self.id As the caller
+                    caller_agent=my_agent_instance.id,  # 使用 self.id 作为调用者
                     target_agent=did,
                     request_url=did_doc_url
                 )
@@ -87,7 +87,7 @@ async def discover_and_describe_agents(publisher_url):
                 else:
                     did_document = did_doc_data
 
-                # 3. From DID Document Extraction from the middle ad.json Address and retrieve content.
+                # 3. 从 DID Document 中提取 ad.json 的地址并获取内容
                 ad_endpoint = None
                 for service in did_document.get("service", []):
                     if service.get("type") == "AgentDescription":
@@ -130,7 +130,7 @@ async def run_calculator_add_demo():
 
     caculator_did = "did:wba:localhost%3A9527:wba:user:28cddee0fade0258"
     calculator_agent = LocalAgent.from_did(caculator_did)
-    # Construction JSON-RPC Request parameters
+    # 构造 JSON-RPC 请求参数
     params = {
         "a": 1.23,
         "b": 4.56
@@ -139,14 +139,14 @@ async def run_calculator_add_demo():
     result = await agent_api_call_get(
     my_agent_instance.id, calculator_agent.id, "/calculator/add", params  )
 
-    logger.info(f"CalculationapiInvocation result: {result}")
+    logger.info(f"计算api调用结果: {result}")
     return result
 
 
 async def run_hello_demo():
     target_did = "did:wba:localhost%3A9527:wba:user:5fea49e183c6c211"
     target_agent = LocalAgent.from_did(target_did)
-    # Construction JSON-RPC Request parameters
+    # 构造 JSON-RPC 请求参数
     params = {
         "message": "hello"
     }
@@ -154,7 +154,7 @@ async def run_hello_demo():
     result = await agent_api_call_get(
     my_agent_instance.id, target_agent.id, "/hello", params  )
 
-    logger.info(f"hello apiInvocation result: {result}")
+    logger.info(f"hello api调用结果: {result}")
     return result
 
 
@@ -165,24 +165,24 @@ async def run_ai_crawler_demo():
 
     crawler = ANPToolCrawler()
 
-    # Collaborative agents request services from the assembled agents through web crawlers.
-    task_description = "I need to calculate the sum of two floating-point numbers. 2.88888+999933.4445556"
+    # 协作智能体通过爬虫向组装后的智能体请求服务
+    task_description = "我需要计算两个浮点数相加 2.88888+999933.4445556"
 
     host,port = ANPSDK.get_did_host_port_from_did(target_did)
     try:
         result = await crawler.run_crawler_demo(
-            req_did=my_agent_instance.id,  # The requester is a collaborative agent.
-            resp_did=target_did,  # The goal is the assembled agent.
+            req_did=my_agent_instance.id,  # 请求方是协作智能体
+            resp_did=target_did,  # 目标是组装后的智能体
             task_input=task_description,
             initial_url=f"http://{host}:{port}/wba/user/{target_did}/ad.json",
-            use_two_way_auth=True,  # Use two-factor authentication.
+            use_two_way_auth=True,  # 使用双向认证
             task_type = "function_query"
         )
-        logger.debug(f"Intelligent Invocation Results: {result}")
+        logger.debug(f"智能调用结果: {result}")
         return
 
     except Exception as e:
-        logger.info(f"Error occurred during intelligent invocation.: {e}")
+        logger.info(f"智能调用过程中出错: {e}")
         return
 
 
@@ -194,8 +194,8 @@ async def run_ai_root_crawler_demo():
 
     crawler = ANPToolCrawler()
 
-    # Collaborative agents request services from the assembled agents through web crawlers.
-    task_description = "I need to calculate the sum of two floating-point numbers. 2.88888+999933.4445556"
+    # 协作智能体通过爬虫向组装后的智能体请求服务
+    task_description = "我需要计算两个浮点数相加 2.88888+999933.4445556"
 
     host,port = ANPSDK.get_did_host_port_from_did(target_did)
     try:
@@ -204,61 +204,61 @@ async def run_ai_root_crawler_demo():
             resp_did=target_did,
             task_input=task_description,
             initial_url="http://localhost:9527/publisher/agents",
-            use_two_way_auth=True,  # Use two-factor authentication.
+            use_two_way_auth=True,  # 使用双向认证
             task_type = "root_query"
         )
-        logger.debug(f"Intelligent Exploration Results: {result}")
+        logger.debug(f"智能探索结果: {result}")
         return
 
     except Exception as e:
-        logger.info(f"Error occurred during intelligent exploration.: {e}")
+        logger.info(f"智能探索过程中出错: {e}")
         return
 
 
 
 async def run_agent_002_demo(sdk, **kwargs):
-    """Invoke agent_002 Custom demonstration method above"""
+    """调用 agent_002 上的自定义演示方法"""
     try:
-        # Through sdk Acquire agent_002 Example
+        # 通过 sdk 获取 agent_002 实例
         target_agent = sdk.get_agent("did:wba:localhost%3A9527:wba:user:5fea49e183c6c211")
         if not target_agent:
-            return "Error：Not found agent_002"
+            return "错误：未找到 agent_002"
 
-        # Invoke agent_002 Methods above
+        # 调用 agent_002 上的方法
         if hasattr(target_agent, 'demo_method') and callable(target_agent.demo_method):
             result = target_agent.demo_method()
             return result
         else:
-            return "Error：In agent_002 Not found above. demo_method"
+            return "错误：在 agent_002 上未找到 demo_method"
             
     except Exception as e:
-        logger.error(f"Invoke agent_002.demo_method Failure: {e}")
-        return f"Invoke agent_002.demo_method Occasionally make mistakes.: {e}"
+        logger.error(f"调用 agent_002.demo_method 失败: {e}")
+        return f"调用 agent_002.demo_method 时出错: {e}"
 
 
 async def run_agent_002_demo_new():
-    """Invoke through search agent_002 Demonstration method"""
+    """通过搜索调用 agent_002 的演示方法"""
     try:
-        # Method1：Invoke through keyword search.
+        # 方式1：通过关键词搜索调用
         result = await caller.call_method_by_search("demo_method")
-        logger.info(f"Search call results: {result}")
+        logger.info(f"搜索调用结果: {result}")
 
-        # Method2：Directly invoke through the method key.
+        # 方式2：通过方法键直接调用
         result2 = await caller.call_method_by_key(
             "did:wba:localhost%3A9527:wba:user:5fea49e183c6c211::calculate_sum",
             10.5, 20.3
         )
-        logger.info(f"Directly call the result.: {result2}")
+        logger.info(f"直接调用结果: {result2}")
 
         return result
 
     except Exception as e:
-        logger.error(f"Call failed: {e}")
-        return f"Error occurred during invocation.: {e}"
+        logger.error(f"调用失败: {e}")
+        return f"调用时出错: {e}"
 
 
 async def search_available_methods(keyword: str = ""):
-    """Search for available local methods."""
+    """搜索可用的本地方法"""
     results = LocalMethodsDocGenerator.search_methods(keyword=keyword)
     for result in results:
         print(f"🔍 {result['agent_name']}.{result['method_name']}: {result['description']}")
@@ -267,7 +267,7 @@ async def search_available_methods(keyword: str = ""):
 
 async def cleanup_agent():
     """
-    Cleanup hook。
+    清理钩子。
     """
     global my_agent_instance
     if my_agent_instance:

@@ -2,7 +2,10 @@ import os
 import json
 import secrets
 from pathlib import Path
-from anp_open_sdk.utils.log_base import  logging as logger
+
+from anp_open_sdk.config import get_global_config
+from anp_open_sdk.utils.log_base import  logging
+logger = logging.getLogger(__name__)
 import socket
 
 class DIDManager:
@@ -15,14 +18,16 @@ class DIDManager:
         Args:
             hosted_dir: DID托管目录路径，如果为None则使用默认路径
         """
-        self.hosted_dir = Path(hosted_dir or os.environ.get('ANP_USER_HOSTED_PATH', 'anp_open_sdk/anp_users_hosted'))
+        config = get_global_config()
+        if hosted_dir is None:
+            self.hosted_dir = Path(config.anp_sdk.user_hosted_path)
         self.hosted_dir.mkdir(parents=True, exist_ok=True)
         
         # 获取主机配置
         self.hostname = socket.gethostname()
         self.hostip = socket.gethostbyname(self.hostname)
-        self.hostport = os.environ.get('HOST_DID_PORT', '9527')
-        self.hostdomain = os.environ.get('HOST_DID_DOMAIN', 'localhost')
+        self.hostport = config.anp_sdk.port
+        self.hostdomain = config.anp_sdk.hosted_did_domain
     
     def is_duplicate_did(self, did_document: dict) -> bool:
         """
