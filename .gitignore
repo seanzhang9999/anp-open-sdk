@@ -13,6 +13,7 @@ data_tmp_log/
 !data_user/
 !data_user/**/*.pem
 !data_user/**/*.key
+!data_user/**/*keys.json
 
 
 
