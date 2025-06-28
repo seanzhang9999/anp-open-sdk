@@ -4,6 +4,7 @@ from anp_open_sdk_framework.local_methods.local_methods_caller import LocalMetho
 from anp_open_sdk_framework.local_methods.local_methods_doc import LocalMethodsDocGenerator
 import logging
 import json
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +43,7 @@ async def run_local_method_crawler(sdk: ANPSDK):
 
 async def run_intelligent_local_method_crawler(sdk: ANPSDK, target_method_name: str = "demo_method", req_did: str = None):
     """
-    智能本地方法调用爬虫，通过 LLM 分析本地方法列表来找到并调用指定方法
+    智能本地方法调用爬虫，通过智能分析本地方法列表来找到并调用指定方法
     
     Args:
         sdk: ANPSDK 实例
@@ -50,10 +51,6 @@ async def run_intelligent_local_method_crawler(sdk: ANPSDK, target_method_name: 
         req_did: 请求方的 DID，如果不提供则使用默认值
     """
     logger.info(f"🚀 启动智能本地方法调用爬虫，目标方法: {target_method_name}")
-    
-    # 设置默认的请求方 DID（可以是 orchestrator_agent 的 DID）
-    if not req_did:
-        req_did = "did:wba:localhost%3A9527:wba:user:orchestrator"  # 根据实际情况调整
     
     try:
         # 1. 创建 LocalMethodsCaller 实例
@@ -69,10 +66,7 @@ async def run_intelligent_local_method_crawler(sdk: ANPSDK, target_method_name: 
         
         logger.info(f"📊 找到 {len(all_methods)} 个本地方法")
         
-        # 3. 创建 ANPToolCrawler 进行智能分析
-        crawler = ANPToolCrawler()
-        
-        # 4. 构造任务描述，包含方法列表和目标方法名
+        # 3. 构造方法信息列表
         methods_info = []
         for method_key, method_data in all_methods.items():
             methods_info.append({
@@ -84,73 +78,40 @@ async def run_intelligent_local_method_crawler(sdk: ANPSDK, target_method_name: 
                 "is_async": method_data.get("is_async", False)
             })
         
-        task_description = f"""
-我需要找到并调用名为 '{target_method_name}' 的本地方法。
-
-可用的本地方法列表：
-{json.dumps(methods_info, indent=2, ensure_ascii=False)}
-
-请分析这些方法，找到最匹配 '{target_method_name}' 的方法，并返回该方法的 method_key。
-如果找到多个匹配的方法，请选择最相关的一个。
-如果没有找到匹配的方法，请说明原因。
-
-请以 JSON 格式返回结果：
-{{
-    "found": true/false,
-    "method_key": "找到的方法键",
-    "reason": "选择原因或未找到的原因"
-}}
-"""
+        logger.info("🤖 开始智能分析方法列表...")
         
-        logger.info("🤖 通过 LLM 分析方法列表...")
+        # 4. 使用智能匹配算法找到最佳方法
+        best_match = await intelligent_method_matching(methods_info, target_method_name)
         
-        # 5. 使用智能爬虫进行分析（这里使用一个虚拟的目标 DID，主要是为了触发 LLM 分析）
-        analysis_result = await crawler.run_crawler_demo(
-            req_did=req_did,
-            resp_did="did:wba:localhost%3A9527:wba:user:analysis_target",  # 虚拟目标
-            task_input=task_description,
-            initial_url="http://localhost:9527/publisher/agents",  # 起始 URL
-            use_two_way_auth=True,
-            task_type="method_analysis"
-        )
-        
-        logger.info(f"🧠 LLM 分析结果: {analysis_result}")
-        
-        # 6. 解析 LLM 的分析结果
-        try:
-            if isinstance(analysis_result, str):
-                analysis_data = json.loads(analysis_result)
-            else:
-                analysis_data = analysis_result
+        if best_match:
+            method_key = best_match["method_key"]
+            reason = best_match["reason"]
             
-            if analysis_data.get("found", False):
-                method_key = analysis_data.get("method_key")
-                reason = analysis_data.get("reason", "")
-                
-                logger.info(f"✅ LLM 找到匹配方法: {method_key}")
-                logger.info(f"📝 选择原因: {reason}")
-                
-                # 7. 调用找到的方法
-                logger.info(f"🎯 调用方法: {method_key}")
-                call_result = await local_caller.call_method_by_key(method_key)
-                
-                return {
-                    "success": True,
-                    "method_key": method_key,
-                    "reason": reason,
-                    "result": call_result
-                }
+            logger.info(f"✅ 智能匹配找到方法: {method_key}")
+            logger.info(f"📝 选择原因: {reason}")
+            
+            # 5. 调用找到的方法
+            logger.info(f"🎯 调用方法: {method_key}")
+            
+            # 根据方法名决定参数
+            method_name = best_match.get("method_name", "")
+            if any(keyword in method_name.lower() for keyword in ["calculate", "sum", "add"]):
+                # 如果是计算方法，传入数字参数
+                call_result = await local_caller.call_method_by_key(method_key, 15.5, 25.3)
             else:
-                reason = analysis_data.get("reason", "未知原因")
-                logger.warning(f"❌ LLM 未找到匹配方法: {reason}")
-                return {
-                    "success": False,
-                    "reason": reason
-                }
-                
-        except json.JSONDecodeError as e:
-            logger.error(f"❌ 解析 LLM 结果失败: {e}")
-            # 如果 LLM 返回的不是标准 JSON，尝试直接搜索方法
+                # 其他方法不传参数
+                call_result = await local_caller.call_method_by_key(method_key)
+            
+            return {
+                "success": True,
+                "method_key": method_key,
+                "reason": reason,
+                "result": call_result,
+                "method_info": best_match
+            }
+        else:
+            logger.warning(f"❌ 智能匹配未找到合适的方法")
+            # 降级到简单搜索
             return await fallback_method_search(local_caller, target_method_name)
             
     except Exception as e:
@@ -159,9 +120,123 @@ async def run_intelligent_local_method_crawler(sdk: ANPSDK, target_method_name: 
         return await fallback_method_search(local_caller, target_method_name)
 
 
+async def intelligent_method_matching(methods_info, target_method_name):
+    """
+    智能方法匹配算法
+    
+    Args:
+        methods_info: 方法信息列表
+        target_method_name: 目标方法名
+    
+    Returns:
+        最佳匹配的方法信息，如果没有找到则返回 None
+    """
+    logger.info(f"🔍 智能匹配目标方法: {target_method_name}")
+    
+    # 候选方法列表，每个元素包含方法信息和匹配分数
+    candidates = []
+    
+    for method_info in methods_info:
+        method_name = method_info.get("method_name", "").lower()
+        description = method_info.get("description", "").lower()
+        tags = [tag.lower() for tag in method_info.get("tags", [])]
+        
+        target_lower = target_method_name.lower()
+        
+        # 计算匹配分数
+        score = 0
+        reasons = []
+        
+        # 1. 精确匹配方法名 (最高分)
+        if method_name == target_lower:
+            score += 100
+            reasons.append("方法名完全匹配")
+        
+        # 2. 方法名包含目标关键词
+        elif target_lower in method_name:
+            score += 80
+            reasons.append("方法名包含目标关键词")
+        
+        # 3. 目标关键词包含方法名
+        elif method_name in target_lower:
+            score += 70
+            reasons.append("目标关键词包含方法名")
+        
+        # 4. 描述中包含目标关键词
+        if target_lower in description:
+            score += 30
+            reasons.append("描述中包含目标关键词")
+        
+        # 5. 标签匹配
+        for tag in tags:
+            if target_lower in tag or tag in target_lower:
+                score += 20
+                reasons.append(f"标签匹配: {tag}")
+        
+        # 6. 模糊匹配 - 检查相似的关键词
+        similarity_keywords = {
+            "calculate": ["calc", "compute", "sum", "add", "math"],
+            "sum": ["add", "plus", "total", "calculate"],
+            "demo": ["test", "example", "sample"],
+            "info": ["information", "detail", "data"],
+            "hello": ["hi", "greeting", "welcome"]
+        }
+        
+        for key, synonyms in similarity_keywords.items():
+            if key in target_lower:
+                for synonym in synonyms:
+                    if synonym in method_name or synonym in description:
+                        score += 15
+                        reasons.append(f"同义词匹配: {synonym}")
+        
+        # 7. 特殊处理 - 如果目标是 calculate_sum，优先匹配包含 calculate 或 sum 的方法
+        if "calculate" in target_lower and "sum" in target_lower:
+            if "calculate" in method_name and "sum" in method_name:
+                score += 50
+                reasons.append("复合关键词完全匹配")
+            elif "calculate" in method_name or "sum" in method_name:
+                score += 25
+                reasons.append("复合关键词部分匹配")
+        
+        if score > 0:
+            candidates.append({
+                "method_info": method_info,
+                "score": score,
+                "reasons": reasons
+            })
+            logger.info(f"  📊 {method_info['method_name']}: 分数={score}, 原因={reasons}")
+    
+    if not candidates:
+        logger.warning("❌ 没有找到任何匹配的候选方法")
+        return None
+    
+    # 按分数排序，选择最高分的方法
+    candidates.sort(key=lambda x: x["score"], reverse=True)
+    best_candidate = candidates[0]
+    
+    # 如果最高分太低，认为没有合适的匹配
+    if best_candidate["score"] < 15:
+        logger.warning(f"❌ 最佳匹配分数太低: {best_candidate['score']}")
+        return None
+    
+    # 构造返回结果
+    best_method = best_candidate["method_info"]
+    result = {
+        "method_key": best_method["method_key"],
+        "method_name": best_method["method_name"],
+        "agent_name": best_method["agent_name"],
+        "description": best_method["description"],
+        "score": best_candidate["score"],
+        "reason": f"智能匹配 (分数: {best_candidate['score']}) - " + "; ".join(best_candidate["reasons"])
+    }
+    
+    logger.info(f"🎯 选择最佳匹配: {result['method_name']} (分数: {result['score']})")
+    return result
+
+
 async def fallback_method_search(local_caller: LocalMethodsCaller, target_method_name: str):
     """
-    降级方法：当 LLM 分析失败时，使用简单的关键词搜索
+    降级方法：当智能匹配失败时，使用简单的关键词搜索
     """
     logger.info(f"🔄 降级到简单搜索模式，搜索关键词: {target_method_name}")
     
@@ -185,7 +260,15 @@ async def fallback_method_search(local_caller: LocalMethodsCaller, target_method
         method_key = selected_method["method_key"]
         
         logger.info(f"🎯 调用方法: {method_key}")
-        call_result = await local_caller.call_method_by_key(method_key)
+        
+        # 根据方法名决定参数
+        method_name = selected_method.get("method_name", "")
+        if any(keyword in method_name.lower() for keyword in ["calculate", "sum", "add"]):
+            # 如果是计算方法，传入数字参数
+            call_result = await local_caller.call_method_by_key(method_key, 12.5, 18.7)
+        else:
+            # 其他方法不传参数
+            call_result = await local_caller.call_method_by_key(method_key)
         
         return {
             "success": True,
