@@ -5,6 +5,7 @@ import os
 import sys
 import asyncio
 import threading
+import json
 
 from anp_open_sdk.anp_sdk_user_data import save_interface_files, LocalUserDataManager
 from anp_open_sdk.sdk_mode import SdkMode
@@ -44,13 +45,18 @@ async def main():
     parser.add_argument(
         '--intelligent',
         action='store_true',
-        help='Use intelligent crawler mode with LLM analysis.'
+        help='Use intelligent crawler mode with smart parameter inference.'
     )
     parser.add_argument(
         '--target-method',
         type=str,
         default='demo_method',
         help='Target method name for intelligent crawler (default: demo_method).'
+    )
+    parser.add_argument(
+        '--method-args',
+        type=str,
+        help='Method arguments in JSON format, e.g., \'{"args": [1, 2], "kwargs": {"name": "test"}}\''
     )
     args = parser.parse_args()
 
@@ -125,12 +131,26 @@ async def main():
             crawler_module = importlib.import_module(crawler_module_name)
             
             if args.intelligent:
+                # 解析方法参数
+                method_args = None
+                if args.method_args:
+                    try:
+                        method_args = json.loads(args.method_args)
+                        logger.info(f"📋 解析到方法参数: {method_args}")
+                    except json.JSONDecodeError as e:
+                        logger.error(f"❌ 方法参数JSON格式错误: {e}")
+                        return
+                
                 # 使用智能爬虫模式
                 if hasattr(crawler_module, "run_intelligent_local_method_crawler"):
                     logger.info(f"--- Running intelligent crawler: {args.crawler} with target method: {args.target_method} ---")
+                    if method_args:
+                        logger.info(f"--- Using provided arguments: {method_args} ---")
+                    
                     result = await crawler_module.run_intelligent_local_method_crawler(
                         sdk=sdk,
-                        target_method_name=args.target_method
+                        target_method_name=args.target_method,
+                        method_args=method_args
                     )
                     logger.info(f"--- Intelligent crawler result: {result} ---")
                     logger.info(f"--- Intelligent crawler finished: {args.crawler} ---")
