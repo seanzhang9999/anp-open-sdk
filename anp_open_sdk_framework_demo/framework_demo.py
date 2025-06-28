@@ -41,6 +41,17 @@ async def main():
         type=str,
         help='Name of the crawler to run (e.g., agent_002_local_caller_crawler).'
     )
+    parser.add_argument(
+        '--intelligent',
+        action='store_true',
+        help='Use intelligent crawler mode with LLM analysis.'
+    )
+    parser.add_argument(
+        '--target-method',
+        type=str,
+        default='demo_method',
+        help='Target method name for intelligent crawler (default: demo_method).'
+    )
     args = parser.parse_args()
 
     app_config = UnifiedConfig(config_file=args.config)
@@ -112,12 +123,28 @@ async def main():
         try:
             crawler_module_name = f"anp_open_sdk_framework_demo.crawlers.{args.crawler}"
             crawler_module = importlib.import_module(crawler_module_name)
-            if hasattr(crawler_module, "run_local_method_crawler"):
-                logger.info(f"--- Running crawler: {args.crawler} ---")
-                await crawler_module.run_local_method_crawler(sdk)
-                logger.info(f"--- Crawler finished: {args.crawler} ---")
+            
+            if args.intelligent:
+                # 使用智能爬虫模式
+                if hasattr(crawler_module, "run_intelligent_local_method_crawler"):
+                    logger.info(f"--- Running intelligent crawler: {args.crawler} with target method: {args.target_method} ---")
+                    result = await crawler_module.run_intelligent_local_method_crawler(
+                        sdk=sdk,
+                        target_method_name=args.target_method
+                    )
+                    logger.info(f"--- Intelligent crawler result: {result} ---")
+                    logger.info(f"--- Intelligent crawler finished: {args.crawler} ---")
+                else:
+                    logger.error(f"Crawler module {args.crawler} does not have a run_intelligent_local_method_crawler function.")
             else:
-                logger.error(f"Crawler module {args.crawler} does not have a run_local_method_crawler function.")
+                # 使用普通爬虫模式
+                if hasattr(crawler_module, "run_local_method_crawler"):
+                    logger.info(f"--- Running crawler: {args.crawler} ---")
+                    await crawler_module.run_local_method_crawler(sdk)
+                    logger.info(f"--- Crawler finished: {args.crawler} ---")
+                else:
+                    logger.error(f"Crawler module {args.crawler} does not have a run_local_method_crawler function.")
+                    
         except ImportError:
             logger.error(f"Could not import crawler: {args.crawler}")
         except Exception as e:
