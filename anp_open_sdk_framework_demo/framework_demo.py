@@ -28,7 +28,6 @@ logger = logging.getLogger(__name__)
 import inspect
 
 
-
 async def main():
     parser = argparse.ArgumentParser(description="ANP Open SDK Multi-Agent Demo")
     parser.add_argument(
@@ -37,17 +36,21 @@ async def main():
         default='anp_open_sdk_framework_demo_agent_unified_config.yaml',
         help='Path to the unified configuration file.'
     )
+    parser.add_argument(
+        '--crawler',
+        type=str,
+        help='Name of the crawler to run (e.g., agent_002_local_caller_crawler).'
+    )
     args = parser.parse_args()
 
     app_config = UnifiedConfig(config_file=args.config)
     set_global_config(app_config)
-    setup_logging() # 假设 setup_logging 内部也改用 get_global_config()
+    setup_logging()
 
     logger.debug("🚀 Starting Agent Host Application...")
     if os.getcwd() not in sys.path:
         sys.path.append(os.getcwd())
 
-    # --- 加载和初始化所有Agent模块 ---
     config = get_global_config()
     agent_config_path = config.multi_agent_mode.agents_cfg_path
     agent_files = glob.glob(f"{agent_config_path}/*/agent_mappings.yaml")
@@ -56,11 +59,7 @@ async def main():
         return
 
     prepared_agents_info = [LocalAgentManager.load_agent_from_module(f) for f in agent_files]
-
-
-    # 过滤掉加载失败的
     valid_agents_info = [info for info in prepared_agents_info if info and info[0]]
-
     all_agents = [info[0] for info in valid_agents_info]
     lifecycle_modules = {info[0].id: info[1] for info in valid_agents_info}
 
@@ -68,33 +67,28 @@ async def main():
         logger.info("No agents were loaded successfully. Exiting.")
         return
 
-    # --- 启动SDK ---
     logger.info("\n✅ All agents pre-loaded. Creating SDK instance...")
     sdk = ANPSDK(mode=SdkMode.MULTI_AGENT_ROUTER, agents=all_agents)
 
-    # --- 新增：后期初始化循环 ---
     logger.info("\n🔄 Running post-initialization for agents...")
     for agent in all_agents:
         module = lifecycle_modules.get(agent.id)
         if module and hasattr(module, "initialize_agent"):
             logger.info(f"  - Calling initialize_agent for {agent.name}...")
-            await module.initialize_agent(agent, sdk)  # 传入 agent 和 sdk 实例
+            await module.initialize_agent(agent, sdk)
 
     for agent in all_agents:
         await LocalAgentManager.generate_and_save_agent_interfaces(agent, sdk)
 
-
-    # 用线程启动 server
     def run_server():
         sdk.start_server()
     server_thread = threading.Thread(target=run_server, daemon=True)
     server_thread.start()
-    # 等待服务器端口就绪
+
     import time
     import socket
 
     def wait_for_port(host, port, timeout=10.0):
-        """等待端口开放，超时抛异常"""
         start = time.time()
         while time.time() - start < timeout:
             try:
@@ -104,57 +98,51 @@ async def main():
                 time.sleep(0.2)
         raise RuntimeError(f"Server on {host}:{port} did not start within {timeout} seconds")
 
-    # 读取配置
     host = config.anp_sdk.host
     port = config.anp_sdk.port
     logger.info(f"Waiting for server to start on {host}:{port} ...")
     wait_for_port(host, port, timeout=15)
     logger.info("Server is ready, proceeding with agent tasks.")
 
-
-    # 生成本地方法文档供查看，如果只是调用，不需要
-    # 在当前程序脚本所在目录下生成文档
     script_dir = os.path.dirname(os.path.abspath(__file__))
     doc_path = os.path.join(script_dir, f"{config.anp_sdk.host}_{config.anp_sdk.port}_local_methods_doc.json")
     LocalMethodsDocGenerator.generate_methods_doc(doc_path)
 
-    logger.debug("\n🔍 Searching for an agent with discovery capabilities...")
-    discovery_agent = None
-    for agent in all_agents:
-        if hasattr(agent, 'discover_and_describe_agents'):
-            discovery_agent = agent
-            break
-    if discovery_agent:
-        logger.info(f"✅ Found discovery agent: '{discovery_agent.name}'. Starting its discovery task...")
-        # 直接调用 agent 实例上的方法
-        publisher_url = "http://localhost:9527/publisher/agents"
-        # agent中的自动抓取函数，自动从主地址搜寻所有did/ad/yaml文档
-        #result = await discovery_agent.discover_and_describe_agents(publisher_url)
-        # agent中的联网调用函数，调用计算器
-        #result = await discovery_agent.run_calculator_add_demo()
-        # agent中的联网调用函数，相当于发送消息
-        #result = await discovery_agent.run_hello_demo()
-        # agent中的AI联网爬取函数，从一个did地址开始爬取
-        # result = await discovery_agent.run_ai_crawler_demo()
-        # agent中的AI联网爬取函数，从多个did汇总地址开始爬取
-        # result = await discovery_agent.run_ai_root_crawler_demo()
-        # print(result)
-        #agent中的本地api去调用另一个agent的本地api
-        result = await discovery_agent.run_agent_002_demo(sdk)
-        print(result)
-        # agent中的本地api通过搜索本地api注册表去调用另一个agent的本地api
-        result = await discovery_agent.run_agent_002_demo_new()
-        print(result)
+    if args.crawler:
+        try:
+            crawler_module_name = f"anp_open_sdk_framework_demo.crawlers.{args.crawler}"
+            crawler_module = importlib.import_module(crawler_module_name)
+            if hasattr(crawler_module, "run_local_method_crawler"):
+                logger.info(f"--- Running crawler: {args.crawler} ---")
+                await crawler_module.run_local_method_crawler(sdk)
+                logger.info(f"--- Crawler finished: {args.crawler} ---")
+            else:
+                logger.error(f"Crawler module {args.crawler} does not have a run_local_method_crawler function.")
+        except ImportError:
+            logger.error(f"Could not import crawler: {args.crawler}")
+        except Exception as e:
+            logger.error(f"An error occurred while running the crawler: {e}")
 
     else:
-        logger.debug("⚠️ No agent with discovery capabilities was found.")
+        logger.debug("\n🔍 No crawler specified. Running default discovery...")
+        discovery_agent = None
+        for agent in all_agents:
+            if hasattr(agent, 'discover_and_describe_agents'):
+                discovery_agent = agent
+                break
+        if discovery_agent:
+            logger.info(f"✅ Found discovery agent: '{discovery_agent.name}'. Starting its discovery task...")
+            result = await discovery_agent.run_agent_002_demo(sdk)
+            print(result)
+            result = await discovery_agent.run_agent_002_demo_new()
+            print(result)
+        else:
+            logger.debug("⚠️ No agent with discovery capabilities was found.")
 
     input("\n🔥 Server is still running. Press any key to stop.")
 
-    # --- 清理 ---
     logger.debug("\n🛑 Shutdown signal received. Cleaning up...")
 
-    # 清理 Agent
     cleanup_tasks = []
     for agent in all_agents:
         module = lifecycle_modules.get(agent.id)
@@ -166,8 +154,6 @@ async def main():
         await asyncio.gather(*cleanup_tasks)
     logger.debug("✅ All agents cleaned up. Exiting.")
 
-    # 停止服务器
-    # 注意：start_server() 是在单独线程中调用的，sdk.stop_server() 只有在 ANPSDK 实现了对应的停止机制时才有效
     if 'sdk' in locals():
         logger.debug("  - Stopping server...")
         if hasattr(sdk, "stop_server"):
@@ -178,13 +164,6 @@ async def main():
 
     import signal
     os.kill(os.getpid(), signal.SIGKILL)
-
-
-
-
-
-
-
 
 if __name__ == "__main__":
     try:

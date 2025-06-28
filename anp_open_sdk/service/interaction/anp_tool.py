@@ -11,68 +11,75 @@ from typing import Dict, Any, Optional
 from anp_open_sdk.anp_sdk_agent import LocalAgent
 from anp_open_sdk.anp_sdk_user_data import LocalUserDataManager
 import logging
+
+from anp_open_sdk_framework.local_methods.local_methods_caller import LocalMethodsCaller
+
 logger = logging.getLogger(__name__)
 
 from anp_open_sdk.agent_connect_hotpatch.authentication.did_wba_auth_header import DIDWbaAuthHeader
 from anp_open_sdk.auth.auth_client import agent_auth_request
 
 
-
 class ANPTool:
     name: str = "anp_tool"
     description: str = """使用代理网络协议（ANP）与其他智能体进行交互。
-1. 使用时需要输入文档 URL 和 HTTP 方法。
-2. 在工具内部，URL 将被解析，并根据解析结果调用相应的 API。
-3. 注意：任何使用 ANPTool 获取的 URL 都必须使用 ANPTool 调用，不要直接调用。
+1. 使用时需要输入 URL 和 HTTP 方法。
+2. URL 可以是标准的 http/https URL，用于远程调用。
+3. URL 也可以是 `local://<agent_did>/<method_name>` 格式，用于调用本地注册的方法，这种方式更快。
+4. 注意：任何使用 ANPTool 获取的 URL 都必须使用 ANPTool 调用，不要直接调用。
 """
     parameters: dict = {
         "type": "object",
         "properties": {
             "url": {
                 "type": "string",
-                "description": "(必填) 代理描述文件或 API 端点的 URL",
+                "description": "(必填) 代理描述文件、API 端点或本地方法调用的 URI",
             },
             "method": {
                 "type": "string",
-                "description": "(可选) HTTP 方法，如 GET、POST、PUT 等，默认为 GET",
+                "description": "(可选) 远程调用时的 HTTP 方法，如 GET、POST 等，默认为 GET",
                 "enum": ["GET", "POST", "PUT", "DELETE", "PATCH"],
                 "default": "GET",
             },
             "headers": {
                 "type": "object",
-                "description": "(可选) HTTP 请求头",
+                "description": "(可选) 远程调用时的 HTTP 请求头",
                 "default": {},
             },
             "params": {
                 "type": "object",
-                "description": "(可选) URL 查询参数",
+                "description": "(可选) 远程调用时的 URL 查询参数，或本地调用的部分参数",
                 "default": {},
             },
             "body": {
                 "type": "object",
-                "description": "(可选) POST/PUT 请求的请求体",
+                "description": "(可选) 远程 POST/PUT 请求的请求体，或本地调用的部分参数",
             },
         },
         "required": ["url"],
     }
 
-    # 声明 auth_client 字段
+    # 声明 auth_client 和 local_caller 字段
     auth_client: Optional[DIDWbaAuthHeader] = None
+    local_caller: Optional[LocalMethodsCaller] = None
 
     def __init__(
-        self,
-        did_document_path: Optional[str] = None,
-        private_key_path: Optional[str] = None,
-        **data,
+            self,
+            did_document_path: Optional[str] = None,
+            private_key_path: Optional[str] = None,
+            local_caller: Optional[LocalMethodsCaller] = None,
+            **data,
     ):
         """
-        使用 DID 认证初始化 ANPTool
+        使用 DID 认证和本地调用器初始化 ANPTool
 
         参数:
-            did_document_path (str, 可选): DID 文档文件路径。如果为 None，则使用默认路径。
-            private_key_path (str, 可选): 私钥文件路径。如果为 None，则使用默认路径。
+            did_document_path (str, 可选): 远程调用时使用的 DID 文档文件路径。
+            private_key_path (str, 可选): 远程调用时使用的私钥文件路径。
+            local_caller (LocalMethodsCaller, 可选): 用于执行本地方法的调用器实例。
         """
         super().__init__(**data)
+        self.local_caller = local_caller
 
         # 获取当前脚本目录
         current_dir = Path(__file__).parent
@@ -81,17 +88,13 @@ class ANPTool:
 
         # 使用提供的路径或默认路径
         if did_document_path is None:
-            # 首先尝试从环境变量中获取
             did_document_path = os.environ.get("DID_DOCUMENT_PATH")
             if did_document_path is None:
-                # 使用默认路径
                 did_document_path = str(base_dir / "use_did_test_public/coder.json")
 
         if private_key_path is None:
-            # 首先尝试从环境变量中获取
             private_key_path = os.environ.get("DID_PRIVATE_KEY_PATH")
             if private_key_path is None:
-                # 使用默认路径
                 private_key_path = str(
                     base_dir / "use_did_test_public/key-1_private.pem"
                 )
@@ -104,40 +107,75 @@ class ANPTool:
             did_document_path=did_document_path, private_key_path=private_key_path
         )
 
+    def _parse_local_uri(self, uri: str) -> (str, str):
+        """解析本地 URI，例如 local://<agent_did>/<method_name>"""
+        try:
+            path = uri.replace("local://", "")
+            agent_did, method_name = path.split('/', 1)
+            return agent_did, method_name
+        except ValueError:
+            raise ValueError(f"无效的本地 URI 格式: {uri}. 期望格式为 'local://<agent_did>/<method_name>'.")
+
     async def execute(
-        self,
-        url: str,
-        method: str = "GET",
-        headers: Dict[str, str] = None,
-        params: Dict[str, Any] = None,
-        body: Dict[str, Any] = None,
+            self,
+            url: str,
+            method: str = "GET",
+            headers: Dict[str, str] = None,
+            params: Dict[str, Any] = None,
+            body: Dict[str, Any] = None,
     ) -> Dict[str, Any]:
         """
-        执行 HTTP 请求以与其他代理交互
-
-        参数:
-            url (str): 代理描述文件或 API 端点的 URL
-            method (str, 可选): HTTP 方法，默认为 "GET"
-            headers (Dict[str, str], 可选): HTTP 请求头
-            params (Dict[str, Any], 可选): URL 查询参数
-            body (Dict[str, Any], 可选): POST/PUT 请求的请求体
-
-        返回:
-            Dict[str, Any]: 响应内容
+        执行本地或远程调用。
+        - 对于 'local://' URI, 执行本地方法调用。
+        - 对于 'http(s)://' URL, 执行远程 HTTP 请求。
         """
+        if url.startswith("local://"):
+            if not self.local_caller:
+                return {"status_code": 500, "error": "ANPTool 未配置本地调用器，无法执行本地调用。", "source": "local"}
 
+            try:
+                target_did, method_name = self._parse_local_uri(url)
+
+                # 合并 params 和 body 作为本地调用的参数
+                kwargs = (params or {}).copy()
+                if body:
+                    kwargs.update(body)
+
+                # 使用本地调用器执行方法
+                method_key = f"{target_did}::{method_name}"
+                result = await self.local_caller.call_method_by_key(
+                    method_key,
+                    **kwargs
+                )
+                return {"status_code": 200, "data": result, "source": "local"}
+            except Exception as e:
+                logger.error(f"本地调用失败: {e}")
+                return {"status_code": 500, "error": str(e), "source": "local"}
+        else:
+            # 对于 http/https URL，执行远程调用
+            return await self._execute_remote_http_request(url, method, headers, params, body)
+
+    async def _execute_remote_http_request(
+            self,
+            url: str,
+            method: str = "GET",
+            headers: Dict[str, str] = None,
+            params: Dict[str, Any] = None,
+            body: Dict[str, Any] = None,
+    ) -> Dict[str, Any]:
+        """
+        执行远程 HTTP 请求以与其他代理交互 (原 execute 方法的逻辑)
+        """
         if headers is None:
             headers = {}
         if params is None:
             params = {}
 
-        logger.debug(f"ANP 请求: {method} {url}")
+        logger.debug(f"ANP 远程请求: {method} {url}")
 
-        # 添加基本请求头
         if "Content-Type" not in headers and method in ["POST", "PUT", "PATCH"]:
             headers["Content-Type"] = "application/json"
 
-        # 添加 DID 认证
         if self.auth_client:
             try:
                 auth_headers = self.auth_client.get_auth_header(url)
@@ -146,47 +184,35 @@ class ANPTool:
                 logger.debug(f"获取认证头失败: {str(e)}")
 
         async with aiohttp.ClientSession() as session:
-            # 准备请求参数
             request_kwargs = {
                 "url": url,
                 "headers": headers,
                 "params": params,
             }
-
-            # 如果有请求体且方法支持，添加请求体
             if body is not None and method in ["POST", "PUT", "PATCH"]:
                 request_kwargs["json"] = body
 
-            # 执行请求
             http_method = getattr(session, method.lower())
 
             try:
                 async with http_method(**request_kwargs) as response:
-                    logger.debug(f"ANP 响应: 状态码 {response.status}")
-
-                    # 检查响应状态
+                    logger.debug(f"ANP 远程响应: 状态码 {response.status}")
                     if (
-                        response.status == 401
-                        and "Authorization" in headers
-                        and self.auth_client
+                            response.status == 401
+                            and "Authorization" in headers
+                            and self.auth_client
                     ):
-                        logger.warning(
-                            "认证失败 (401)，尝试重新获取认证"
-                        )
-                        # 如果认证失败且使用了 token，清除 token 并重试
+                        logger.warning("认证失败 (401)，尝试重新获取认证")
                         self.auth_client.clear_token(url)
-                        # 重新获取认证头
                         headers.update(
                             self.auth_client.get_auth_header(url, force_new=True)
                         )
-                        # 重新执行请求
                         request_kwargs["headers"] = headers
                         async with http_method(**request_kwargs) as retry_response:
                             logger.debug(
                                 f"ANP 重试响应: 状态码 {retry_response.status}"
                             )
                             return await self._process_response(retry_response, url)
-
                     return await self._process_response(response, url)
             except aiohttp.ClientError as e:
                 logger.debug(f"HTTP 请求失败: {str(e)}")
@@ -209,44 +235,29 @@ class ANPTool:
 
         # 根据内容类型处理响应
         if "application/json" in content_type:
-            # 处理 JSON 响应
             try:
                 result = json.loads(text)
                 logger.debug("成功解析 JSON 响应")
             except json.JSONDecodeError:
-                logger.warning(
-                    "Content-Type 声明为 JSON 但解析失败，返回原始文本"
-                )
+                logger.warning("Content-Type 声明为 JSON 但解析失败，返回原始文本")
                 result = {"text": text, "format": "text", "content_type": content_type}
         elif "application/yaml" in content_type or "application/x-yaml" in content_type:
-            # 处理 YAML 响应
             try:
                 result = yaml.safe_load(text)
                 logger.debug("成功解析 YAML 响应")
-                result = {
-                    "data": result,
-                    "format": "yaml",
-                    "content_type": content_type,
-                }
+                result = {"data": result, "format": "yaml", "content_type": content_type}
             except yaml.YAMLError:
-                logger.warning(
-                    "Content-Type 声明为 YAML 但解析失败，返回原始文本"
-                )
+                logger.warning("Content-Type 声明为 YAML 但解析失败，返回原始文本")
                 result = {"text": text, "format": "text", "content_type": content_type}
         else:
-            # 默认返回文本
             result = {"text": text, "format": "text", "content_type": content_type}
 
         # 添加状态码到结果
         if isinstance(result, dict):
             result["status_code"] = response.status
         else:
-            result = {
-                "data": result,
-                "status_code": response.status,
-                "format": "unknown",
-                "content_type": content_type,
-            }
+            result = {"data": result, "status_code": response.status, "format": "unknown",
+                      "content_type": content_type}
 
         # 添加 URL 到结果以便跟踪
         result["url"] = str(url)

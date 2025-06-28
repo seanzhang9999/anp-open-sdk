@@ -144,3 +144,4 @@ yarn-error.log*
 !data_user/**/*.pem
 !data_user/**/*.key
 !data_user/**/*keys.json
+thought_doc_link
