@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 from typing import Any, Dict, Optional, List
 
 from .local_methods_decorators import LOCAL_METHODS_REGISTRY
@@ -60,15 +61,34 @@ class LocalMethodsCaller:
             raise AttributeError(f"Agent {method_info['agent_name']} 没有方法 {method_name}")
 
         method = getattr(target_agent, method_name)
+        
         if not callable(method):
             raise TypeError(f"{method_name} 不是可调用方法")
+        
+        # 检查是否需要自动注入 agent
+        sig = inspect.signature(method)
+        params = list(sig.parameters.keys())
+        inject_agent = False
+        if params and params[0] == "agent":
+            # 如果用户没有传 agent 参数，则自动注入
+            if len(args) < 1 and "agent" not in kwargs:
+                inject_agent = True
+                
+                
+
 
         # 调用方法
         print(f"🚀 调用方法: {method_info['agent_name']}.{method_name}")
         if method_info["is_async"]:
-            return await method(*args, **kwargs)
+            if inject_agent:
+                return await method(target_agent, *args, **kwargs)
+            else:
+                return await method(*args, **kwargs)
         else:
-            return method(*args, **kwargs)
+            if inject_agent:
+                return method(target_agent, *args, **kwargs)
+            else:
+                return method(*args, **kwargs)
 
     def list_all_methods(self) -> List[Dict]:
         """列出所有可用的本地方法"""

@@ -9,6 +9,7 @@ from anp_open_sdk.anp_sdk_agent import LocalAgent
 from anp_open_sdk.anp_sdk import ANPSDK
 from anp_open_sdk.anp_sdk_user_data import LocalUserDataManager, save_interface_files
 from anp_open_sdk.service.router.router_agent import wrap_business_handler
+from anp_open_sdk_framework.local_methods.local_methods_decorators import register_local_methods_to_agent
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +48,11 @@ class LocalAgentManager:
             agent.api_config = cfg.get("api", [])
             logger.info(f"  -> self register agent : {agent.name}")
             register_module.register(agent)
+            # 注册本地方法
+            register_local_methods_to_agent(agent, register_module)
+            register_local_methods_to_agent(agent, handlers_module)
+
+
             return agent, None
 
         # 2. agent_llm: 存在 initialize_agent
@@ -56,6 +62,8 @@ class LocalAgentManager:
             agent.name = cfg["name"]
             agent.api_config = cfg.get("api", [])
             logger.info(f"  - pre-init agent: {agent.name}")
+            # 注册本地方法
+            register_local_methods_to_agent(agent, handlers_module)
             return agent, handlers_module
 
         # 3. 普通配置型 agent_001 / agent_caculator
@@ -71,6 +79,8 @@ class LocalAgentManager:
                 handler_func = wrap_business_handler(handler_func)
             agent.expose_api(api["path"], handler_func, methods=[api["method"]])
             logger.info(f"  - config register agent: {agent.name}，api:{api}")
+        # 注册本地方法
+        register_local_methods_to_agent(agent, handlers_module)
         return agent, None
 
     @staticmethod

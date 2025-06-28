@@ -9,6 +9,7 @@ import threading
 from anp_open_sdk.anp_sdk_user_data import save_interface_files, LocalUserDataManager
 from anp_open_sdk.sdk_mode import SdkMode
 from anp_open_sdk.service.router.router_agent import wrap_business_handler
+from anp_open_sdk_framework.local_methods.local_methods_decorators import register_local_methods_to_agent
 
 from anp_open_sdk.config import UnifiedConfig, set_global_config
 from anp_open_sdk.utils.log_base import setup_logging

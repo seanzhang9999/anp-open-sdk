@@ -111,15 +111,17 @@ python anp_open_sdk_framework_demo/framework_demo.py
         print(result)
 ```
 
-
 9527服务器不关闭时,启动9528服务器
+
 ```bash
 # 检查所有 Agent 插件的 DID 是否绑定，未绑定可新建 DID
 python anp_open_sdk_framework_demo/agent_user_binding.py --config anp_open_sdk_framework_demo_agent_9528_unified_config.yaml
 # 启动智能体网络测试
 python anp_open_sdk_framework_demo/framework_demo.py --config anp_open_sdk_framework_demo_agent_9528_unified_config.yaml
 ```
+
 注意观察run_ai_root_crawler_demo 的爬取仍然指向9527服务器,跨服通过did认证后爬取服务
+
 ```python
    async def run_ai_root_crawler_demo():
       crawler = ANPToolCrawler()
@@ -128,6 +130,67 @@ python anp_open_sdk_framework_demo/framework_demo.py --config anp_open_sdk_frame
       # 协作智能体通过爬虫向组装后的智能体请求服务
       task_description = "我需要计算两个浮点数相加 3.88888+999933.4445556"
 ```
+
+### 5. 深入了解结构
+
+ANP Open SDK Framework Demo - 运行流程图
+```mermaid
+sequenceDiagram
+participant User
+participant Demo as framework_demo.py
+participant Config as UnifiedConfig
+participant AgentManager as LocalAgentManager
+participant SDK as ANPSDK
+participant Module as AgentLifecycle
+participant ServerThread
+User->>+Demo: python framework_demo.py --config <config_file>
+Demo->>+Config: Create(config_file)
+Config-->>-Demo: app_config
+Demo->>Demo: set_global_config() & setup_logging()
+Note over Demo: Find all 'agent_mappings.yaml' files
+loop For each agent config
+    Demo->>+AgentManager: load_agent_from_module(agent_config)
+    AgentManager-->>-Demo: (agent_instance, lifecycle_module)
+end
+Demo->>+SDK: Create(mode=MULTI_AGENT_ROUTER, agents=all_agents)
+SDK-->>-Demo: sdk_instance
+loop For each agent
+    Demo->>+Module: await initialize_agent(agent, sdk)
+    Note right of Module: Post-init tasks
+    Module-->>-Demo: 
+end
+loop For each agent
+    Demo->>+AgentManager: generate_and_save_agent_interfaces(agent, sdk)
+    AgentManager-->>-Demo: 
+end
+Demo->>+ServerThread: start(sdk.start_server())
+ServerThread->>SDK: start_server()
+Note right of ServerThread: SDK Server starts in background
+Demo->>Demo: wait_for_port()
+Note over Demo: Waits until server is ready
+Demo->>Demo: LocalMethodsDocGenerator.generate_methods_doc()
+Note over Demo: Generates local API documentation
+Note over Demo: Find an agent with discovery capabilities
+Demo->>+Module: await discovery_agent.run_..._demo(sdk)
+Module->>SDK: interact with other agents
+SDK-->>Module: result
+Module-->>-Demo: result
+Demo->>User: print(result)
+Demo->>User: "Press any key to stop."
+User->>Demo: (Presses key)
+Note over Demo: Initiating shutdown...
+loop For each agent
+    Demo->>+Module: await cleanup_agent()
+    Note right of Module: Cleanup tasks
+    Module-->>-Demo: 
+end
+Demo->>SDK: stop_server()
+SDK-->>ServerThread: stop
+ServerThread-->>-Demo: (thread ends)
+Demo->>Demo: os.kill(self)
+Note over Demo: Forcefully exits the process
+```
+
 
 
 ---

@@ -244,11 +244,11 @@ async def run_agent_002_demo_new():
         logger.info(f"搜索调用结果: {result}")
 
         # 方式2：通过方法键直接调用
-        result2 = await caller.call_method_by_key(
+        result = await caller.call_method_by_key(
             "did:wba:localhost%3A9527:wba:user:5fea49e183c6c211::calculate_sum",
             10.5, 20.3
         )
-        logger.info(f"直接调用结果: {result2}")
+        logger.info(f"直接调用结果: {result}")
 
         return result
 

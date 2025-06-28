@@ -1,4 +1,5 @@
 from starlette.responses import JSONResponse
+from anp_open_sdk_framework.local_methods.local_methods_decorators import local_method, register_local_methods_to_agent
 
 
 async def hello_handler( request, message ):
@@ -20,3 +21,9 @@ async def info_handler(request_data, request):
         },
         status_code=200
     )
+    
+    
+@local_method(description="计算两个数的和", tags=["math", "calculator"])
+def calculate_sum(a: float, b: float):
+    return {"result": a + b, "operation": "add"}
+
