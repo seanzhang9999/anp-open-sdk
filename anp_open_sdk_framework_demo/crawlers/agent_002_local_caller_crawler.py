@@ -5,6 +5,7 @@ from anp_open_sdk_framework.local_methods.local_methods_doc import LocalMethodsD
 import logging
 import json
 import re
+import inspect
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +42,7 @@ async def run_local_method_crawler(sdk: ANPSDK):
     return result
 
 
-async def run_intelligent_local_method_crawler(sdk: ANPSDK, target_method_name: str = "demo_method", req_did: str = None):
+async def run_intelligent_local_method_crawler(sdk: ANPSDK, target_method_name: str = "demo_method", req_did: str = None, method_args: dict = None):
     """
     智能本地方法调用爬虫，通过智能分析本地方法列表来找到并调用指定方法
     
@@ -49,6 +50,7 @@ async def run_intelligent_local_method_crawler(sdk: ANPSDK, target_method_name: 
         sdk: ANPSDK 实例
         target_method_name: 要查找和调用的方法名
         req_did: 请求方的 DID，如果不提供则使用默认值
+        method_args: 方法参数字典，格式为 {"args": [位置参数], "kwargs": {关键字参数}}
     """
     logger.info(f"🚀 启动智能本地方法调用爬虫，目标方法: {target_method_name}")
     
@@ -75,7 +77,9 @@ async def run_intelligent_local_method_crawler(sdk: ANPSDK, target_method_name: 
                 "method_name": method_data.get("name", "unknown"),
                 "description": method_data.get("description", ""),
                 "tags": method_data.get("tags", []),
-                "is_async": method_data.get("is_async", False)
+                "is_async": method_data.get("is_async", False),
+                "signature": method_data.get("signature", ""),
+                "parameters": method_data.get("parameters", [])
             })
         
         logger.info("🤖 开始智能分析方法列表...")
@@ -90,34 +94,198 @@ async def run_intelligent_local_method_crawler(sdk: ANPSDK, target_method_name: 
             logger.info(f"✅ 智能匹配找到方法: {method_key}")
             logger.info(f"📝 选择原因: {reason}")
             
-            # 5. 调用找到的方法
-            logger.info(f"🎯 调用方法: {method_key}")
+            # 5. 智能准备方法参数
+            call_args, call_kwargs = await prepare_method_arguments(
+                sdk, method_key, best_match, method_args, target_method_name
+            )
             
-            # 根据方法名决定参数
-            method_name = best_match.get("method_name", "")
-            if any(keyword in method_name.lower() for keyword in ["calculate", "sum", "add"]):
-                # 如果是计算方法，传入数字参数
-                call_result = await local_caller.call_method_by_key(method_key, 15.5, 25.3)
-            else:
-                # 其他方法不传参数
-                call_result = await local_caller.call_method_by_key(method_key)
+            # 6. 调用找到的方法
+            logger.info(f"🎯 调用方法: {method_key}")
+            logger.info(f"📋 参数: args={call_args}, kwargs={call_kwargs}")
+            
+            call_result = await local_caller.call_method_by_key(method_key, *call_args, **call_kwargs)
             
             return {
                 "success": True,
                 "method_key": method_key,
                 "reason": reason,
                 "result": call_result,
-                "method_info": best_match
+                "method_info": best_match,
+                "used_args": call_args,
+                "used_kwargs": call_kwargs
             }
         else:
             logger.warning(f"❌ 智能匹配未找到合适的方法")
             # 降级到简单搜索
-            return await fallback_method_search(local_caller, target_method_name)
+            return await fallback_method_search(local_caller, target_method_name, method_args)
             
     except Exception as e:
         logger.error(f"❌ 智能方法调用过程中出错: {e}")
         # 降级到简单搜索
-        return await fallback_method_search(local_caller, target_method_name)
+        return await fallback_method_search(local_caller, target_method_name, method_args)
+
+
+async def prepare_method_arguments(sdk, method_key, method_info, provided_args, target_method_name):
+    """
+    智能准备方法参数
+    
+    Args:
+        sdk: ANPSDK 实例
+        method_key: 方法键
+        method_info: 方法信息
+        provided_args: 用户提供的参数
+        target_method_name: 目标方法名
+    
+    Returns:
+        tuple: (args, kwargs) 元组
+    """
+    # 如果用户提供了参数，直接使用
+    if provided_args:
+        args = provided_args.get("args", [])
+        kwargs = provided_args.get("kwargs", {})
+        logger.info(f"📝 使用用户提供的参数: args={args}, kwargs={kwargs}")
+        return args, kwargs
+    
+    # 获取方法的实际签名信息
+    try:
+        method_doc_info = LocalMethodsDocGenerator().get_method_info(method_key)
+        if not method_doc_info:
+            logger.warning(f"⚠️ 无法获取方法 {method_key} 的详细信息")
+            return infer_simple_arguments(target_method_name, method_info)
+        
+        # 获取实际的方法对象来分析参数
+        target_agent = sdk.get_agent(method_doc_info["agent_did"])
+        if not target_agent:
+            logger.warning(f"⚠️ 无法找到 agent: {method_doc_info['agent_did']}")
+            return infer_simple_arguments(target_method_name, method_info)
+        
+        method_name = method_doc_info["name"]
+        if not hasattr(target_agent, method_name):
+            logger.warning(f"⚠️ Agent 没有方法: {method_name}")
+            return infer_simple_arguments(target_method_name, method_info)
+        
+        method = getattr(target_agent, method_name)
+        sig = inspect.signature(method)
+        
+        logger.info(f"🔍 分析方法签名: {sig}")
+        
+        # 分析参数并智能填充
+        args = []
+        kwargs = {}
+        
+        for param_name, param in sig.parameters.items():
+            # 跳过 self 和 agent 参数
+            if param_name in ['self', 'agent']:
+                continue
+            
+            # 根据参数名和类型智能推断值
+            param_value = infer_parameter_value(param_name, param, target_method_name, method_info)
+            
+            if param_value is not None:
+                if param.kind == param.POSITIONAL_OR_KEYWORD:
+                    args.append(param_value)
+                else:
+                    kwargs[param_name] = param_value
+                logger.info(f"  📌 推断参数 {param_name}: {param_value}")
+            elif param.default == param.empty:
+                # 必需参数但无法推断，使用默认值
+                default_value = get_default_value_for_type(param.annotation if param.annotation != param.empty else None)
+                if param.kind == param.POSITIONAL_OR_KEYWORD:
+                    args.append(default_value)
+                else:
+                    kwargs[param_name] = default_value
+                logger.info(f"  🔧 使用默认值 {param_name}: {default_value}")
+        
+        return args, kwargs
+        
+    except Exception as e:
+        logger.error(f"❌ 分析方法参数时出错: {e}")
+        # 降级到简单的参数推断
+        return infer_simple_arguments(target_method_name, method_info)
+
+
+def infer_parameter_value(param_name, param, target_method_name, method_info):
+    """
+    根据参数名、类型和上下文推断参数值
+    """
+    param_name_lower = param_name.lower()
+    target_lower = target_method_name.lower()
+    method_name_lower = method_info.get("method_name", "").lower()
+    
+    # 数值类型参数
+    if any(keyword in param_name_lower for keyword in ['num', 'value', 'amount', 'count', 'size']):
+        if any(keyword in target_lower or keyword in method_name_lower for keyword in ['calculate', 'sum', 'add', 'math']):
+            return 10.5 if param_name_lower in ['a', 'x', 'first', 'num1'] else 20.3
+        return 1
+    
+    # 特定的数学参数名
+    if param_name_lower in ['a', 'x', 'first', 'num1']:
+        return 15.5
+    elif param_name_lower in ['b', 'y', 'second', 'num2']:
+        return 25.3
+    
+    # 字符串类型参数
+    if any(keyword in param_name_lower for keyword in ['message', 'text', 'content', 'data']):
+        return f"Hello from intelligent crawler for {target_method_name}"
+    
+    if any(keyword in param_name_lower for keyword in ['name', 'title']):
+        return "Test User"
+    
+    # 布尔类型参数
+    if any(keyword in param_name_lower for keyword in ['enable', 'active', 'flag', 'is_']):
+        return True
+    
+    # 根据类型注解推断
+    if param.annotation != param.empty:
+        return get_default_value_for_type(param.annotation)
+    
+    return None
+
+
+def get_default_value_for_type(type_hint):
+    """
+    根据类型注解返回默认值
+    """
+    if type_hint is None:
+        return None
+    
+    type_name = str(type_hint).lower()
+    
+    if 'int' in type_name:
+        return 42
+    elif 'float' in type_name:
+        return 3.14
+    elif 'str' in type_name:
+        return "default_string"
+    elif 'bool' in type_name:
+        return True
+    elif 'list' in type_name:
+        return []
+    elif 'dict' in type_name:
+        return {}
+    else:
+        return None
+
+
+def infer_simple_arguments(target_method_name, method_info):
+    """
+    简单的参数推断（降级方案）
+    """
+    target_lower = target_method_name.lower()
+    method_name_lower = method_info.get("method_name", "").lower()
+    
+    # 如果是计算相关的方法，提供两个数字参数
+    if any(keyword in target_lower or keyword in method_name_lower 
+           for keyword in ["calculate", "sum", "add", "math", "compute"]):
+        return [15.5, 25.3], {}
+    
+    # 如果是问候相关的方法，提供消息参数
+    if any(keyword in target_lower or keyword in method_name_lower 
+           for keyword in ["hello", "greet", "message"]):
+        return [], {"message": f"Hello from intelligent crawler"}
+    
+    # 默认不提供参数
+    return [], {}
 
 
 async def intelligent_method_matching(methods_info, target_method_name):
@@ -234,7 +402,7 @@ async def intelligent_method_matching(methods_info, target_method_name):
     return result
 
 
-async def fallback_method_search(local_caller: LocalMethodsCaller, target_method_name: str):
+async def fallback_method_search(local_caller: LocalMethodsCaller, target_method_name: str, method_args: dict = None):
     """
     降级方法：当智能匹配失败时，使用简单的关键词搜索
     """
@@ -261,21 +429,25 @@ async def fallback_method_search(local_caller: LocalMethodsCaller, target_method
         
         logger.info(f"🎯 调用方法: {method_key}")
         
-        # 根据方法名决定参数
-        method_name = selected_method.get("method_name", "")
-        if any(keyword in method_name.lower() for keyword in ["calculate", "sum", "add"]):
-            # 如果是计算方法，传入数字参数
-            call_result = await local_caller.call_method_by_key(method_key, 12.5, 18.7)
+        # 准备参数
+        if method_args:
+            args = method_args.get("args", [])
+            kwargs = method_args.get("kwargs", {})
         else:
-            # 其他方法不传参数
-            call_result = await local_caller.call_method_by_key(method_key)
+            # 简单推断参数
+            args, kwargs = infer_simple_arguments(target_method_name, selected_method)
+        
+        logger.info(f"📋 使用参数: args={args}, kwargs={kwargs}")
+        call_result = await local_caller.call_method_by_key(method_key, *args, **kwargs)
         
         return {
             "success": True,
             "method_key": method_key,
             "reason": f"通过关键词搜索找到方法",
             "result": call_result,
-            "search_results": search_results
+            "search_results": search_results,
+            "used_args": args,
+            "used_kwargs": kwargs
         }
         
     except Exception as e:
