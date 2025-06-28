@@ -90,6 +90,6 @@ class LocalMethodsCaller:
             else:
                 return method(*args, **kwargs)
 
-    def list_all_methods(self) -> List[Dict]:
-        """列出所有可用的本地方法"""
-        return list(LOCAL_METHODS_REGISTRY.values())
+    def list_all_methods(self) -> Dict[str, Dict]:
+        """列出所有可用的本地方法，返回字典格式"""
+        return LOCAL_METHODS_REGISTRY
