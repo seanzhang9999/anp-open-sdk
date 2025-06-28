@@ -29,23 +29,24 @@ def register(agent):
     
     # 注册一个本地自定义方法
     # 使用装饰器注册本地方法
-    @local_method(description="演示方法，返回agent信息", tags=["demo", "info"])
-    def demo_method():
-        return f"这是来自 {agent.name} 的演示方法"
 
-    @local_method(description="计算两个数的和", tags=["math", "calculator"])
-    def calculate_sum(a: float, b: float):
-        return {"result": a + b, "operation": "add"}
 
-    @local_method(description="异步演示方法", tags=["demo", "async"])
-    async def async_demo():
-        await asyncio.sleep(0.1)
-        return "异步方法结果"
 
-    # 自动注册所有标记的本地方法
-    register_local_methods_to_agent(agent, locals())
+
 
     return agent
 
+@local_method(description="演示方法，返回agent信息", tags=["demo", "info"])
+def demo_method(agent):
+    return f"这是来自 {agent.name} 的演示方法"
+
+@local_method(description="计算两个数的和", tags=["math", "calculator"])
+def calculate_sum(a: float, b: float):
+    return {"result": a + b, "operation": "add"}
+
+@local_method(description="异步演示方法", tags=["demo", "async"])
+async def async_demo():
+    await asyncio.sleep(0.1)
+    return "异步方法结果"
 
 

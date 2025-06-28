@@ -226,7 +226,7 @@ async def run_agent_002_demo(sdk, **kwargs):
 
         # 调用 agent_002 上的方法
         if hasattr(target_agent, 'demo_method') and callable(target_agent.demo_method):
-            result = target_agent.demo_method()
+            result = target_agent.demo_method(target_agent)
             return result
         else:
             return "错误：在 agent_002 上未找到 demo_method"
