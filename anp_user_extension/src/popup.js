@@ -19,10 +19,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const messagesContainer = document.getElementById('messages');
   const userInfo = document.getElementById('user-info');
   const chatModeSwitcher = document.getElementById('chat-mode-switcher');
+  const agentDemoPanel = document.getElementById('agent-demo-panel');
+  const agentStatus = document.getElementById('agent-status');
 
   // App State
   let currentUser = null;
-  let chatMode = 'generic'; // 'generic' or 'agent'
+  let chatMode = 'generic'; // 'generic', 'agent', or 'agent-demo'
   let llmConfig = {};
 
   // --- Initialization ---
@@ -52,6 +54,9 @@ document.addEventListener('DOMContentLoaded', () => {
     configForm.addEventListener('submit', handleConfigSave);
     messageForm.addEventListener('submit', handleSendMessage);
     chatModeSwitcher.addEventListener('click', handleModeSwitch);
+    
+    // Add demo button listeners
+    setupDemoButtonListeners();
   };
 
   // --- User & Auth ---
@@ -144,9 +149,24 @@ document.addEventListener('DOMContentLoaded', () => {
       chatMode = e.target.dataset.mode;
       document.querySelector('.chat-mode.active-mode').classList.remove('active-mode');
       e.target.classList.add('active-mode');
+      
+      // Show/hide agent demo panel
+      if (chatMode === 'agent-demo') {
+        agentDemoPanel.style.display = 'block';
+        updateAgentStatus();
+      } else {
+        agentDemoPanel.style.display = 'none';
+      }
+      
       // Optional: Clear chat history on mode switch
       messagesContainer.innerHTML = '';
-      addMessage('system', `Switched to ${chatMode === 'generic' ? 'Generic LLM' : 'Personal Agent'} mode.`);
+      if (chatMode === 'generic') {
+        addMessage('system', 'Switched to Generic LLM mode.');
+      } else if (chatMode === 'agent') {
+        addMessage('system', 'Switched to Personal Agent mode.');
+      } else if (chatMode === 'agent-demo') {
+        addMessage('system', 'Switched to Agent Demos mode. Click the buttons above to run demonstrations.');
+      }
     }
   };
 
@@ -281,6 +301,88 @@ document.addEventListener('DOMContentLoaded', () => {
     if (apiBaseInput) apiBaseInput.value = config.apiBase || '';
     if (apiKeyInput) apiKeyInput.value = config.apiKey || '';
     if (modelInput) modelInput.value = config.model || 'gpt-3.5-turbo';
+  };
+
+  // --- Agent Demo Functions ---
+  const setupDemoButtonListeners = () => {
+    const demoButtons = [
+      { id: 'demo-discover', endpoint: '/agents/discover', name: '发现智能体' },
+      { id: 'demo-calculator', endpoint: '/agents/demo/calculator', name: '计算器演示' },
+      { id: 'demo-hello', endpoint: '/agents/demo/hello', name: 'Hello演示' },
+      { id: 'demo-ai-crawler', endpoint: '/agents/demo/ai-crawler', name: 'AI爬虫演示' },
+      { id: 'demo-ai-root-crawler', endpoint: '/agents/demo/ai-root-crawler', name: 'AI根爬虫演示' },
+      { id: 'demo-agent-002', endpoint: '/agents/demo/agent-002', name: 'Agent 002演示' },
+      { id: 'demo-agent-002-new', endpoint: '/agents/demo/agent-002-new', name: 'Agent 002新演示' }
+    ];
+
+    demoButtons.forEach(({ id, endpoint, name }) => {
+      const button = document.getElementById(id);
+      if (button) {
+        button.addEventListener('click', () => runAgentDemo(endpoint, name));
+      }
+    });
+  };
+
+  const updateAgentStatus = async () => {
+    if (!currentUser) {
+      agentStatus.textContent = '请先登录';
+      return;
+    }
+
+    try {
+      const response = await fetch('http://localhost:8000/agents/status', {
+        method: 'GET',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${currentUser.username}:${currentUser.password || ''}`
+        }
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        agentStatus.textContent = `状态: ${data.initialized ? '已初始化' : '未初始化'} | 智能体数量: ${data.agents_count}`;
+      } else {
+        agentStatus.textContent = '获取状态失败';
+      }
+    } catch (error) {
+      console.error('Failed to get agent status:', error);
+      agentStatus.textContent = '连接失败';
+    }
+  };
+
+  const runAgentDemo = async (endpoint, demoName) => {
+    if (!currentUser) {
+      addMessage('system', '请先登录');
+      return;
+    }
+
+    addMessage('system', `正在运行 ${demoName}...`);
+    addMessage('assistant', '...', true); // Show loading indicator
+
+    try {
+      const response = await fetch(`http://localhost:8000${endpoint}`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${currentUser.username}:${currentUser.password || ''}`
+        }
+      });
+
+      const data = await response.json();
+      
+      if (response.ok && data.success) {
+        const resultText = typeof data.result === 'object' 
+          ? JSON.stringify(data.result, null, 2) 
+          : data.result || '演示完成';
+        updateLastMessage('assistant', `${demoName} 结果:\n${resultText}`);
+      } else {
+        const errorText = data.error || data.detail || '演示失败';
+        updateLastMessage('system', `${demoName} 失败: ${errorText}`);
+      }
+    } catch (error) {
+      console.error(`${demoName} error:`, error);
+      updateLastMessage('system', `${demoName} 错误: ${error.message}`);
+    }
   };
 
   // Start the application

@@ -1,8 +1,11 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from anp_user_service.app.routers import auth, chat
+from anp_user_service.app.routers import auth, chat, agents
+import logging
 
-app = FastAPI(title="MCP Chat Extension Backend")
+logger = logging.getLogger(__name__)
+
+app = FastAPI(title="ANP User Service with Agent Integration")
 
 # CORS (Cross-Origin Resource Sharing)
 # Allow your Chrome extension to call this API
@@ -26,10 +29,31 @@ app.add_middleware(
 
 app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 app.include_router(chat.router, prefix="/agent", tags=["Agent Chat"])
+app.include_router(agents.router, prefix="/agents", tags=["Agent Management"])
+
+@app.on_event("startup")
+async def startup_event():
+    """应用启动事件"""
+    logger.info("🚀 Starting ANP User Service...")
+    # 初始化智能体服务
+    from anp_user_service.app.services.agent_service import agent_service_manager
+    success = await agent_service_manager.initialize_agents()
+    if success:
+        logger.info("✅ Agent service initialized successfully")
+    else:
+        logger.error("❌ Failed to initialize agent service")
+    
+@app.on_event("shutdown")
+async def shutdown_event():
+    """应用关闭事件"""
+    logger.info("🛑 Shutting down ANP User Service...")
+    # 清理智能体服务
+    from anp_user_service.app.services.agent_service import agent_service_manager
+    await agent_service_manager.cleanup()
 
 @app.get("/")
 async def root():
-    return {"message": "Welcome to the MCP Chat Extension Backend!"}
+    return {"message": "Welcome to the ANP User Service with Agent Integration!"}
 
 # To run the backend (from mcp-chat-extension/backend_py directory):
 # Make sure anp_open_sdk is in PYTHONPATH if not installed

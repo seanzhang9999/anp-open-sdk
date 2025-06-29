@@ -227,3 +227,98 @@ body {
   border-bottom: 3px solid #007bff;
 }
 
+/* Agent Demo Panel Styles */
+#agent-demo-panel {
+  background: white;
+  border-bottom: 1px solid #ddd;
+  padding: 12px 16px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.demo-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.demo-btn {
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: #f8f9fa;
+  color: #333;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-weight: 500;
+}
+
+.demo-btn:hover {
+  background: #e9ecef;
+  border-color: #adb5bd;
+}
+
+.demo-btn:active {
+  background: #dee2e6;
+}
+
+.demo-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+#agent-status {
+  padding: 8px;
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  font-size: 11px;
+  color: #666;
+  min-height: 30px;
+}
+
+.panel {
+  background: white;
+  border-bottom: 1px solid #ddd;
+  padding: 12px 16px;
+}
+
+.panel h3 {
+  margin-bottom: 12px;
+  font-size: 14px;
+  color: #333;
+}
+
+/* Message types for agent demos */
+.message.system {
+  background: #FFF3E0;
+  color: #E65100;
+  border-left: 3px solid #FF9800;
+  font-style: italic;
+}
+
+.message.loading {
+  background: #F3E5F5;
+  color: #7B1FA2;
+  border-left: 3px solid #9C27B0;
+}
+
+.message.loading::after {
+  content: '';
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-left: 8px;
+  border: 2px solid #9C27B0;
+  border-top: 2px solid transparent;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+

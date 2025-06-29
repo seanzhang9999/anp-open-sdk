@@ -57,7 +57,24 @@
       <div id="chat-mode-switcher">
         <div id="mode-generic" class="chat-mode active-mode" data-mode="generic">Generic LLM</div>
         <div id="mode-agent" class="chat-mode" data-mode="agent">Personal Agent</div>
+        <div id="mode-agent-demo" class="chat-mode" data-mode="agent-demo">Agent Demos</div>
       </div>
+      
+      <!-- Agent Demo Panel -->
+      <div id="agent-demo-panel" class="panel" style="display:none;">
+        <h3>智能体演示功能</h3>
+        <div class="demo-buttons">
+          <button id="demo-discover" class="demo-btn">发现智能体</button>
+          <button id="demo-calculator" class="demo-btn">计算器演示</button>
+          <button id="demo-hello" class="demo-btn">Hello演示</button>
+          <button id="demo-ai-crawler" class="demo-btn">AI爬虫演示</button>
+          <button id="demo-ai-root-crawler" class="demo-btn">AI根爬虫演示</button>
+          <button id="demo-agent-002" class="demo-btn">Agent 002演示</button>
+          <button id="demo-agent-002-new" class="demo-btn">Agent 002新演示</button>
+        </div>
+        <div id="agent-status"></div>
+      </div>
+      
       <div id="messages"></div>
       <div id="input-container">
         <form id="message-form">
