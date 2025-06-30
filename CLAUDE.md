@@ -63,8 +63,8 @@ python anp_open_sdk_framework_demo/agent_user_binding.py
 python anp_open_sdk_framework_demo/framework_demo.py
 
 # Start second server on port 9528 (keep 9527 running)
-python anp_open_sdk_framework_demo/agent_user_binding.py --config anp_open_sdk_framework_demo_agent_9528_unified_config.yaml
-python anp_open_sdk_framework_demo/framework_demo.py --config anp_open_sdk_framework_demo_agent_9528_unified_config.yaml
+python anp_open_sdk_framework_demo/agent_user_binding.py --config unified_config_anp_open_sdk_framework_demo_agent_9528.yaml
+python anp_open_sdk_framework_demo/framework_demo.py --config unified_config_anp_open_sdk_framework_demo_agent_9528.yaml
 ```
 
 ### User Extension (Chrome Plugin)

@@ -115,9 +115,9 @@ python anp_open_sdk_framework_demo/framework_demo.py
 
 ```bash
 # 检查所有 Agent 插件的 DID 是否绑定，未绑定可新建 DID
-python anp_open_sdk_framework_demo/agent_user_binding.py --config anp_open_sdk_framework_demo_agent_9528_unified_config.yaml
+python anp_open_sdk_framework_demo/agent_user_binding.py --config unified_config_anp_open_sdk_framework_demo_agent_9528.yaml
 # 启动智能体网络测试
-python anp_open_sdk_framework_demo/framework_demo.py --config anp_open_sdk_framework_demo_agent_9528_unified_config.yaml
+python anp_open_sdk_framework_demo/framework_demo.py --config unified_config_anp_open_sdk_framework_demo_agent_9528.yaml
 ```
 
 注意观察run_ai_root_crawler_demo 的爬取仍然指向9527服务器,跨服通过did认证后爬取服务

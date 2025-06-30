@@ -12,7 +12,7 @@ import logging
 from anp_open_sdk.utils.log_base import setup_logging
 from anp_open_sdk.config import UnifiedConfig,set_global_config
 
-app_config = UnifiedConfig(config_file='anp_open_sdk_framework_demo_agent_unified_config.yaml')
+app_config = UnifiedConfig(config_file='unified_config_anp_open_sdk_framework_demo_agent.yaml')
 set_global_config(app_config)
 
 setup_logging() # 假设 setup_logging 内部也改用 get_global_config()
