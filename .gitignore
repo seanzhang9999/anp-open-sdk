@@ -146,3 +146,4 @@ CLAUDE.md
 !data_user/**/*keys.json
 thought_doc_link
 .vscode/settings.json
+uv.lock
