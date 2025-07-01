@@ -145,3 +145,4 @@ CLAUDE.md
 !data_user/**/*.key
 !data_user/**/*keys.json
 thought_doc_link
+.vscode/settings.json
