@@ -25,7 +25,7 @@ class AgentServiceManager:
         self.lifecycle_modules: Dict[str, Any] = {}
         self.server_thread: Optional[threading.Thread] = None
         self.is_initialized = False
-        self.config_file = 'anp_open_sdk_framework_demo_agent_9528_unified_config.yaml'
+        self.config_file = 'unified_config_anp_open_sdk_framework_demo_agent_9528.yaml'
         
     async def initialize_agents(self, config_file: Optional[str] = None) -> bool:
         """初始化智能体服务"""

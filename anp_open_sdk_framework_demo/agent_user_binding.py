@@ -18,7 +18,7 @@ def parse_arguments():
     parser.add_argument(
         '--config',
         type=str,
-        default='anp_open_sdk_framework_demo_agent_unified_config.yaml',
+        default='unified_config_anp_open_sdk_framework_demo_agent.yaml',
         help='Path to the unified configuration file.'
     )
     return parser.parse_args()
