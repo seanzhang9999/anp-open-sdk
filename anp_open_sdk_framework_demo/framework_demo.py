@@ -19,6 +19,9 @@ from anp_open_sdk.anp_sdk import ANPSDK
 import logging
 
 from anp_open_sdk_framework.agent_manager import LocalAgentManager
+from anp_open_sdk_framework.master_agent import MasterAgent
+from anp_open_sdk_framework.unified_crawler import UnifiedCrawler
+from anp_open_sdk_framework.unified_caller import UnifiedCaller
 
 from anp_open_sdk_framework.local_methods.local_methods_caller import LocalMethodsCaller
 from anp_open_sdk_framework.local_methods.local_methods_doc import LocalMethodsDocGenerator
@@ -57,6 +60,21 @@ async def main():
         '--method-args',
         type=str,
         help='Method arguments in JSON format, e.g., \'{"args": [1, 2], "kwargs": {"name": "test"}}\''
+    )
+    parser.add_argument(
+        '--master-mode',
+        action='store_true',
+        help='Run in master agent mode for unified task execution.'
+    )
+    parser.add_argument(
+        '--task',
+        type=str,
+        help='Task description for master agent to execute.'
+    )
+    parser.add_argument(
+        '--unified-mode',
+        action='store_true',
+        help='Use unified crawler and caller instead of legacy crawlers.'
     )
     args = parser.parse_args()
 
@@ -125,6 +143,84 @@ async def main():
     doc_path = os.path.join(script_dir, f"{config.anp_sdk.host}_{config.anp_sdk.port}_local_methods_doc.json")
     LocalMethodsDocGenerator.generate_methods_doc(doc_path)
 
+    # 新增：主智能体模式
+    if args.master_mode:
+        logger.info("🤖 启动主智能体模式...")
+        master_agent = MasterAgent(sdk, name="FrameworkMasterAgent")
+        await master_agent.initialize()
+        
+        if args.task:
+            logger.info(f"📋 执行任务: {args.task}")
+            
+            # 解析任务上下文
+            task_context = {}
+            if args.method_args:
+                try:
+                    task_context = json.loads(args.method_args)
+                except json.JSONDecodeError as e:
+                    logger.error(f"❌ 任务上下文JSON格式错误: {e}")
+                    return
+            
+            result = await master_agent.execute_task(args.task, task_context)
+            logger.info(f"📊 任务结果: {json.dumps(result, indent=2, ensure_ascii=False)}")
+        else:
+            # 交互模式
+            logger.info("🎯 进入交互模式，输入任务描述或 'quit' 退出")
+            while True:
+                try:
+                    task_input = input("\n请输入任务: ").strip()
+                    if task_input.lower() in ['quit', 'exit', '退出']:
+                        break
+                    
+                    if task_input:
+                        result = await master_agent.execute_task(task_input)
+                        print(f"结果: {json.dumps(result, indent=2, ensure_ascii=False)}")
+                except KeyboardInterrupt:
+                    break
+                except Exception as e:
+                    logger.error(f"任务执行错误: {e}")
+        
+        return
+
+    # 新增：统一模式
+    if args.unified_mode:
+        logger.info("🔧 启动统一爬虫和调用器模式...")
+        unified_crawler = UnifiedCrawler(sdk)
+        unified_caller = UnifiedCaller(sdk)
+        
+        # 发现所有资源
+        resources = await unified_crawler.discover_all_resources()
+        logger.info(f"📊 资源发现完成: {unified_crawler.get_resource_summary()}")
+        
+        if args.target_method:
+            # 解析方法参数
+            method_args = {}
+            if args.method_args:
+                try:
+                    method_args = json.loads(args.method_args)
+                    logger.info(f"📋 解析到方法参数: {method_args}")
+                except json.JSONDecodeError as e:
+                    logger.error(f"❌ 方法参数JSON格式错误: {e}")
+                    return
+            
+            try:
+                if args.intelligent:
+                    # 智能调用
+                    logger.info(f"🤖 智能调用目标方法: {args.target_method}")
+                    result = await unified_crawler.intelligent_call(args.target_method, **method_args)
+                else:
+                    # 直接调用
+                    logger.info(f"🎯 直接调用目标方法: {args.target_method}")
+                    result = await unified_crawler.call_by_name(args.target_method, **method_args)
+                
+                logger.info(f"✅ 调用结果: {result}")
+                
+            except Exception as e:
+                logger.error(f"❌ 调用失败: {e}")
+        
+        return
+
+    # 原有的爬虫模式
     if args.crawler:
         try:
             crawler_module_name = f"anp_open_sdk_framework_demo.crawlers.{args.crawler}"
