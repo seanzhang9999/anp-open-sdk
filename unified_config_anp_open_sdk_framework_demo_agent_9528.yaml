@@ -8,7 +8,7 @@ multi_agent_mode:
 log_settings:
   log_level: INFO
   detail:
-    file: "{APP_ROOT}/data_tmp_log/9528-app.log"
+    file: "{APP_ROOT}/data_log/9528-app.log"
     max_size: 100
 
 anp_sdk:

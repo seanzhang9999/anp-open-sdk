@@ -104,19 +104,10 @@ def rename_directory_with_prefix(user_dir, prefix):
         return user_dir
 
 # 设置根目录
-root_dir = os.path.join('data_user', 'localhost_9527', 'anp_users')
+root_dir = os.path.join('data_user', 'localhost_9528', 'anp_users')
 
 # 遍历所有 user_* 目录
 for user_dir in glob.glob(os.path.join(root_dir, 'user_*')):
-
-
-
-
-
-
-
-
-
 
 
     print(f"\n处理目录: {user_dir}")
