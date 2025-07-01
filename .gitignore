@@ -145,3 +145,7 @@ yarn-error.log*
 !data_user/**/*.key
 !data_user/**/*keys.json
 thought_doc_link
+data_user/localhost_9528/anp_users/user_28cddee0fade0258/openapi_did%3Awba%3Alocalhost%253A9527%3Awba%3Auser%3A28cddee0fade0258.yaml
+data_user/localhost_9528/anp_users/user_cec3b9608ee4eb9c/openapi_did%3Awba%3Alocalhost%253A9527%3Awba%3Aagent%3Acec3b9608ee4eb9c.yaml
+data_user/localhost_9528/anp_users/user_3ea884878ea5fbb1/openapi_did%3Awba%3Alocalhost%253A9527%3Awba%3Auser%3A3ea884878ea5fbb1.yaml
+uv.lock

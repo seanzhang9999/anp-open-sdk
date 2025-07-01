@@ -179,6 +179,9 @@ async def main():
                 break
         if discovery_agent:
             logger.info(f"✅ Found discovery agent: '{discovery_agent.name}'. Starting its discovery task...")
+            result = await discovery_agent.run_ai_root_crawler_demo()
+            print(result)
+
             result = await discovery_agent.run_agent_002_demo(sdk)
             print(result)
             result = await discovery_agent.run_agent_002_demo_new()
@@ -209,9 +212,7 @@ async def main():
         else:
             logger.debug("  - sdk 实例没有 stop_server 方法，无法主动停止服务。")
 
-    import signal
-    os.kill(os.getpid(), signal.SIGKILL)
-
+    sys.exit(0)
 if __name__ == "__main__":
     try:
         asyncio.run(main())
