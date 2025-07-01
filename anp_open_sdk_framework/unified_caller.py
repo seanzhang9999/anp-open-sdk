@@ -82,7 +82,7 @@ class UnifiedCaller:
         
         raise ValueError(f"未找到本地方法: {target}.{method_name}")
 
-    async def _call_remote_api(self, target_did: str, api_path: str, params: Optional[Dict] = None, method: str = "GET") -> Dict:
+    async def _call_remote_api(self, target_did: str, api_path: str, *args, params: Optional[Dict] = None, method: str = "GET", **kwargs) -> Dict:
         """调用远程Agent API"""
         # 获取调用者DID
         caller_agent = None
