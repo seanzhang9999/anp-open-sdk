@@ -3,12 +3,12 @@
 # ===================================================================
 
 # 0. 项目临时文件
-anp_open_sdk_demo/data_tmp_result/
-anp_open_sdk_demo/demo_data/
-anp_open_sdk_demo/demo_data_tmp/
-anp_open_sdk_framework_demo/*local_methods_doc.json
-anp_open_sdk_demo/data_demo_simulate/
-data_log/
+**/data_tmp_result/
+**/demo_data/
+**/demo_data_tmp/
+**local_methods_doc.json
+**/data_demo_simulate/
+**/data_tmp/
 
 
 
@@ -140,10 +140,11 @@ yarn-error.log*
 CLAUDE.md
 
 # 测试用户私钥和证书需要被同步
-!data_user/
-!data_user/**/*.pem
-!data_user/**/*.key
-!data_user/**/*keys.json
+!**data_user/
+!**data_user/**/*.pem
+!**data_user/**/*.key
+!**data_user/**/*keys.json
 thought_doc_link
 .vscode/settings.json
 uv.lock
+**/.env

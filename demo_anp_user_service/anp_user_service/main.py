@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from anp_user_service.app.routers import auth, chat, agents
+from demo_anp_user_service.anp_user_service.app.routers import auth, chat, agents
 import logging
 
 logger = logging.getLogger(__name__)
@@ -36,7 +36,7 @@ async def startup_event():
     """应用启动事件"""
     logger.info("🚀 Starting ANP User Service...")
     # 初始化智能体服务
-    from anp_user_service.app.services.agent_service import agent_service_manager
+    from demo_anp_user_service.anp_user_service.app.services.agent_service import agent_service_manager
     success = await agent_service_manager.initialize_agents()
     if success:
         logger.info("✅ Agent service initialized successfully")
@@ -48,7 +48,7 @@ async def shutdown_event():
     """应用关闭事件"""
     logger.info("🛑 Shutting down ANP User Service...")
     # 清理智能体服务
-    from anp_user_service.app.services.agent_service import agent_service_manager
+    from demo_anp_user_service.anp_user_service.app.services.agent_service import agent_service_manager
     await agent_service_manager.cleanup()
 
 @app.get("/")
