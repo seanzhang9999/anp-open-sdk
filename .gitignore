@@ -3,7 +3,7 @@
 # ===================================================================
 
 # 0. 项目临时文件
-**/data_tmp_result/
+**/data_tmp_result/*
 **/demo_data/
 **/demo_data_tmp/
 **local_methods_doc.json
