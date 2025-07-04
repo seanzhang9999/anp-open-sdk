@@ -116,6 +116,32 @@ class ANPTool:
         except ValueError:
             raise ValueError(f"无效的本地 URI 格式: {uri}. 期望格式为 'local://<agent_did>/<method_name>'.")
 
+    def _get_caller_did_from_auth_client(self) -> str:
+        """从现有的 auth_client 配置中提取 DID"""
+        try:
+            # 方法1: 从 auth_client 的 DID 文档路径读取
+            if hasattr(self, 'auth_client') and self.auth_client:
+                did_doc_path = getattr(self.auth_client, 'did_document_path', None)
+                if did_doc_path and os.path.exists(did_doc_path):
+                    with open(did_doc_path, 'r') as f:
+                        did_doc = json.load(f)
+                        return did_doc.get('id', 'unknown')
+            
+            # 方法2: 从默认路径读取（与 __init__ 中的逻辑一致）
+            current_dir = Path(__file__).parent
+            base_dir = current_dir.parent
+            default_did_path = base_dir / "use_did_test_public/coder.json"
+            
+            if default_did_path.exists():
+                with open(default_did_path, 'r') as f:
+                    did_doc = json.load(f)
+                    return did_doc.get('id', 'unknown')
+                    
+        except Exception as e:
+            logger.debug(f"获取 caller DID 失败: {e}")
+        
+        return 'unknown'
+
     async def execute(
             self,
             url: str,
@@ -123,11 +149,19 @@ class ANPTool:
             headers: Dict[str, str] = None,
             params: Dict[str, Any] = None,
             body: Dict[str, Any] = None,
+            caller_agent: str = None,    # 新增：调用方智能体 DID
+            target_agent: str = None,    # 新增：目标智能体 DID
+            use_auth: bool = True        # 新增：是否使用认证
     ) -> Dict[str, Any]:
         """
         执行本地或远程调用。
         - 对于 'local://' URI, 执行本地方法调用。
         - 对于 'http(s)://' URL, 执行远程 HTTP 请求。
+        
+        参数:
+            caller_agent: 调用方智能体 DID，如果为 None 则从配置中自动获取
+            target_agent: 目标智能体 DID，如果为 None 则使用单向认证
+            use_auth: 是否使用认证，False 时回退到原有的 aiohttp 实现
         """
         if url.startswith("local://"):
             if not self.local_caller:
@@ -153,7 +187,7 @@ class ANPTool:
                 return {"status_code": 500, "error": str(e), "source": "local"}
         else:
             # 对于 http/https URL，执行远程调用
-            return await self._execute_remote_http_request(url, method, headers, params, body)
+            return await self._execute_remote_http_request(url, method, headers, params, body, caller_agent, target_agent, use_auth)
 
     async def _execute_remote_http_request(
             self,
@@ -162,9 +196,17 @@ class ANPTool:
             headers: Dict[str, str] = None,
             params: Dict[str, Any] = None,
             body: Dict[str, Any] = None,
+            caller_agent: str = None,
+            target_agent: str = None,
+            use_auth: bool = True
     ) -> Dict[str, Any]:
         """
-        执行远程 HTTP 请求以与其他代理交互 (原 execute 方法的逻辑)
+        执行远程 HTTP 请求以与其他代理交互
+        
+        参数:
+            caller_agent: 调用方智能体 DID，如果为 None 则从配置中自动获取
+            target_agent: 目标智能体 DID，如果为 None 则使用单向认证
+            use_auth: 是否使用认证，False 时回退到原有的 aiohttp 实现
         """
         if headers is None:
             headers = {}
@@ -172,6 +214,82 @@ class ANPTool:
             params = {}
 
         logger.debug(f"ANP 远程请求: {method} {url}")
+
+        # 如果不使用认证，回退到原有的 aiohttp 实现
+        if not use_auth:
+            return await self._execute_legacy_http_request(url, method, headers, params, body)
+
+        # 获取 caller_agent
+        if not caller_agent:
+            caller_agent = self._get_caller_did_from_auth_client()
+
+        # 确定认证模式
+        use_two_way_auth = target_agent is not None and target_agent != 'unknown'
+
+        # 准备完整的 URL（包含查询参数）
+        final_url = url
+        if params:
+            from urllib.parse import urlencode, urlparse, parse_qs, urlunparse
+            parsed_url = urlparse(url)
+            existing_params = parse_qs(parsed_url.query)
+
+            # 合并现有参数和新参数
+            for key, value in params.items():
+                existing_params[key] = [str(value)]
+
+            # 重新构建 URL
+            new_query = urlencode(existing_params, doseq=True)
+            final_url = urlunparse((
+                parsed_url.scheme,
+                parsed_url.netloc,
+                parsed_url.path,
+                parsed_url.params,
+                new_query,
+                parsed_url.fragment
+            ))
+
+        try:
+            # 使用 agent_auth_request 进行认证请求
+            status, response, info, is_auth_pass = await agent_auth_request(
+                caller_agent=caller_agent,
+                target_agent=target_agent or caller_agent,  # 单向认证时使用 caller_agent
+                request_url=final_url,
+                method=method.upper(),
+                json_data=body,
+                custom_headers=headers,
+                use_two_way_auth=use_two_way_auth
+            )
+
+            logger.debug(f"ANP 认证响应: 状态码 {status}")
+
+            # 处理响应，保持与原有格式兼容
+            return await self._process_two_way_response(response, final_url, status, info, is_auth_pass)
+
+        except Exception as e:
+            logger.debug(f"认证请求失败: {str(e)}")
+            return {
+                "error": f"认证请求失败: {str(e)}",
+                "status_code": 500,
+                "url": url
+            }
+
+    async def _execute_legacy_http_request(
+            self,
+            url: str,
+            method: str = "GET",
+            headers: Dict[str, str] = None,
+            params: Dict[str, Any] = None,
+            body: Dict[str, Any] = None,
+    ) -> Dict[str, Any]:
+        """
+        原有的 aiohttp 实现，作为不使用认证时的回退选项
+        """
+        if headers is None:
+            headers = {}
+        if params is None:
+            params = {}
+
+        logger.debug(f"ANP 传统请求 (无认证): {method} {url}")
 
         if "Content-Type" not in headers and method in ["POST", "PUT", "PATCH"]:
             headers["Content-Type"] = "application/json"
@@ -196,7 +314,7 @@ class ANPTool:
 
             try:
                 async with http_method(**request_kwargs) as response:
-                    logger.debug(f"ANP 远程响应: 状态码 {response.status}")
+                    logger.debug(f"ANP 传统响应: 状态码 {response.status}")
                     if (
                             response.status == 401
                             and "Authorization" in headers

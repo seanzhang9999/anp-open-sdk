@@ -1,0 +1,19 @@
+[project]
+name = "anp_open_sdk"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "Sean Zhang",email = "seanzhang9999@gmail.com"}
+]
+#readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+]
+
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["auth", "config", "service", "anp_users_hosted", "agent_connect_hotpatch"]
