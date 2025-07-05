@@ -612,7 +612,7 @@ class DemoTaskRunner:
                     
                 # 处理工具调用
                 self.step_helper.pause(f"迭代 {current_iteration}: 执行工具调用")
-                logger.debug(f"执行 {len(response_message.tool_calls)} 个工具调用")
+                logger.info(f"执行 {len(response_message.tool_calls)} 个工具调用")
                 
                 for tool_call in response_message.tool_calls:
 
@@ -677,14 +677,14 @@ class DemoTaskRunner:
 
         # 显示结果
         self.step_helper.pause(f"{agent_name}智能爬取完成，显示结果")
-        logger.debug(f"\n=== {agent_name}响应 ===")
-        logger.debug(result["content"])
+        logger.info(f"\n=== {agent_name}响应 ===")
+        logger.info(result["content"])
 
         logger.debug("\n=== 访问过的URL ===")
         for url in result.get("visited_urls", []):
             logger.debug(url)
 
-        logger.debug(f"\n=== 总共爬取了 {len(result.get('crawled_documents', []))} 个文档 ===")
+        logger.info(f"\n=== 总共爬取了 {len(result.get('crawled_documents', []))} 个文档 ===")
 
         return result
 
