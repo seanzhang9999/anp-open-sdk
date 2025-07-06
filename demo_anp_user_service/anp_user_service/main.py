@@ -27,7 +27,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
+app.include_router(auth.router, prefix="/adapter_auth", tags=["Authentication"])
 app.include_router(chat.router, prefix="/agent", tags=["Agent Chat"])
 app.include_router(agents.router, prefix="/agents", tags=["Agent Management"])
 

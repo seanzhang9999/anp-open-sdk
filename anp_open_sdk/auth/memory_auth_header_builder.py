@@ -1,4 +1,4 @@
-# anp_open_sdk/auth/memory_auth_header_builder.py
+# anp_open_sdk/adapter_auth/memory_auth_header_builder.py
 
 """
 内存版本的认证头构建器

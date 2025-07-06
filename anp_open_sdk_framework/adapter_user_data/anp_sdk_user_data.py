@@ -23,7 +23,7 @@ ANP用户工具
 2. 列出所有用户 (-l)
 3. 按服务器信息排序显示用户 (-s)
 """
-
+import glob
 import os
 import json
 import secrets
@@ -41,7 +41,7 @@ from typing import Dict, List, Optional, Any
 
 
 from anp_open_sdk.config import UnifiedConfig,get_global_config
-from anp_open_sdk.base_user_data import BaseUserData, BaseUserDataManager
+from anp_open_sdk.core.base_user_data import BaseUserData, BaseUserDataManager
 
 def create_user(args):
     name, host, port, host_dir, agent_type = args.n
@@ -190,7 +190,7 @@ class LocalUserData(BaseUserData):
         self.agent_cfg = agent_cfg
         self.did_doc = did_doc
         self.password_paths = password_paths
-        self.did = did_doc.get("id")
+        self._did_value = did_doc.get("id")  # 使用私有属性存储DID值
         self.name = agent_cfg.get("name")
         self.unique_id = agent_cfg.get("unique_id")
         self.user_dir = user_folder_path
@@ -252,13 +252,46 @@ class LocalUserData(BaseUserData):
         return self._did_doc_path
 
     def get_did(self) -> str:
-        return self.did
+        return self._did_value
 
     def get_private_key_path(self) -> str:
         return self.did_private_key_file_path
 
     def get_public_key_path(self) -> str:
         return self.did_public_key_file_path
+
+    @property
+    def did_document(self):
+        """为认证流程提供 did_document 属性（兼容性）"""
+        return self.did_doc
+
+    @property
+    def private_keys_jwk(self):
+        """为认证流程提供 private_keys_jwk 属性（兼容性）"""
+        # 如果有现成的 private_keys，直接返回
+        if hasattr(self, 'private_keys') and self.private_keys:
+            return self.private_keys
+        
+        # 否则尝试从文件加载并转换为 JWK 格式
+        try:
+            from anp_open_sdk.auth.schemas import DIDCredentials
+            credentials = DIDCredentials.from_user_data(self)
+            if credentials and credentials.key_pairs:
+                # 转换为 JWK 格式
+                jwk_keys = {}
+                for key_id, key_pair in credentials.key_pairs.items():
+                    if key_pair.private_key:
+                        # 这里应该转换为 JWK 格式，暂时返回原始格式
+                        jwk_keys[key_id] = {
+                            "private_key": key_pair.private_key,
+                            "public_key": key_pair.public_key
+                        }
+                return jwk_keys
+        except Exception as e:
+            logger.warning(f"无法加载 private_keys_jwk: {e}")
+        
+        # 如果都失败了，返回空字典
+        return {}
 
     def get_token_to_remote(self, remote_did: str) -> Optional[Dict[str, Any]]:
         return self.token_to_remote_dict.get(remote_did)
@@ -274,10 +307,13 @@ class LocalUserData(BaseUserData):
             "is_revoked": False,
             "req_did": remote_did
         }
-    def get_token_from_remote(self, remote_did: str) -> Optional[Dict[str, Any]]:
-        return self.token_from_remote_dict.get(remote_did)
+    def get_token_from_remote(self, remote_did: str) -> Optional[str]:
+        """实现基类抽象方法：从存储中获取与特定远程DID通信的Token"""
+        token_data = self.token_from_remote_dict.get(remote_did)
+        return token_data.get("token") if token_data else None
 
-    def store_token_from_remote(self, remote_did: str, token: str):
+    def save_token_for_remote(self, remote_did: str, token: str):
+        """实现基类抽象方法：为特定的远程DID保存Token"""
         from datetime import datetime
         now = datetime.now()
         self.token_from_remote_dict[remote_did] = {
@@ -285,6 +321,10 @@ class LocalUserData(BaseUserData):
             "created_at": now.isoformat(),
             "req_did": remote_did
         }
+
+    def store_token_from_remote(self, remote_did: str, token: str):
+        """向后兼容方法：存储来自远程的Token"""
+        self.save_token_for_remote(remote_did, token)
 
     def add_contact(self, contact: Dict[str, Any]):
         did = contact.get("did")
@@ -297,78 +337,88 @@ class LocalUserData(BaseUserData):
     def list_contacts(self) -> List[Dict[str, Any]]:
         return list(self.contacts.values())
 
+
 class LocalUserDataManager(BaseUserDataManager):
-    _instance = None
-    def __new__(cls, user_dir: Optional[str] = None):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-        return cls._instance
+    """
+    管理从本地文件系统加载的用户数据。
+    扫描指定目录，为每个用户创建一个 LocalUserData 实例。
+    """
 
-    def __init__(self, user_dir: Optional[str] = None):
-        if hasattr(self, '_initialized') and self._initialized:
-            return
-        config = get_global_config()
+    def __init__(self):
+        self._users: Dict[str, BaseUserData] = {}
+        self.config = get_global_config()
+        self._load_all_users()
 
-        self._user_dir = user_dir or config.anp_sdk.user_did_path
-        self.users: Dict[str, LocalUserData] = {}
-        self.load_users()
-        self._initialized = True
-
-    @property
-    def user_dir(self):
-        return self._user_dir
-
-    def load_users(self):
-        if not os.path.isdir(self._user_dir):
-            logger.warning(f"用户目录不存在: {self._user_dir}")
+    def _load_all_users(self):
+        """
+        从配置文件中指定的路径加载所有用户数据。
+        """
+        user_data_path = self.config.anp_sdk.user_did_path
+        if not user_data_path or not os.path.isdir(user_data_path):
+            logger.warning(f"用户数据路径 '{user_data_path}' 未配置或不存在，无法加载用户。")
             return
 
-        for entry in os.scandir(self._user_dir):
-            if entry.is_dir() and (entry.name.startswith('user_') or entry.name.startswith('user_hosted_')):
-                user_folder_path = entry.path
-                folder_name = entry.name
-                try:
-                    cfg_path = os.path.join(user_folder_path, 'agent_cfg.yaml')
-                    agent_cfg = {}
-                    if os.path.exists(cfg_path):
-                        with open(cfg_path, 'r', encoding='utf-8') as f:
-                            agent_cfg = yaml.safe_load(f)
-                    did_doc_path = os.path.join(user_folder_path, 'did_document.json')
-                    did_doc = {}
-                    if os.path.exists(did_doc_path):
-                        with open(did_doc_path, 'r', encoding='utf-8') as f:
-                            did_doc = json.load(f)
-                    config = get_global_config()
+        did_files = glob.glob(os.path.join(user_data_path, "*", "did_document.json"))
 
-                    key_id = did_doc.get('key_id') or did_doc.get('publicKey', [{}])[0].get('id') if did_doc.get('publicKey') else config.anp_sdk.user_did_key_id
-                    did_private_key_file_path = os.path.join(user_folder_path, f"{key_id}_private.pem")
-                    did_public_key_file_path = os.path.join(user_folder_path, f"{key_id}_public.pem")
-                    jwt_private_key_file_path = os.path.join(user_folder_path, 'private_key.pem')
-                    jwt_public_key_file_path = os.path.join(user_folder_path, 'public_key.pem')
-                    password_paths = {
-                        "did_private_key_file_path": did_private_key_file_path,
-                        "did_public_key_file_path": did_public_key_file_path,
-                        "jwt_private_key_file_path": jwt_private_key_file_path,
-                        "jwt_public_key_file_path": jwt_public_key_file_path
-                    }
-                    if did_doc and agent_cfg:
-                         user_data = LocalUserData(folder_name, agent_cfg, did_doc, did_doc_path, password_paths, user_folder_path)
-                         self.users[user_data.did] = user_data
-                except Exception as e:
-                    logger.error(f"加载用户数据失败 ({folder_name}): {e}")
-            else:
-                logger.warning(f"不合格的文件或文件夹: {entry.name},{self._user_dir}")
+        for did_file_path in did_files:
+            user_dir = os.path.dirname(did_file_path)
+            folder_name = os.path.basename(user_dir)
 
-        logger.debug(f"加载用户数据共 {len(self.users)} 个用户")
+            try:
+                with open(did_file_path, 'r', encoding='utf-8') as f:
+                    did_doc = json.load(f)
+
+                user_did = did_doc.get("id")
+                if not user_did:
+                    logger.warning(f"在 {did_file_path} 中未找到 'id' 字段，跳过。")
+                    continue
+
+                agent_cfg_path = os.path.join(user_dir, "agent_cfg.yaml")
+                if not os.path.exists(agent_cfg_path):
+                    logger.warning(f"在 {user_dir} 中未找到 agent_cfg.yaml，跳过。")
+                    continue
+                with open(agent_cfg_path, 'r', encoding='utf-8') as f:
+                    agent_cfg = yaml.safe_load(f)
+
+                key_id = did_doc.get('key_id') or (
+                            did_doc.get('publicKey') and did_doc['publicKey'][0].get('id')) or 'key-1'
+
+                password_paths = {
+                    "did_private_key_file_path": os.path.join(user_dir, f"{key_id}_private.pem"),
+                    "did_public_key_file_path": os.path.join(user_dir, f"{key_id}_public.pem"),
+                    "jwt_private_key_file_path": os.path.join(user_dir, "private_key.pem"),
+                    "jwt_public_key_file_path": os.path.join(user_dir, "public_key.pem"),
+                }
+
+                if not all(os.path.exists(p) for p in password_paths.values()):
+                    logger.warning(f"在 {user_dir} 中缺少一个或多个密钥文件，跳过。")
+                    continue
+
+                user_data = LocalUserData(
+                    folder_name=folder_name,
+                    agent_cfg=agent_cfg,
+                    did_doc=did_doc,
+                    did_doc_path=did_file_path,
+                    password_paths=password_paths,
+                    user_folder_path=user_dir
+                )
+                self._users[user_did] = user_data
+                logger.info(f"✅ 成功加载用户凭证: {user_did}")
+
+            except (IOError, json.JSONDecodeError, yaml.YAMLError) as e:
+                logger.error(f"加载用户数据失败 {user_dir}: {e}")
 
     def get_user_data(self, did: str) -> Optional[BaseUserData]:
-        return self.users.get(did)
+        """
+        通过 DID 获取已加载的用户数据。
+        """
+        return self._users.get(did)
 
     def get_all_users(self) -> List[BaseUserData]:
-        return list(self.users.values())
+        return list(self._users.values())
 
     def get_user_data_by_name(self, name: str) -> Optional[BaseUserData]:
-        for user_data in self.users.values():
+        for user_data in self._users.values():
             if user_data.name == name:
                 return user_data
         return None

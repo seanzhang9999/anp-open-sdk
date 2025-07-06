@@ -20,7 +20,7 @@ anp_sdk:
   user_did_path: '{APP_ROOT}/data_user/localhost_9528/anp_users'
   user_hosted_path: '{APP_ROOT}/data_user/localhost_9528/anp_users_hosted'
   hosted_did_domain: localhost
-  auth_virtual_dir: wba/auth
+  auth_virtual_dir: wba/adapter_auth
   msg_virtual_dir: /agent/message
   token_expire_time: 3600
   user_did_key_id: key-1

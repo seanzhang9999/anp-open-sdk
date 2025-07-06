@@ -1,170 +1,80 @@
 import json
 import logging
-logger = logging.getLogger(__name__)
-
-import string
+import warnings
 from typing import Optional, Dict, Tuple, Any
 
-import aiohttp
-from aiohttp import ClientResponse
+# 核心变化：移除了对 aiohttp, LocalAgent, LocalUserDataManager 等的直接依赖
+# 这些现在都由框架层处理
+from .did_auth_base import BaseDIDAuthenticator
+from anp_open_sdk.auth_methods.wba.implementation import create_pure_authenticator
+from aiohttp import ClientResponse # 暂时保留以兼容 handle_response
 
-from .did_auth_wba import WBAAuth, get_response_DIDAuthHeader_Token, check_response_DIDAtuhHeader
-from ..anp_sdk_agent import LocalAgent
-from ..anp_sdk_user_data import LocalUserDataManager
-from ..auth.schemas import DIDCredentials, AuthenticationContext
-from ..auth.did_auth_base import BaseDIDAuthenticator
+logger = logging.getLogger(__name__)
 
+# create_authenticator 现在应该使用纯净的实现
+# 注意：它需要一个 DIDResolver，这将在框架层被注入
+def create_authenticator(resolver) -> BaseDIDAuthenticator:
+    # 这个函数现在更像一个工厂，根据配置选择不同的纯净认证器
+    return create_pure_authenticator(resolver)
 
-
-def create_authenticator(auth_method: str = "wba") -> BaseDIDAuthenticator:
-    if auth_method == "wba":
-        from ..auth.did_auth_wba import WBADIDResolver, WBADIDSigner, WBAAuthHeaderBuilder, WBADIDAuthenticator
-        resolver = WBADIDResolver()
-        signer = WBADIDSigner()
-        header_builder = WBAAuthHeaderBuilder()
-        base_auth = WBAAuth()
-        return WBADIDAuthenticator(resolver, signer, header_builder, base_auth)
-    else:
-        raise ValueError(f"Unsupported authentication method: {auth_method}")
-
-class AgentAuthManager:
-    """智能体认证管理器"""
-    def __init__(self, authenticator: BaseDIDAuthenticator):
-        self.authenticator = authenticator
-
-    async def agent_auth_two_way_v2(
-        self,
-        caller_credentials: DIDCredentials,
-        target_did: str,
-        request_url: str,
-        method: str = "GET",
-        json_data: Optional[Dict] = None,
-        custom_headers: Dict[str, str] = None,
-        use_two_way_auth: bool = True
-    ) -> Tuple[int, str, str, bool]:
-        if custom_headers is None:
-            custom_headers = {}
-        context = AuthenticationContext(
-            caller_did=caller_credentials.did_document.did,
-            target_did=target_did,
-            request_url=request_url,
-            method=method,
-            custom_headers=custom_headers,
-            json_data=json_data,
-            use_two_way_auth=use_two_way_auth
-        )
-        caller_agent = LocalAgent.from_did(context.caller_did)
-        try:
-            status_code, response_auth_header, response_data = await self.authenticator.authenticate_request(
-                context, caller_credentials
-            )
-            if status_code == 401 or status_code == 403:
-                context.use_two_way_auth = False
-                status_code, response_auth_header, response_data = await self.authenticator.authenticate_request(
-                    context, caller_credentials
-                )
-                if status_code != 401 and status_code != 403:
-                    auth_value, token = get_response_DIDAuthHeader_Token(response_auth_header)
-                    if token:
-                        if auth_value != "OneWayAuth":
-                            response_auth_header = json.loads(response_auth_header.get("Authorization"))
-                            response_auth_header = response_auth_header[0].get("resp_did_auth_header")
-                            response_auth_header = response_auth_header.get("Authorization")
-                            if not await check_response_DIDAtuhHeader(response_auth_header):
-                                message = f"接收方DID认证头验证失败! 状态: {status_code}\n响应: {response_data}"
-                                return status_code, response_data, message, False
-                            caller_agent.contact_manager.store_token_from_remote(context.target_did, token)
-                            message = f"DID双向认证成功! 已保存 {context.target_did} 颁发的token:{token}"
-                            return status_code, response_data, message, True
-                        else:
-                            caller_agent.contact_manager.store_token_from_remote(context.target_did, token)
-                            message = f"单向认证成功! 已保存 {context.target_did} 颁发的token:{token}"
-                            return status_code, response_data, message, True
-                    else:
-                        message = "无token，可能是无认证页面或第一代协议"
-                        return status_code, response_data, message, True
-                else:
-                    message = "401错误，认证失败"
-                    return 401, '', message, False
-            else:
-                if status_code != 401 and status_code != 403:
-                    auth_value, token = get_response_DIDAuthHeader_Token(response_auth_header)
-                    if token:
-                        if auth_value != "OneWayAuth":
-                            response_auth_header = json.loads(response_auth_header.get("Authorization"))
-                            response_auth_header = response_auth_header[0].get("resp_did_auth_header")
-                            response_auth_header = response_auth_header.get("Authorization")
-                            if not await check_response_DIDAtuhHeader(response_auth_header):
-                                message = f"接收方DID认证头验证失败! 状态: {status_code}\n响应: {response_data}"
-                                return status_code, response_data, message, False
-                            caller_agent.contact_manager.store_token_from_remote(context.target_did, token)
-                            message = f"DID双向认证成功! 已保存 {context.target_did} 颁发的token:{token}"
-                            return status_code, response_data, message, True
-                        else:
-                            caller_agent.contact_manager.store_token_from_remote(context.target_did, token)
-                            message = f"单向认证成功! 已保存 {context.target_did} 颁发的token:{token}"
-                            return status_code, response_data, message, True
-                    else:
-                        message = "无token，可能是无认证页面或第一代协议"
-                        return status_code, response_data, message, True
-                else:
-                    message = "401错误，认证失败"
-                    return 401, '', message, False
-        except Exception as e:
-            logger.error(f"认证过程中发生错误: {e}")
-            return 500, '', f"认证错误: {str(e)}", False
+# ---------------------------------------------------------------------------
+# 旧的 AgentAuthManager 和 agent_auth_two_way_v2 函数可以被标记为 @deprecated
+# 或者直接删除，这里我们选择删除它们以保持整洁。
+# ---------------------------------------------------------------------------
 
 async def agent_auth_request(
     caller_agent: str,
     target_agent: str,
-    request_url,
+    request_url: str,
     method: str = "GET",
     json_data: Optional[Dict] = None,
     custom_headers: Optional[Dict[str, str]] = None,
-    use_two_way_auth: bool = True,
-    auth_method: str = "wba"
-) -> Tuple[int, str, str, bool]:
-    """通用认证函数，自动优先用本地token，否则走DID认证，token失效自动fallback"""
-    user_data_manager = LocalUserDataManager()
-    user_data = user_data_manager.get_user_data(caller_agent)
-    caller_credentials = DIDCredentials.from_paths(
-        did_document_path=user_data.did_doc_path,
-        private_key_path=str(user_data.did_private_key_file_path)
-    )
-    authenticator = create_authenticator(auth_method=auth_method)
-    auth_manager = AgentAuthManager(authenticator)
+    # use_two_way_auth 和 auth_method 参数现在由内部逻辑处理
+) -> Tuple[int, Any, str, bool]:
     """
-    暂时屏蔽token分支 token方案需要升级保证安全
-    caller_agent_obj = LocalAgent.from_did(caller_credentials.did_document.did)
-    token_info = caller_agent_obj.contact_manager.get_token_to_remote(target_agent)
-    from datetime import datetime, timezone
-    if token_info and not token_info.get("is_revoked", False):
-        expires_at = token_info.get("expires_at")
-        if isinstance(expires_at, str):
-            expires_at = datetime.fromisoformat(expires_at)
-        if expires_at.tzinfo is None:
-            expires_at = expires_at.replace(tzinfo=timezone.utc)
-        if datetime.now(timezone.utc) < expires_at:
-            token = token_info["token"]
-            status, response_data = await agent_token_request(
-                request_url, token, caller_credentials.did_document.did, target_agent, method, json_data
-            )
-            if status == 401 or status == 403:
-                if hasattr(caller_agent_obj.contact_manager, 'revoke_token_from_remote'):
-                    caller_agent_obj.contact_manager.revoke_token_from_remote(target_agent)
-            else:
-                return status, response_data, "token认证请求", status == 200
-    """
-    return await auth_manager.agent_auth_two_way_v2(
-        caller_credentials=caller_credentials,
-        target_did=target_agent,
-        request_url=request_url,
-        method=method,
-        json_data=json_data,
-        custom_headers=custom_headers,
-        use_two_way_auth=use_two_way_auth
+      **[已废弃]** 通用认证函数。请迁移到使用 anp_open_sdk_framework.auth.AuthClient 类。
+
+      这个函数现在是一个兼容性包装器，它会在内部创建所有依赖项，
+      效率较低。为了获得最佳性能和灵活性，请在您的应用程序中创建
+      一个 AuthClient 的单例实例。
+      """
+    warnings.warn(
+        "`agent_auth_request` is deprecated and will be removed in a future version. "
+        "Please use the `AuthClient` class from `anp_open_sdk_framework.auth.auth_client`.",
+        DeprecationWarning,
+        stacklevel=2
     )
+
+    # 为了向后兼容，在函数内部临时创建所有实例
+    # 这是一种反模式，但可以确保旧代码还能运行
+    try:
+        from anp_open_sdk_framework.adapter_user_data.anp_sdk_user_data import  LocalUserDataManager
+        from anp_open_sdk_framework.adapter_transport.http_transport import HttpTransport
+        from anp_open_sdk_framework.adapter_auth.framework_auth import FrameworkAuthManager
+        from anp_open_sdk_framework.auth.auth_client import AuthClient
+
+        user_data_manager = LocalUserDataManager()
+        http_transport = HttpTransport()
+        framework_auth_manager = FrameworkAuthManager(user_data_manager, http_transport)
+        auth_client = AuthClient(framework_auth_manager)
+
+        return await auth_client.authenticated_request(
+            caller_agent=caller_agent,
+            target_agent=target_agent,
+            request_url=request_url,
+            method=method,
+            json_data=json_data
+        )
+    except Exception as e:
+        logger.error(f"兼容模式下的认证请求失败: {e}", exc_info=True)
+        return 500, {"error": str(e)}, f"Authentication failed in compatibility mode: {e}", False
+
+
 async def handle_response(response: Any) -> Dict:
+    """
+    这个工具函数与具体认证逻辑无关，可以保留。
+    它负责将不同类型的响应（dict, aiohttp.ClientResponse）统一处理为字典。
+    """
     if isinstance(response, dict):
         return response
     elif isinstance(response, ClientResponse):
@@ -191,38 +101,5 @@ async def handle_response(response: Any) -> Dict:
         logger.error(f"未知响应类型: {type(response)}")
         return {"error": f"未知类型: {type(response)}"}
 
-async def agent_token_request(target_url: str, token: str, sender_did: str, targeter_did: string, method: str = "GET",
-                              json_data: Optional[Dict] = None) -> Tuple[int, Dict[str, Any]]:
-    try:
-
-        #当前方案需要后续改进，当前并不安全
-        headers = {
-            "Authorization": f"Bearer {token}",
-            "req_did": f"{sender_did}",
-            "resp_did": f"{targeter_did}"
-        }
-
-        async with aiohttp.ClientSession() as session:
-            if method.upper() == "GET":
-                async with session.get(
-                    target_url,
-                    headers=headers
-                ) as response:
-                    status = response.status
-                    response_data = await response.json() if status == 200 else {}
-                    return status, response_data
-            elif method.upper() == "POST":
-                async with session.post(
-                    target_url,
-                    headers=headers,
-                    json=json_data
-                ) as response:
-                    status = response.status
-                    response_data = await response.json() if status == 200 else {}
-                    return status, response_data
-            else:
-                logger.debug(f"Unsupported HTTP method: {method}")
-                return 400, {"error": "Unsupported HTTP method"}
-    except Exception as e:
-        logger.debug(f"Error sending request with token: {e}")
-        return 500, {"error": str(e)}
+# agent_token_request 函数现在是多余的，因为Token逻辑已经整合到
+# AuthFlowManager 和 FrameworkAuthManager 中，可以安全地移除。

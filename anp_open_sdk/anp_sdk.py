@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from anp_open_sdk.anp_sdk_user_data import LocalUserDataManager
 import urllib.parse
 import os
 import time
@@ -68,7 +67,6 @@ class ANPSDK:
         self.proxy_mode = False
         self.proxy_task = None
         self.group_manager = GroupManager(self)
-        self.user_data_manager = LocalUserDataManager()
         self.agent = None
         self.initialized = True
         config = get_global_config()
@@ -155,62 +153,7 @@ class ANPSDK:
     def list_groups(self) -> List[str]:
         return self.group_manager.list_groups()
 
-    async def check_did_host_request(self):
-        from anp_open_sdk.service.publisher.anp_sdk_publisher_mail_backend import EnhancedMailManager
-        from anp_open_sdk.service.publisher.anp_sdk_publisher import DIDManager
-        try:
-            config = get_global_config()
-            use_local = config.mail.use_local_backend
-            logger.debug(f"管理邮箱检查前初始化，使用本地文件邮件后端参数设置:{use_local}")
-            mail_manager = EnhancedMailManager(use_local_backend=use_local)
-            did_manager = DIDManager()
-            
-            did_requests = mail_manager.get_unread_did_requests()
-            if not did_requests:
-                return "没有新的DID托管请求"
-            
-            result = "开始处理DID托管请求\n"
-            for request in did_requests:
-                did_document = request['content']
-                from_address = request['from_address']
-                message_id = request['message_id']
-                
-                parsed_json = json.loads(did_document)
-                did_document_dict = dict(parsed_json)
 
-                if did_manager.is_duplicate_did(did_document):
-                    mail_manager.send_reply_email(
-                        from_address,
-                        "DID已申请",
-                        "重复的DID申请，请联系管理员"
-                    )
-                    mail_manager.mark_message_as_read(message_id)
-                    result += f"{from_address}的DID {did_document_dict.get('id')} 已申请，退回\n"
-                    continue
-                
-                success, new_did_doc, error = did_manager.store_did_document(did_document_dict)
-                if success:
-                    mail_manager.send_reply_email(
-                        from_address,
-                        "ANP HOSTED DID RESPONSED",
-                        new_did_doc)
-                    
-                    result += f"{from_address}的DID {new_did_doc['id']} 已保存\n"
-                else:
-                    mail_manager.send_reply_email(
-                        from_address,
-                        "DID托管申请失败",
-                        f"处理DID文档时发生错误: {error}"
-                    )
-                    result += f"{from_address}的DID处理失败: {error}\n"
-                
-                mail_manager.mark_message_as_read(message_id)
-            
-            return result
-        except Exception as e:
-            error_msg = f"处理DID托管请求时发生错误: {e}"
-            logger.error(error_msg)
-            return error_msg
 
     def register_agent(self, agent: LocalAgent):
         self.router.register_agent(agent)

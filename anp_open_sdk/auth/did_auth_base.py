@@ -1,4 +1,4 @@
-# anp_open_sdk/auth/base_auth.py
+# anp_open_sdk/adapter_auth/base_auth.py
 from abc import ABC, abstractmethod
 from typing import Optional, Dict, Any, Tuple
 from .schemas import DIDCredentials, AuthenticationContext, DIDDocument, DIDKeyPair

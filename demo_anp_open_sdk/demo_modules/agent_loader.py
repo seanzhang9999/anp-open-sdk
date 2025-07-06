@@ -2,7 +2,7 @@ from typing import List, Optional
 import logging
 logger = logging.getLogger(__name__)
 from anp_open_sdk.anp_sdk import ANPSDK, LocalAgent
-from anp_open_sdk.anp_sdk_user_data import LocalUserDataManager
+from anp_open_sdk_framework.adapter_user_data.anp_sdk_user_data import LocalUserDataManager
 from anp_open_sdk.config import get_global_config
 
 

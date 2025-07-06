@@ -14,6 +14,13 @@ class FrameworkDIDResolver(BaseDIDResolver):
         self.transport = transport
         self.user_data_manager = user_data_manager
 
+    def supports_did_method(self, did: str) -> bool:
+        """
+        实现抽象方法。
+        这个解析器支持'did:wba:'方法。
+        """
+        return did.startswith("did:wba:")
+
     async def resolve_did_document(self, did: str) -> Optional[DIDDocument]:
         # 1. 优先从本地加载 (如果存在)
         local_user = self.user_data_manager.get_user_data(did)

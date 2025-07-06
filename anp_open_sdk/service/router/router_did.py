@@ -21,7 +21,10 @@ from urllib.parse import quote
 from fastapi.responses import JSONResponse
 import sys
 import os
-from anp_open_sdk.anp_sdk_user_data import get_user_dir_did_doc_by_did, get_agent_cfg_by_user_dir
+
+from anp_open_sdk.service.router.utils import url_did_format
+from anp_open_sdk_framework.adapter_user_data.anp_sdk_user_data import get_user_dir_did_doc_by_did, \
+    get_agent_cfg_by_user_dir
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..","..")))
 import os
@@ -221,25 +224,7 @@ async def get_agent_description(user_id: str, request: Request) -> Dict:
     return result
 
 
-def url_did_format(user_id,request):
-    host = request.url.hostname
-    port = request.url.port
-    user_id = urllib.parse.unquote(user_id)
-    if user_id.startswith("did:wba"):
-        # 新增处理：如果 user_id 不包含 %3A，按 : 分割，第四个部分是数字，则把第三个 : 换成 %3A
-        if "%3A" not in user_id:
-            parts = user_id.split(":")
-            if len(parts) > 4 and parts[3].isdigit():
-                resp_did = ":".join(parts[:3]) + "%3A" + ":".join(parts[3:])
-    elif len(user_id) == 16: # unique_id
-        if port == 80 or port == 443:
-            resp_did = f"did:wba:{host}:wba:user:{user_id}"
-        else:
-            resp_did = f"did:wba:{host}%3A{port}:wba:user:{user_id}"
-    else :
-        resp_did = "not_did_wba"
 
-    return resp_did
 
 
 @router.get("/wba/user/{resp_did}/{yaml_file_name}.yaml", summary="Get agent OpenAPI YAML")

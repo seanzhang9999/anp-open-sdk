@@ -1,5 +1,4 @@
 import argparse
-import importlib
 import glob
 import os
 import sys
@@ -7,10 +6,7 @@ import asyncio
 import threading
 import json
 
-from anp_open_sdk.anp_sdk_user_data import save_interface_files, LocalUserDataManager
 from anp_open_sdk.sdk_mode import SdkMode
-from anp_open_sdk.service.router.router_agent import wrap_business_handler
-from anp_open_sdk_framework.local_methods.local_methods_decorators import register_local_methods_to_agent
 
 from anp_open_sdk.config import UnifiedConfig, set_global_config
 from anp_open_sdk.utils.log_base import setup_logging
@@ -23,13 +19,18 @@ from anp_open_sdk_framework.master_agent import MasterAgent
 from anp_open_sdk_framework.unified_crawler import UnifiedCrawler
 from anp_open_sdk_framework.unified_caller import UnifiedCaller
 
-from anp_open_sdk_framework.local_methods.local_methods_caller import LocalMethodsCaller
+
+from anp_open_sdk_framework.adapter_user_data.anp_sdk_user_data import  LocalUserDataManager
+from anp_open_sdk_framework.adapter_transport.http_transport import HttpTransport
+from anp_open_sdk_framework.adapter_auth.framework_auth import FrameworkAuthManager
+from anp_open_sdk_framework.auth.auth_client import AuthClient
+
+
 from anp_open_sdk_framework.local_methods.local_methods_doc import LocalMethodsDocGenerator
 from anp_open_sdk.config import get_global_config
 
 logger = logging.getLogger(__name__)
 
-import inspect
 
 def show_usage_examples():
     print("""
@@ -240,8 +241,10 @@ async def main():
         # 如果是相对路径，在当前脚本目录下查找
         script_dir = os.path.dirname(os.path.abspath(__file__))
         config_file = os.path.join(script_dir, config_file)
+        app_config = UnifiedConfig(config_file=config_file, app_root=script_dir)
+    else:
+        app_config = UnifiedConfig(config_file=config_file)
 
-    app_config = UnifiedConfig(config_file=config_file)
     set_global_config(app_config)
     setup_logging()
 
@@ -267,6 +270,27 @@ async def main():
 
     logger.info(f"✅ 成功加载 {len(all_agents)} 个智能体，创建SDK实例...")
     sdk = ANPSDK(mode=SdkMode.MULTI_AGENT_ROUTER, agents=all_agents)
+
+    # --- 核心改造开始 ---
+    # 1. 在顶层创建核心服务实例
+    # 这些实例将在整个应用程序的生命周期中作为单例使用
+    user_data_manager = LocalUserDataManager()
+    sdk.user_data_manager = user_data_manager
+    http_transport = HttpTransport()
+    # 注意：FrameworkAuthManager现在需要一个DIDResolver
+    # 我们将在其构造函数中创建它，或者也可以在这里创建并注入
+    framework_auth_manager = FrameworkAuthManager(user_data_manager, http_transport)
+    auth_client = AuthClient(framework_auth_manager)
+
+    # 2. 将核心服务注入到每个 agent 实例中
+    logger.info("💉 正在向所有智能体注入核心服务...")
+    for agent in all_agents:
+        agent.auth_client = auth_client
+        # 未来可以注入更多服务，如 Orchestrator, Crawler 等
+        # agent.orchestrator = ...
+    logger.info("✅ 核心服务注入完成。")
+    # --- 核心改造结束 ---
+
     logger.info("🔄 执行智能体后初始化...")
     for agent in all_agents:
         module = lifecycle_modules.get(agent.id)

@@ -595,9 +595,9 @@ def extract_auth_header_parts_two_way(auth_header: str) -> Tuple[str, str, str, 
             - signature: Signature value
             
     Raises:
-        ValueError: If any required field is missing in the auth header
+        ValueError: If any required field is missing in the adapter_auth header
     """
-    logger.debug(f"Extracting auth header parts from: {auth_header}")
+    logger.debug(f"Extracting adapter_auth header parts from: {auth_header}")
     
     required_fields = {
         'did': r'(?i)did="([^"]+)"',
@@ -616,10 +616,10 @@ def extract_auth_header_parts_two_way(auth_header: str) -> Tuple[str, str, str, 
     for field, pattern in required_fields.items():
         match = re.search(pattern, auth_header)
         if not match:
-            raise ValueError(f"Missing required field in auth header: {field}")
+            raise ValueError(f"Missing required field in adapter_auth header: {field}")
         parts[field] = match.group(1)
     
-    logger.debug(f"Extracted auth header parts: {parts}")
+    logger.debug(f"Extracted adapter_auth header parts: {parts}")
     return (parts['did'], parts['nonce'], parts['timestamp'], 
             parts['resp_did'], parts['verification_method'], parts['signature'])
 
@@ -644,7 +644,7 @@ def verify_auth_header_signature_two_way(
     #logger.debug("Starting DID authentication header verification")
     
     try:
-        # Extract auth header parts
+        # Extract adapter_auth header parts
         client_did, nonce, timestamp_str, resp_id, verification_method, signature = extract_auth_header_parts_two_way(auth_header)
          
         # Verify DID (case-sensitive)
@@ -682,7 +682,7 @@ def verify_auth_header_signature_two_way(
             return False, f"Verification error: {str(e)}"
             
     except ValueError as e:
-        logger.debug(f"Error extracting auth header parts: {str(e)}")
+        logger.debug(f"Error extracting adapter_auth header parts: {str(e)}")
         return False, str(e)
     except Exception as e:
         logger.debug(f"Error during verification process: {str(e)}")

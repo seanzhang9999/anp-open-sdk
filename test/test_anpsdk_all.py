@@ -4,7 +4,7 @@ ANP SDK Demo 自动化集成测试
 
 本脚本自动化测试 anp_open_sdk_demo 的主要演示功能，确保各主要流程可正常跑通。
 """
-
+import os
 import sys
 import asyncio
 import traceback
@@ -14,7 +14,14 @@ import logging
 from anp_open_sdk.utils.log_base import setup_logging
 from anp_open_sdk.config import UnifiedConfig,set_global_config
 
-app_config = UnifiedConfig(config_file='unified_config_anp_open_sdk_framework_demo_agent.yaml')
+config_file = 'unified_config_anp_open_sdk_framework_demo_agent.yaml'
+if not os.path.isabs(config_file):
+    # 如果是相对路径，在当前脚本目录下查找
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    config_file = os.path.join(script_dir, config_file)
+    app_config = UnifiedConfig(config_file=config_file, app_root= script_dir)
+else:
+    app_config = UnifiedConfig(config_file=config_file)
 set_global_config(app_config)
 
 setup_logging() # 假设 setup_logging 内部也改用 get_global_config()
@@ -23,12 +30,12 @@ logger = logging.getLogger(__name__)
 # 添加项目路径
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from anp_open_sdk_demo.demo_modules.step_helper import DemoStepHelper
-from anp_open_sdk_demo.demo_modules.agent_loader import DemoAgentLoader
-from anp_open_sdk_demo.demo_modules.agent_batch_registry import DemoAgentRegistry
-from anp_open_sdk_demo.demo_modules.demo_tasks import DemoTaskRunner
-from anp_open_sdk_demo.services.dns_service import DemoDNSService
-from anp_open_sdk_demo.services.sdk_manager import DemoSDKManager
+from demo_anp_open_sdk.demo_modules.step_helper import DemoStepHelper
+from demo_anp_open_sdk.demo_modules.agent_loader import DemoAgentLoader
+from demo_anp_open_sdk.demo_modules.agent_batch_registry import DemoAgentRegistry
+from demo_anp_open_sdk.demo_modules.demo_tasks import DemoTaskRunner
+from demo_anp_open_sdk.services.dns_service import DemoDNSService
+from demo_anp_open_sdk.services.sdk_manager import DemoSDKManager
 
 def setup_demo_env():
     """初始化演示环境，返回 DemoTaskRunner 和 agent 列表"""

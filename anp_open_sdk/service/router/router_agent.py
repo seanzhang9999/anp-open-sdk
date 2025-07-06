@@ -13,10 +13,10 @@
 # limitations under the License.
 import inspect
 
-from anp_open_sdk.service.router.router_did import url_did_format
 import logging
 logger = logging.getLogger(__name__)
 
+from .utils import url_did_format
 
 from fastapi import Request
 from typing import Dict, Any, List

@@ -7,11 +7,9 @@
 
 import sys
 import asyncio
-import json
 import tempfile
 import shutil
 from pathlib import Path
-from typing import Dict, Any, Optional
 import logging
 
 # 添加项目路径
@@ -22,10 +20,9 @@ try:
 except ImportError:
     pytest = None
 
-from anp_open_sdk.auth.schemas import DIDCredentials, DIDDocument, DIDKeyPair, AuthenticationContext
-from anp_open_sdk.auth.auth_client import AgentAuthManager, create_authenticator, agent_auth_request
-from anp_open_sdk.auth.auth_server import AgentAuthServer, generate_auth_response
-from anp_open_sdk.anp_sdk_user_data import LocalUserDataManager, did_create_user
+from anp_open_sdk.auth.schemas import DIDCredentials, DIDKeyPair, AuthenticationContext
+from anp_open_sdk.auth.auth_client import create_authenticator, agent_auth_request
+from anp_open_sdk_framework.adapter_user_data.anp_sdk_user_data import LocalUserDataManager, did_create_user
 from anp_open_sdk.anp_sdk_agent import LocalAgent
 from anp_open_sdk.anp_sdk import ANPSDK
 

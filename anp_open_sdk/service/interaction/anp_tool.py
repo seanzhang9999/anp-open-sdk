@@ -9,9 +9,11 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 
 from anp_open_sdk.anp_sdk_agent import LocalAgent
-from anp_open_sdk.anp_sdk_user_data import LocalUserDataManager
+from anp_open_sdk.auth.did_auth_wba import parse_wba_did_host_port
+from anp_open_sdk_framework.adapter_user_data.anp_sdk_user_data import LocalUserDataManager
 import logging
 
+from anp_open_sdk_framework.auth.auth_client import AuthClient
 from anp_open_sdk_framework.local_methods.local_methods_caller import LocalMethodsCaller
 
 logger = logging.getLogger(__name__)
@@ -60,52 +62,28 @@ class ANPTool:
     }
 
     # 声明 auth_client 和 local_caller 字段
-    auth_client: Optional[DIDWbaAuthHeader] = None
+    auth_client: Optional[AuthClient] = None
     local_caller: Optional[LocalMethodsCaller] = None
 
     def __init__(
             self,
-            did_document_path: Optional[str] = None,
-            private_key_path: Optional[str] = None,
+            auth_client: Optional[AuthClient] = None,
             local_caller: Optional[LocalMethodsCaller] = None,
             **data,
     ):
         """
-        使用 DID 认证和本地调用器初始化 ANPTool
+                使用 AuthClient 和本地调用器初始化 ANPTool
 
-        参数:
-            did_document_path (str, 可选): 远程调用时使用的 DID 文档文件路径。
-            private_key_path (str, 可选): 远程调用时使用的私钥文件路径。
-            local_caller (LocalMethodsCaller, 可选): 用于执行本地方法的调用器实例。
-        """
+                参数:
+                    auth_client (AuthClient, 可选): 用于执行认证请求的客户端实例。
+                    local_caller (LocalMethodsCaller, 可选): 用于执行本地方法的调用器实例。
+                """
         super().__init__(**data)
         self.local_caller = local_caller
+        # 直接使用传入的 auth_client 实例
+        self.auth_client = auth_client
 
-        # 获取当前脚本目录
-        current_dir = Path(__file__).parent
-        # 获取项目根目录
-        base_dir = current_dir.parent
 
-        # 使用提供的路径或默认路径
-        if did_document_path is None:
-            did_document_path = os.environ.get("DID_DOCUMENT_PATH")
-            if did_document_path is None:
-                did_document_path = str(base_dir / "use_did_test_public/coder.json")
-
-        if private_key_path is None:
-            private_key_path = os.environ.get("DID_PRIVATE_KEY_PATH")
-            if private_key_path is None:
-                private_key_path = str(
-                    base_dir / "use_did_test_public/key-1_private.pem"
-                )
-
-        logger.debug(
-            f"ANPTool 初始化 - DID 路径: {did_document_path}, 私钥路径: {private_key_path}"
-        )
-
-        self.auth_client = DIDWbaAuthHeader(
-            did_document_path=did_document_path, private_key_path=private_key_path
-        )
 
     def _parse_local_uri(self, uri: str) -> (str, str):
         """解析本地 URI，例如 local://<agent_did>/<method_name>"""
@@ -219,9 +197,18 @@ class ANPTool:
         if not use_auth:
             return await self._execute_legacy_http_request(url, method, headers, params, body)
 
+        # 检查 auth_client 是否被注入
+        if not self.auth_client:
+            logger.error("ANPTool 未配置 AuthClient，无法执行认证请求。")
+            return {"error": "ANPTool is not configured with an AuthClient.", "status_code": 500}
+
         # 获取 caller_agent
+        # 注意：这里的逻辑需要调整，因为我们不能再从文件路径推断DID
+        # 理想情况下，caller_agent 应该总是被明确提供
         if not caller_agent:
-            caller_agent = self._get_caller_did_from_auth_client()
+            # 这是一个临时的、不理想的回退方案
+            logger.warning("调用 execute 时未提供 caller_agent，认证可能失败。")
+            caller_agent = "unknown_caller"
 
         # 确定认证模式
         use_two_way_auth = target_agent is not None and target_agent != 'unknown'
@@ -249,16 +236,15 @@ class ANPTool:
             ))
 
         try:
-            # 使用 agent_auth_request 进行认证请求
-            status, response, info, is_auth_pass = await agent_auth_request(
+            status, response, info, is_auth_pass = await self.auth_client.authenticated_request(
                 caller_agent=caller_agent,
                 target_agent=target_agent or caller_agent,  # 单向认证时使用 caller_agent
                 request_url=final_url,
                 method=method.upper(),
                 json_data=body,
-                custom_headers=headers,
-                use_two_way_auth=use_two_way_auth
+                # custom_headers 参数在我们的新架构中不再需要，因为它被包含在请求上下文中
             )
+
 
             logger.debug(f"ANP 认证响应: 状态码 {status}")
 
@@ -446,14 +432,12 @@ class ANPTool:
             # 3. 调用 agent_auth_two_way（需要传入必要的参数）
             # 注意：这里暂时使用占位符，后续需要根据实际情况调整
 
-            status, response, info, is_auth_pass = await agent_auth_request(
+            status, response, info, is_auth_pass = await self.auth_client.authenticated_request(
                 caller_agent=caller_agent,  # 需要传入调用方智能体ID
                 target_agent=target_agent,  # 需要传入目标方智能体ID，如果对方没有ID，可以随便写，因为对方不会响应这个信息
                 request_url=final_url,
                 method=method.upper(),
                 json_data=request_data,
-                custom_headers=headers,  # 传递自定义头部给 agent_auth_two_way 处理
-                use_two_way_auth= use_two_way_auth
             )
 
             logger.debug(f"ANP 双向认证响应: 状态码 {status}")
@@ -530,6 +514,9 @@ class CustomJSONEncoder(JSONEncoder):
 class ANPToolCrawler:
     """ANP Tool 智能爬虫 - 简化版本"""
 
+    # 在构造函数中接收 auth_client
+    def __init__(self, auth_client: Optional[AuthClient] = None):
+        self.auth_client = auth_client
 
 
     async def run_crawler_demo(self, task_input: str, initial_url: str,
@@ -569,8 +556,8 @@ class ANPToolCrawler:
                 user_input=task_input,
                 initial_url=initial_url,
                 prompt_template=prompt_template,
-                did_document_path=caller_agent.did_document_path,
-                private_key_path=caller_agent.private_key_path,
+                #did_document_path=caller_agent.did_document_path,
+                #private_key_path=caller_agent.private_key_path,
                 task_type=task_type,
                 max_documents=max_documents,
                 agent_name=agent_name
@@ -736,8 +723,7 @@ class ANPToolCrawler:
         """
 
     async def _intelligent_crawler(self, user_input: str, initial_url: str,
-                                 prompt_template: str, did_document_path: str,
-                                 private_key_path: str, anpsdk=None,
+                                 prompt_template: str,  anpsdk=None,
                                  caller_agent: str = None, target_agent: str = None,
                                  use_two_way_auth: bool = True, task_type: str = "general",
                                  max_documents: int = 10, agent_name: str = "智能爬虫"):
@@ -748,10 +734,10 @@ class ANPToolCrawler:
         visited_urls = set()
         crawled_documents = []
 
-        # 初始化ANPTool
+        # 初始化ANPTool，并传入注入的 auth_client
+        # 注意：这里的 self.auth_client 是从 ANPToolCrawler 的构造函数中传入的
         anp_tool = ANPTool(
-            did_document_path=did_document_path,
-            private_key_path=private_key_path
+            auth_client=self.auth_client
         )
 
         # 获取初始URL内容
@@ -957,6 +943,21 @@ class ANPToolCrawler:
                         params = parameters
         body = function_args.get("body", {})
 
+
+        # 2. --- URL 健壮性修复 ---
+        # 检查URL是否为相对路径，如果是，则根据target_agent的DID补全
+        if url and not url.startswith(('http://', 'https://')):
+            if not target_agent:
+                logger.warning(f"无法补全相对URL '{url}'，因为缺少 target_agent DID。")
+            else:
+                host, port = parse_wba_did_host_port(target_agent)
+                if not host:
+                    logger.error(f"无法从目标DID '{target_agent}' 中解析主机以补全相对URL '{url}'")
+                else:
+                    base_url = f"http://{host}:{port}"
+                    # 确保相对路径前有一个斜杠
+                    url = f"{base_url}{url if url.startswith('/') else '/' + url}"
+                    logger.info(f"已将相对URL补全为: {url}")
         # 处理消息参数
         if len(body) == 0:
             message_value = self._find_message_in_args(function_args)

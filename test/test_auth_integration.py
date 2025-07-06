@@ -24,7 +24,7 @@ set_global_config(config)
 from anp_open_sdk.auth.schemas import DIDCredentials, AuthenticationContext
 from anp_open_sdk.auth.memory_auth_header_builder import create_memory_auth_header_client
 from anp_open_sdk.auth.auth_client import create_authenticator
-from anp_open_sdk.anp_sdk_user_data import LocalUserDataManager, did_create_user
+from anp_open_sdk_framework.adapter_user_data.anp_sdk_user_data import LocalUserDataManager, did_create_user
 from anp_open_sdk.anp_sdk_agent import LocalAgent
 
 # 设置日志

@@ -22,12 +22,12 @@ from .step_helper import DemoStepHelper
 
 
 
-from anp_open_sdk_demo.demo_modules.customized_group_member import (
+from demo_anp_open_sdk.demo_modules.customized_group_member import (
     GroupMemberWithStorage,
     GroupMemberWithStats,
     GroupMemberComplete
 )
-from anp_open_sdk_demo.demo_modules.customized_group_runner import (
+from demo_anp_open_sdk.demo_modules.customized_group_runner import (
     ChatRoomRunnerWithLogging,
     ModeratedChatRunnerWithLogging
 )
@@ -96,7 +96,7 @@ class DemoTaskRunner:
 
     async def run_agent_lifecycle_demo(self, agent1,agent2,agent3):
         # 导入必要的模块
-        from anp_open_sdk.anp_sdk_user_data import did_create_user, get_user_dir_did_doc_by_did
+        from anp_open_sdk_framework.adapter_user_data.anp_sdk_user_data import did_create_user, get_user_dir_did_doc_by_did
         from anp_open_sdk.anp_sdk_agent import LocalAgent
         from anp_open_sdk.config import get_global_config
         import os

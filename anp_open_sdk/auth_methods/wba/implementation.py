@@ -1,14 +1,21 @@
 # anp_open_sdk/auth_methods/wba/implementation.py
 import base64
+import hashlib
 import json
 import logging
+import secrets
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any, Tuple
+from urllib.parse import urlparse
 
-from anp_open_sdk.core.auth.base import BaseDIDAuthenticator, BaseDIDResolver, BaseDIDSigner, BaseAuthHeaderBuilder, \
+import aiohttp
+import jcs
+
+from anp_open_sdk.auth.did_auth_base import BaseDIDAuthenticator, BaseDIDResolver, BaseDIDSigner, BaseAuthHeaderBuilder, \
     BaseAuth
-from anp_open_sdk.core.auth.schemas import AuthenticationContext, DIDCredentials, DIDDocument
-from anp_open_sdk.core.auth.utils import generate_nonce, verify_timestamp
+from anp_open_sdk.auth.schemas import AuthenticationContext, DIDCredentials, DIDDocument
+from anp_open_sdk.auth.utils import generate_nonce, is_valid_server_nonce
+from anp_open_sdk.auth.token_nonce_auth import verify_timestamp
 
 logger = logging.getLogger(__name__)
 
@@ -42,24 +49,116 @@ class PureWBAAuthHeaderBuilder(BaseAuthHeaderBuilder):
     def __init__(self, signer: BaseDIDSigner):
         self.signer = signer
 
+    def _select_authentication_method(self, did_document) -> Tuple[Dict, str]:
+        """从DID文档中选择第一个认证方法。"""
+        # Check if it's a DIDDocument (Pydantic model) or a dict
+        if hasattr(did_document, 'authentication'):
+            authentication_methods = did_document.authentication
+            verification_methods = did_document.verification_methods
+        else:
+            authentication_methods = did_document.get("authentication")
+            verification_methods = did_document.get("verificationMethod", [])
+            
+        if not authentication_methods or not isinstance(authentication_methods, list):
+            raise ValueError("DID document is missing or has an invalid 'authentication' field.")
+
+        first_method_ref = authentication_methods[0]
+
+        if isinstance(first_method_ref, str):
+            method_id = first_method_ref
+            if hasattr(did_document, 'verification_methods'):
+                # For DIDDocument Pydantic model
+                method_dict = next((vm.__dict__ for vm in verification_methods if vm.id == method_id), None)
+            else:
+                # For dict
+                method_dict = next((vm for vm in verification_methods if vm.get("id") == method_id), None)
+            if not method_dict:
+                raise ValueError(f"Verification method '{method_id}' not found in 'verificationMethod' array.")
+        elif isinstance(first_method_ref, dict):
+            method_dict = first_method_ref
+            method_id = method_dict.get("id")
+            if not method_id:
+                raise ValueError("Embedded authentication method is missing 'id'.")
+        else:
+            raise ValueError("Invalid format for authentication method reference.")
+
+        fragment = urlparse(method_id).fragment
+        if not fragment:
+            raise ValueError(f"Could not extract fragment from verification method ID: {method_id}")
+
+        return method_dict, f"#{fragment}"
+
     def build_auth_header(self, context: AuthenticationContext, credentials: DIDCredentials) -> Dict[str, str]:
-        nonce = generate_nonce()
-        timestamp = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
-        key_id = credentials.key_id
+        did_document = credentials.did_document
+        did = credentials.did
 
-        parts = [credentials.did, nonce, timestamp]
-        if context.use_two_way_auth and context.target_did:
-            parts.append(context.target_did)
-        parts.append(key_id)
+        _method_dict, verification_method_fragment = self._select_authentication_method(did_document)
 
-        payload_to_sign = ",".join(parts)
-        signature = self.signer.sign_payload(payload_to_sign, credentials.private_key_bytes)
+        nonce = secrets.token_hex(16)
+        timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-        header_parts = parts + [signature]
-        auth_header_value = ",".join(header_parts)
-        return {"Authorization": f"DIDWba {auth_header_value}"}
+        data_to_sign = {
+            "nonce": nonce,
+            "timestamp": timestamp,
+            "service": context.request_url,
+            "did": did,
+        }
+        if context.use_two_way_auth:
+            data_to_sign["resp_did"] = context.target_did
 
+        canonical_json = jcs.canonicalize(data_to_sign)
+        content_hash = hashlib.sha256(canonical_json).digest()
 
+        signature_bytes = credentials.sign(content_hash, verification_method_fragment)
+        signature = base64.urlsafe_b64encode(signature_bytes).rstrip(b"=").decode("utf-8")
+
+        parts = [
+            f'DIDWba did="{did}"',
+            f'nonce="{nonce}"',
+            f'timestamp="{timestamp}"',
+        ]
+        if context.use_two_way_auth:
+            parts.append(f'resp_did="{context.target_did}"')
+
+        parts.extend([f'verification_method="{verification_method_fragment}"', f'signature="{signature}"'])
+
+        auth_header_value = ", ".join(parts)
+        return {"Authorization": auth_header_value}
+
+    def parse_auth_header(self, auth_header: str) -> Dict[str, Any]:
+        """解析纯净的WBA认证头。"""
+        if not auth_header or not auth_header.startswith("DIDWba "):
+            return {}
+
+        value = auth_header[7:]  # Remove "DIDWba " prefix
+        parts = value.split(',')
+
+        try:
+            if len(parts) == 6:
+                # Two-way auth: did,nonce,ts,resp_did,keyid,sig
+                return {
+                    'did': parts[0],
+                    'nonce': parts[1],
+                    'timestamp': parts[2],
+                    'resp_did': parts[3],
+                    'key_id': parts[4],
+                    'signature': parts[5]
+                }
+            elif len(parts) == 5:
+                # One-way auth: did,nonce,ts,keyid,sig
+                return {
+                    'did': parts[0],
+                    'nonce': parts[1],
+                    'timestamp': parts[2],
+                    'key_id': parts[3],
+                    'signature': parts[4],
+                    'resp_did': None
+                }
+        except IndexError:
+            logger.error(f"解析认证头时发生索引错误: {auth_header}")
+            return {}
+
+        return {}
 class PureWBAAuth(BaseAuth):
     """纯净的WBA认证头解析器。"""
 
@@ -83,11 +182,170 @@ class PureWBADIDAuthenticator(BaseDIDAuthenticator):
     它依赖于一个外部的DIDResolver来获取公钥。
     """
 
-    def __init__(self, resolver: BaseDIDResolver):
-        signer = PureWBADIDSigner()
-        header_builder = PureWBAAuthHeaderBuilder(signer)
-        base_auth = PureWBAAuth()
+
+    def __init__(self, resolver: BaseDIDResolver, signer: BaseDIDSigner, header_builder: BaseAuthHeaderBuilder, base_auth: BaseAuth):
         super().__init__(resolver, signer, header_builder, base_auth)
+
+    async def authenticate_request(self, context: AuthenticationContext, credentials: DIDCredentials) -> Tuple[
+        bool, str, Dict[str, Any]]:
+        """
+        使用纯净组件执行认证请求。
+        借鉴 WBADIDAuthenticator 的实现，但使用自身的 pure 组件。
+        """
+        try:
+            # 1. 构建认证头
+            auth_headers = self.header_builder.build_auth_header(context, credentials)
+
+            # 2. 准备请求参数
+            request_url = context.request_url
+            method = getattr(context, 'method', 'GET').upper()
+            json_data = getattr(context, 'json_data', None)
+            custom_headers = getattr(context, 'custom_headers', {})
+
+            # 合并认证头和自定义头
+            merged_headers = {**custom_headers, **auth_headers}
+
+            # 3. 发送带认证头的HTTP请求
+            async with aiohttp.ClientSession() as session:
+                request_kwargs = {'headers': merged_headers}
+                if method in ["POST", "PUT", "PATCH"] and json_data is not None:
+                    request_kwargs['json'] = json_data
+
+                async with session.request(method, request_url, **request_kwargs) as response:
+                    status = response.status
+                    is_success = 200 <= status < 300
+                    response_headers = dict(response.headers)
+
+                    try:
+                        response_body = await response.json()
+                    except (aiohttp.ContentTypeError, json.JSONDecodeError):
+                        response_body = {"text": await response.text()}
+
+                    return is_success, json.dumps(response_headers), response_body
+
+        except Exception as e:
+            logger.error(f"Pure authenticate_request failed: {e}", exc_info=True)
+            return False, "", {"error": str(e)}
+
+    async def verify_response(self, auth_header: str, context: AuthenticationContext) -> Tuple[bool, str]:
+        """
+        验证来自服务端的响应认证头。
+        这是对 BaseDIDAuthenticator 中抽象方法的实现。
+        """
+        try:
+            if not auth_header or not auth_header.startswith("DIDWba "):
+                return False, "Invalid or missing 'DIDWba' prefix in auth header."
+
+            parts = auth_header[7:].split(',')
+            if len(parts) != 6:
+                return False, f"Invalid auth header format. Expected 6 parts, got {len(parts)}."
+
+            did, nonce, timestamp, resp_did, key_id, signature = parts
+
+            # 1. 验证时间戳
+            if not verify_timestamp(timestamp):
+                return False, "Timestamp verification failed."
+
+            # 2. 验证响应的接收者是否是请求的发起者
+            if resp_did != context.caller_did:
+                return False, f"Response DID mismatch. Expected {context.caller_did}, got {resp_did}."
+
+            # 3. 解析签名者的DID文档
+            did_doc = await self.resolver.resolve_did_document(did)
+            if not did_doc:
+                return False, f"Failed to resolve DID document for {did}."
+
+            # 4. 从DID文档中获取公钥
+            public_key_b58 = None
+            for vm in did_doc.verification_methods:
+                if vm.get('id') == key_id:
+                    public_key_b58 = vm.get('publicKeyMultibase')
+                    break
+
+            if not public_key_b58:
+                return False, f"Public key with id {key_id} not found in DID document for {did}."
+
+            # Multibase 'z' prefix indicates base58btc
+            from anp_open_sdk.auth.utils import multibase_to_bytes
+            public_key_bytes = multibase_to_bytes(public_key_b58)
+
+            # 5. 验证签名
+            payload_to_verify = ",".join(parts[:-1])
+            is_valid = self.signer.verify_signature(payload_to_verify, signature, public_key_bytes)
+
+            if not is_valid:
+                return False, "Signature verification failed."
+
+            return True, "Response verification successful."
+        except Exception as e:
+            logger.error(f"Error during response verification: {e}", exc_info=True)
+            return False, f"Exception during verification: {e}"
+
+    async def verify_request_header(self, auth_header: str, context: AuthenticationContext) -> Tuple[bool, str]:
+        """
+        验证来自客户端的请求认证头 (服务端使用)。
+        """
+        try:
+            parsed_header = self.header_builder.parse_auth_header(auth_header)
+            if not parsed_header:
+                return False, "Invalid or unparsable auth header."
+            required_keys = {"did", "nonce", "timestamp", "verification_method", "signature"}
+            if not required_keys.issubset(parsed_header.keys()):
+                return False, "Auth header is missing required fields."
+
+            did = parsed_header['did']
+            nonce = parsed_header['nonce']
+            timestamp = parsed_header['timestamp']
+            verification_method_fragment = parsed_header['verification_method']
+            signature = parsed_header['signature']
+            resp_did_from_header = parsed_header.get('resp_did')
+
+            # 1. 验证时间戳
+            if not verify_timestamp(timestamp):
+                return False, "Timestamp verification failed."
+
+            # 2. 验证 Nonce
+            if not is_valid_server_nonce(nonce):
+                return False, "Invalid or reused nonce."
+
+            # 3. 如果是双向认证，验证目标DID
+            if resp_did_from_header:
+                if resp_did_from_header != context.target_did:
+                    return False, f"Response DID mismatch. Header has {resp_did_from_header}, server is {context.target_did}."
+
+            # 4. 解析签名者的DID文档
+            did_doc = await self.resolver.resolve_did_document(did)
+            if not did_doc:
+                return False, f"Failed to resolve DID document for {did}."
+
+            # 5. 获取公钥
+            public_key_bytes = did_doc.get_public_key_bytes_by_fragment(verification_method_fragment)
+            if not public_key_bytes:
+                return False, f"Public key with fragment {verification_method_fragment} not found in DID document for {did}."
+
+            # 6. 重构签名内容并验证签名
+            data_to_sign = {
+                "nonce": nonce,
+                "timestamp": timestamp,
+                "service": context.request_url,
+                "did": did,
+            }
+            if resp_did_from_header:
+                data_to_sign["resp_did"] = resp_did_from_header
+
+            canonical_json_bytes = jcs.canonicalize(data_to_sign)
+            payload_to_verify = hashlib.sha256(canonical_json_bytes).hexdigest()
+
+            is_valid = self.signer.verify_signature(payload_to_verify, signature, public_key_bytes)
+
+            if not is_valid:
+                return False, "Signature verification failed."
+
+            return True, "Request verification successful."
+        except Exception as e:
+            logger.error(f"Error during request header verification: {e}", exc_info=True)
+            return False, f"Exception during verification: {e}"
+
 
     async def verify_response_header(self, auth_header: str, expected_sender_did: str) -> bool:
         """
@@ -124,4 +382,7 @@ class PureWBADIDAuthenticator(BaseDIDAuthenticator):
 
 def create_pure_authenticator(resolver: BaseDIDResolver) -> BaseDIDAuthenticator:
     """工厂函数，创建无依赖的认证器。"""
-    return PureWBADIDAuthenticator(resolver)
+    signer = PureWBADIDSigner()
+    header_builder = PureWBAAuthHeaderBuilder(signer)
+    base_auth = PureWBAAuth()
+    return PureWBADIDAuthenticator(resolver, signer, header_builder, base_auth)

@@ -1,13 +1,11 @@
 import json
-import os
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 
 from ..core.config import USERS_CREDENTIALS_FILE, get_anp_user_base_path
 from ..models.schemas import UserCreate
-from anp_open_sdk.anp_sdk_user_data import (
+from anp_open_sdk_framework.adapter_user_data.anp_sdk_user_data import (
     did_create_user,
-    get_user_dir_did_doc_by_did,
     LocalUserDataManager)
 
 

@@ -1,4 +1,5 @@
 # anp_open_sdk/agents_config/orchestrator_agent/agent_handlers.py
+import types
 
 import httpx  # 需要安装 httpx: pip install httpx
 import json
@@ -9,7 +10,6 @@ import logging
 logger = logging.getLogger(__name__)
 from anp_open_sdk.anp_sdk import ANPSDK
 from anp_open_sdk.anp_sdk_agent import LocalAgent
-from anp_open_sdk.auth.auth_client import agent_auth_request
 from anp_open_sdk_framework.local_methods.local_methods_caller import LocalMethodsCaller
 from anp_open_sdk_framework.local_methods.local_methods_doc import LocalMethodsDocGenerator
 
@@ -29,18 +29,19 @@ async def initialize_agent(agent, sdk_instance):
     caller = LocalMethodsCaller(sdk_instance)
 
     # 关键步骤：将函数作为方法动态地附加到创建的 Agent 实例上
-    agent.discover_and_describe_agents = discover_and_describe_agents
-    agent.run_calculator_add_demo = run_calculator_add_demo
-    agent.run_hello_demo = run_hello_demo
-    agent.run_ai_crawler_demo = run_ai_crawler_demo
-    agent.run_ai_root_crawler_demo = run_ai_root_crawler_demo
-    agent.run_agent_002_demo = run_agent_002_demo
-    agent.run_agent_002_demo_new = run_agent_002_demo_new
-    logger.debug(f" -> Attached capability to loading side.")
+    # 使用 types.MethodType 确保 'self' 参数被正确传递
+    agent.discover_and_describe_agents = types.MethodType(discover_and_describe_agents, agent)
+    agent.run_calculator_add_demo = types.MethodType(run_calculator_add_demo, agent)
+    agent.run_hello_demo = types.MethodType(run_hello_demo, agent)
+    agent.run_ai_crawler_demo = types.MethodType(run_ai_crawler_demo, agent)
+    agent.run_ai_root_crawler_demo = types.MethodType(run_ai_root_crawler_demo, agent)
+    agent.run_agent_002_demo = types.MethodType(run_agent_002_demo, agent)
+    agent.run_agent_002_demo_new = types.MethodType(run_agent_002_demo_new, agent)
+    logger.debug(f" -> Attached capability to agent instance: {agent.name}")
 
     return my_agent_instance
 
-async def discover_and_describe_agents(publisher_url):
+async def discover_and_describe_agents(self,publisher_url):
     """
     发现并获取所有已发布Agent的详细描述。
     这个函数将被附加到 Agent 实例上作为方法。
@@ -72,8 +73,9 @@ async def discover_and_describe_agents(publisher_url):
                 did_doc_url = f"http://{host}:{port}/wba/user/{user_id}/did.json"
 
                 logger.debug(f"    - Step 2: Fetching DID Document from {did_doc_url}")
-                status, did_doc_data, msg, success = await agent_auth_request(
-                    caller_agent=my_agent_instance.id,  # 使用 self.id 作为调用者
+                # 核心变化：使用注入的 auth_client
+                status, did_doc_data, msg, success = await self.auth_client.authenticated_request(
+                    caller_agent=self.id,  # 使用 self.id 作为调用者
                     target_agent=did,
                     request_url=did_doc_url
                 )
@@ -100,8 +102,9 @@ async def discover_and_describe_agents(publisher_url):
                     continue
 
                 logger.debug(f"    - Step 3: Fetching Agent Description from {ad_endpoint}")
-                status, ad_data, msg, success = await agent_auth_request(
-                    caller_agent=my_agent_instance.id,
+                # 再次使用注入的 auth_client
+                status, ad_data, msg, success = await self.auth_client.authenticated_request(
+                    caller_agent=self.id,
                     target_agent=did,
                     request_url=ad_endpoint
                 )
@@ -126,7 +129,7 @@ async def discover_and_describe_agents(publisher_url):
 
 
 
-async def run_calculator_add_demo():
+async def run_calculator_add_demo(self):
 
     caculator_did = "did:wba:localhost%3A9527:wba:user:28cddee0fade0258"
     calculator_agent = LocalAgent.from_did(caculator_did)
@@ -137,13 +140,13 @@ async def run_calculator_add_demo():
     }
 
     result = await agent_api_call_get(
-    my_agent_instance.id, calculator_agent.id, "/calculator/add", params  )
+    self.id, calculator_agent.id, "/calculator/add", params  )
 
     logger.info(f"计算api调用结果: {result}")
     return result
 
 
-async def run_hello_demo():
+async def run_hello_demo(self):
     target_did = "did:wba:localhost%3A9527:wba:user:5fea49e183c6c211"
     target_agent = LocalAgent.from_did(target_did)
     # 构造 JSON-RPC 请求参数
@@ -152,13 +155,13 @@ async def run_hello_demo():
     }
 
     result = await agent_api_call_get(
-    my_agent_instance.id, target_agent.id, "/hello", params  )
+    self.id, target_agent.id, "/hello", params  )
 
     logger.info(f"hello api调用结果: {result}")
     return result
 
 
-async def run_ai_crawler_demo():
+async def run_ai_crawler_demo(self):
 
     target_did= "did:wba:localhost%3A9527:wba:user:28cddee0fade0258"
 
@@ -171,7 +174,7 @@ async def run_ai_crawler_demo():
     host,port = ANPSDK.get_did_host_port_from_did(target_did)
     try:
         result = await crawler.run_crawler_demo(
-            req_did=my_agent_instance.id,  # 请求方是协作智能体
+            req_did=self.id,  # 请求方是协作智能体
             resp_did=target_did,  # 目标是组装后的智能体
             task_input=task_description,
             initial_url=f"http://{host}:{port}/wba/user/{target_did}/ad.json",
@@ -187,12 +190,12 @@ async def run_ai_crawler_demo():
 
 
 
-async def run_ai_root_crawler_demo():
+async def run_ai_root_crawler_demo(self):
 
     target_did= "did:wba:localhost%3A9527:wba:user:28cddee0fade0258"
 
 
-    crawler = ANPToolCrawler()
+    crawler = ANPToolCrawler(auth_client=self.auth_client)
 
     # 协作智能体通过爬虫向组装后的智能体请求服务
     task_description = "我需要计算两个浮点数相加 2.88888+999933.4445556"
@@ -200,7 +203,7 @@ async def run_ai_root_crawler_demo():
     host,port = ANPSDK.get_did_host_port_from_did(target_did)
     try:
         result = await crawler.run_crawler_demo(
-            req_did=my_agent_instance.id,
+            req_did=self.id,
             resp_did=target_did,
             task_input=task_description,
             initial_url="http://localhost:9527/publisher/agents",
@@ -216,7 +219,7 @@ async def run_ai_root_crawler_demo():
 
 
 
-async def run_agent_002_demo(sdk, **kwargs):
+async def run_agent_002_demo(self,sdk, **kwargs):
     """调用 agent_002 上的自定义演示方法"""
     try:
         # 通过 sdk 获取 agent_002 实例
@@ -236,7 +239,7 @@ async def run_agent_002_demo(sdk, **kwargs):
         return f"调用 agent_002.demo_method 时出错: {e}"
 
 
-async def run_agent_002_demo_new():
+async def run_agent_002_demo_new(self):
     """通过搜索调用 agent_002 的演示方法"""
     try:
         # 方式1：通过关键词搜索调用

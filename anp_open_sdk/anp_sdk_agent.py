@@ -108,11 +108,11 @@ class LocalAgent:
 
     @classmethod
     def from_did(cls, did: str, name: str = "未命名", agent_type: str = "personal"):
-        from anp_open_sdk.anp_sdk_user_data import LocalUserDataManager
+        from anp_open_sdk_framework.adapter_user_data.anp_sdk_user_data import LocalUserDataManager
         user_data_manager = LocalUserDataManager()
-        user_data_manager.load_users()
+        # Users are already loaded in __init__, no need to call load_users()
         user_data = user_data_manager.get_user_data(did)
-        if name == "未命名":
+        if user_data and name == "未命名":
             name = user_data.name
         if not user_data:
             raise ValueError(f"未找到 DID 为 {did} 的用户数据")
@@ -120,13 +120,13 @@ class LocalAgent:
 
     @classmethod
     def from_name(cls, name: str, agent_type: str = "personal"):
-        from anp_open_sdk.anp_sdk_user_data import LocalUserDataManager
+        from anp_open_sdk_framework.adapter_user_data.anp_sdk_user_data import LocalUserDataManager
         user_data_manager = LocalUserDataManager()
-        user_data_manager.load_users()
+        # Users are already loaded in __init__, no need to call load_users()
         user_data = user_data_manager.get_user_data_by_name(name)
         if not user_data:
             logger.error(f"未找到 name 为 {name} 的用户数据")
-            return cls( None, name, agent_type)
+            return cls(None, name, agent_type)
         return cls(user_data, name, agent_type)
 
     def __del__(self):

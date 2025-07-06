@@ -24,7 +24,7 @@ anp_sdk:
 
 
   # 虚拟目录配置
-  auth_virtual_dir: "wba/auth"
+  auth_virtual_dir: "wba/adapter_auth"
   msg_virtual_dir: "/agent/message"
   
   # 安全配置

@@ -1,4 +1,4 @@
-# anp_open_sdk/auth/wba_auth.py
+# anp_open_sdk/adapter_auth/wba_auth.py
 
 from agent_connect.authentication import resolve_did_wba_document
 from anp_open_sdk.config import get_global_config
@@ -18,7 +18,6 @@ from agent_connect.authentication.did_wba import extract_auth_header_parts
 
 from ..agent_connect_hotpatch.authentication.did_wba import extract_auth_header_parts_two_way, \
     verify_auth_header_signature_two_way
-from ..anp_sdk_user_data import LocalUserDataManager
 
 
 
@@ -80,41 +79,35 @@ class WBADIDSigner(BaseDIDSigner):
             return False
 
 class WBAAuthHeaderBuilder(BaseAuthHeaderBuilder):
-    def build_auth_header(self, context, credentials):
-        user_data_manager = LocalUserDataManager()
-        user_data = user_data_manager.get_user_data(context.caller_did)
+    def build_auth_header(self, context: AuthenticationContext, credentials: DIDCredentials) -> Dict[str, str]:
+        """
+        构建 WBA 双向认证头。
+        """
+        from datetime import datetime, timezone
+        import uuid
 
-        did_document_path = user_data.did_doc_path
-        private_key_path =user_data.did_private_key_file_path
+        # 1. 准备组件
+        nonce = str(uuid.uuid4())
+        timestamp = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+        caller_did = context.caller_did
+        target_did = context.target_did
 
-        if context.use_two_way_auth:
-            # 优先用 hotpatch 的 DIDWbaAuthHeader
-            from anp_open_sdk.agent_connect_hotpatch.authentication.did_wba_auth_header import DIDWbaAuthHeader as TwoWayDIDWbaAuthHeader
-            auth_client = TwoWayDIDWbaAuthHeader(
-                did_document_path=did_document_path,
-                private_key_path=private_key_path
-            )
-        else:
-            # 用 agent_connect 的 DIDWbaAuthHeader
-            from agent_connect.authentication.did_wba_auth_header import DIDWbaAuthHeader as OneWayDIDWbaAuthHeader
-            auth_client = OneWayDIDWbaAuthHeader(
-                did_document_path=did_document_path,
-                private_key_path=private_key_path
-            )
+        # 从凭证中获取 key_id。它通常是 DID URL 的一部分，指向验证方法。
+        if not hasattr(credentials.key_pair, 'key_id') or not credentials.key_pair.key_id:
+            raise ValueError("DIDCredentials.key_pair is missing 'key_id'")
+        key_id = credentials.key_pair.key_id
 
-        # 判断是否有 get_auth_header_two_way 方法
-        if hasattr(auth_client, 'get_auth_header_two_way'):
-            # 双向认证
-            auth_headers = auth_client.get_auth_header_two_way(
-                context.request_url, context.target_did
-            )
-        else:
-            # 单向/降级认证
-            auth_headers = auth_client.get_auth_header(
-                context.request_url
-            )
-        return auth_headers
+        # 2. 构建签名负载
+        payload_to_sign = f"{caller_did}{nonce}{timestamp}{target_did}"
 
+        # 3. 签名
+        signer = WBADIDSigner()
+        signature = signer.sign_payload(payload_to_sign, credentials.key_pair)
+
+        # 4. 组装认证头
+        auth_header_value = f'DID-WBA-V1-ED25519 did="{caller_did}",nonce="{nonce}",timestamp="{timestamp}",resp-did="{target_did}",keyid="{key_id}",signature="{signature}"'
+
+        return {"Authorization": auth_header_value}
     def parse_auth_header(self, auth_header: str) -> Dict[str, Any]:
             from anp_open_sdk.agent_connect_hotpatch.authentication.did_wba import extract_auth_header_parts_two_way
             try:

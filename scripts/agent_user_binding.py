@@ -3,7 +3,7 @@ import os
 import argparse
 import sys
 import yaml
-from anp_open_sdk.anp_sdk_user_data import LocalUserDataManager, did_create_user
+from anp_open_sdk_framework.adapter_user_data.anp_sdk_user_data import LocalUserDataManager, did_create_user
 import glob
 
 from anp_open_sdk.config import UnifiedConfig, set_global_config,get_global_config

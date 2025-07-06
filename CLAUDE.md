@@ -21,7 +21,7 @@ python -m venv .venv
 source .venv/bin/activate  # Linux/Mac
 # .venv\Scripts\activate   # Windows
 
-# Install dependencies
+# Install dependencies (Poetry required)
 poetry install
 python -m ensurepip --upgrade
 python -m pip install --upgrade pip
@@ -69,52 +69,125 @@ python anp_open_sdk_framework_demo/framework_demo.py --config unified_config_anp
 
 ### User Extension (Chrome Plugin)
 ```bash
-cd anp_user_extension
+cd demo_anp_user_service/anp_user_extension
 npm install
 npm run build
 ```
 
 ### User Service Backend
 ```bash
-cd anp_user_service
+cd demo_anp_user_service
 python main.py
 ```
 
+### No Linting/Formatting Tools
+This project currently has no automated linting, formatting, or code quality tools configured. Development relies on manual code review and IDE defaults.
+
 ## Architecture Overview
 
-### Core Classes and Files
+ANP Open SDK follows a layered architecture with clear separation of concerns across three main layers:
 
-- **anp_open_sdk/anp_sdk.py** - Main ANPSDK class with multi-mode support
-- **anp_open_sdk/anp_sdk_agent.py** - LocalAgent class for agent instances
-- **anp_open_sdk_framework/agent_manager.py** - LocalAgentManager for loading agents from YAML configs
-- **anp_open_sdk/auth/** - Authentication and DID management
-- **anp_open_sdk/service/** - Routers, publishers, and interaction services
+### Core Architecture Layers
+
+1. **Core SDK Layer** (`anp_open_sdk/`) - Protocol encapsulation, DID management, authentication
+2. **Framework Layer** (`anp_open_sdk_framework/`) - Plugin architecture for rapid agent development  
+3. **Application Layer** - Demo applications, user services, and extensions
+
+### Key Classes and Files
+
+**Main Orchestration:**
+- **anp_open_sdk/anp_sdk.py** - Central ANPSDK class with 5 operational modes (multi-agent router, DID server, self-service, WebSocket proxy)
+- **anp_open_sdk/anp_sdk_agent.py** - LocalAgent class for individual agent instances with DID-based identity
+- **anp_open_sdk_framework/agent_manager.py** - LocalAgentManager for YAML-based agent loading and OpenAPI generation
+
+**Authentication & Security:**
+- **anp_open_sdk/auth/** - DID-based authentication system with WBA implementation, JWT tokens, contact management
+- **anp_open_sdk/auth/did_auth_wba.py** - Web-Based Authentication implementation
+- **anp_open_sdk/auth/auth_server.py** - Central authentication orchestrator
+
+**Service & Routing:**
+- **anp_open_sdk/service/router/** - Multi-agent request routing, DID resolution, business handler wrapping
+- **anp_open_sdk/service/publisher/** - DID publishing and agent registration services
+- **anp_open_sdk/service/interaction/** - Group management, P2P messaging, tool integration
 
 ### Agent Plugin System
 
-Agents are defined using YAML configuration files in `data_user/localhost_XXXX/agents_config/`:
+Agents use a flexible plugin architecture with three loading patterns:
+
+**Configuration Files** (`data_user/localhost_XXXX/agents_config/`):
 - **agent_mappings.yaml** - Agent configuration (name, DID, API endpoints)
 - **agent_handlers.py** - Business logic handlers  
 - **agent_register.py** - Optional custom registration logic
 
+**Loading Patterns:**
+1. **Self-registration** - Agents register themselves via `agent_register.py`
+2. **Initialization-based** - Framework calls `initialize_agent()` function
+3. **Configuration-driven** - YAML mapping to handler functions with automatic wrapping
+
 ### Configuration System
 
-- **unified_config.default.yaml** - Configuration template
-- **UnifiedConfig class** - Centralized configuration management with environment variable mapping
-- Supports `{APP_ROOT}` placeholder for dynamic path resolution
+**UnifiedConfig Architecture** - Centralized YAML-based configuration with advanced features:
+- **unified_config.default.yaml** - Configuration template with environment variable mapping
+- **UnifiedConfig class** - Type inference, validation, and nested access via `ConfigNode` objects
+- **Path placeholder resolution** - `{APP_ROOT}` automatically resolves to project root directory
+- **Environment variable integration** - Direct mapping from YAML keys to `.env` file variables
+- **Secrets management** - Protected access patterns for sensitive configuration data
 
-### Multi-Server Architecture
+**Configuration Hierarchy:**
+```
+unified_config.yaml
+├── anp_sdk (core SDK settings)
+├── llm (language model configuration) 
+├── mail (email backend configuration)
+├── env_mapping (environment variable mappings)
+└── secrets (protected configuration access)
+```
 
-The framework supports running multiple agent servers (9527, 9528) that can communicate cross-server through DID authentication.
+### Multi-Server Architecture & Communication Flow
 
-### Key Integration Points
+**Deployment Flexibility** - Framework supports multiple operational modes and deployment patterns:
+- **Multi-agent servers** (default ports 9527, 9528) with cross-server DID-based authentication
+- **Five SDK modes** via `SdkMode` enum for different deployment scenarios
+- **Local vs. networked** agent communication with transparent routing
 
+**Agent Communication Flow:**
+```
+Client Request → FastAPI Middleware → DID/JWT Auth → Agent Router → LocalAgent → Business Logic
+                     ↓                    ↓               ↓            ↓
+            CORS/Security        Token Verification   DID Resolution   Method Invocation
+```
+
+**DID-Based Identity System:**
+- **Decentralized identifiers** for secure agent-to-agent communication
+- **Self-sovereign identity** with local cryptographic key management  
+- **Contact management** with token storage and relationship tracking
+- **Cross-network discovery** and authentication
+
+### Key Integration Points & Design Patterns
+
+**Agent Loading & Registration:**
 1. **Agent Loading**: `LocalAgentManager.load_agent_from_module()` loads agents from YAML configs
-2. **API Registration**: `wrap_business_handler()` wraps agent handlers for FastAPI
-3. **Local Methods**: `@local_method` decorator registers methods for local API calls
-4. **Cross-Agent Communication**: Agents can call each other's APIs locally or over network
+2. **API Registration**: `wrap_business_handler()` wraps agent handlers for FastAPI with parameter extraction
+3. **Local Methods**: `@local_method` decorator registers methods for inter-agent API calls
+4. **Cross-Agent Communication**: Agents communicate via DID resolution and token-based authentication
 
-## Development Patterns
+**Core Design Patterns:**
+- **Plugin Architecture** - Decorator-based registration (`@local_method`, `@expose_api`) with module-based loading
+- **Event-Driven Architecture** - Group event handlers, message routing, WebSocket/SSE real-time communication  
+- **Singleton with Multi-Instance** - ANPSDK class supports multiple instances on different ports
+- **Middleware Pattern** - Authentication, CORS, and request preprocessing via FastAPI middleware
+
+## File Structure & Development Patterns
+
+### Project Structure
+- `anp_open_sdk/` - Core SDK implementation (protocol, auth, routing)
+- `anp_open_sdk_demo/` - Core SDK demo and examples  
+- `anp_open_sdk_framework/` - Advanced framework layer (plugin architecture)
+- `anp_open_sdk_framework_demo/` - Framework usage examples and main demo entry point
+- `demo_anp_user_service/` - User-facing services and Chrome extension
+- `data_user/` - Runtime agent configurations, DID storage, and user data
+- `test/` - Unit tests and integration tests
+- `scripts/` - Development and deployment scripts
 
 ### Creating New Agents
 1. Create directory under `data_user/localhost_XXXX/agents_config/agent_name/`
@@ -147,10 +220,13 @@ config = get_global_config()
 
 ## File Structure Notes
 
-- `anp_open_sdk/` - Core SDK implementation
-- `anp_open_sdk_demo/` - Demo and test modules  
-- `anp_open_sdk_framework/` - Advanced framework layer
-- `anp_open_sdk_framework_demo/` - Framework usage examples
-- `data_user/` - Agent configurations and user data
+- `anp_open_sdk/` - Core SDK implementation (protocol, auth, routing)
+- `anp_open_sdk_demo/` - Core SDK demo and examples  
+- `anp_open_sdk_framework/` - Advanced framework layer (plugin architecture)
+- `anp_open_sdk_framework_demo/` - Framework usage examples and main demo entry point
+- `demo_anp_user_service/` - User-facing services and Chrome extension
+- `data_user/` - Runtime agent configurations, DID storage, and user data
 - `test/` - Unit tests and integration tests
-- Configuration files use YAML format with environment variable support
+- `scripts/` - Development and deployment scripts
+
+**Configuration files use YAML format with environment variable support and automatic path resolution.**
