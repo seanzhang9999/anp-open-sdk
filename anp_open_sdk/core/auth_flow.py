@@ -35,15 +35,19 @@ class AuthFlowManager:
     async def prepare_request_context(
             self, target_did: str, url: str, method: str, json_data: Optional[Dict] = None,
             use_two_way_auth: bool = True
-    ) -> RequestContext:
+    ) -> Tuple[AuthenticationContext, RequestContext]:
         """
         准备认证请求。这是 WBAAuthHeaderBuilder.build_auth_header 逻辑的纯净版。
         """
         # 1. 尝试使用Token (简化逻辑，实际可扩展)
         token = self.user_data.get_token_from_remote(target_did)
+        # 创建一个临时的 context，即使是 token 认证也可能需要
+        temp_context = AuthenticationContext(
+            caller_did=self.user_data.did, target_did=target_did, request_url=url, method=method
+        )
         if token:
             headers = {"Authorization": f"Bearer {token}", "req_did": self.user_data.did, "resp_did": target_did}
-            return RequestContext(method=method, url=url, headers=headers, json_data=json_data)
+            return temp_context, RequestContext(method=method, url=url, headers=headers, json_data=json_data)
 
         # 2. 如果没有Token，执行DID认证
         try:
@@ -63,10 +67,11 @@ class AuthFlowManager:
         )
 
         auth_headers = self.authenticator.header_builder.build_auth_header(context, caller_credentials)
-        return RequestContext(method=method, url=url, headers=auth_headers, json_data=json_data)
+        request_context = RequestContext(method=method, url=url, headers=auth_headers, json_data=json_data)
+        return context, request_context
 
     async def process_response(
-            self, response: ResponseContext, target_did: str
+            self, context: AuthenticationContext, response: ResponseContext, target_did: str
     ) -> AuthResult:
         """
         处理响应，严格实现了响应头解析、签名验证和Token提取。
@@ -97,16 +102,22 @@ class AuthFlowManager:
         if auth_type == "TwoWayAuth":
             # 这里的 authenticator 需要一个纯净的 verify_signature 方法
             # 它依赖于一个 DID 解析器来获取对方的公钥
-            is_peer_signature_valid = await self.authenticator.verify_signature_from_header(
-                peer_auth_header, expected_sender_did = target_did
+            is_peer_signature_valid, msg = await self.authenticator.verify_signature_from_header(
+                auth_header=peer_auth_header,
+                context=context,
+                expected_sender_did=target_did
             )
             if not is_peer_signature_valid:
+                # 返回详细的错误信息
+                error_msg = f"对端DID签名验证失败: {msg}"
+                logger.error(error_msg)
                 return AuthResult(
                     is_successful=False,
                     status_code=401,
-                    error_message="Peer DID signature verification failed."
+                    # 修正：在返回错误时，也提供响应体
+                    body=response.json_data or response.text_data,
+                    error_message=error_msg
                 )
-
         # 4. 所有验证通过，返回成功结果
         return AuthResult(
             is_successful=True,

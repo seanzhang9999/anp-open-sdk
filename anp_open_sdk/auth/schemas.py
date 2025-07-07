@@ -150,10 +150,22 @@ class DIDCredentials(BaseModel):
         # 提取密钥ID（去掉 # 前缀）
         key_id = verification_method_fragment.lstrip('#')
         
+        # DEBUG: 记录签名请求的基本信息
+        logger.info(f"🔐 PRIVATE KEY DEBUG - Key ID: {key_id}")
+        logger.info(f"🔐 PRIVATE KEY DEBUG - Verification method fragment: {verification_method_fragment}")
+        logger.info(f"🔐 PRIVATE KEY DEBUG - Data to sign length: {len(data_to_sign)}")
+        logger.info(f"🔐 PRIVATE KEY DEBUG - Data to sign (hex): {data_to_sign.hex()}")
+        
         # 获取对应的密钥对
         key_pair = self.get_key_pair(key_id)
         if not key_pair:
             raise ValueError(f"Key pair with ID '{key_id}' not found")
+        
+        # DEBUG: 记录密钥对信息
+        logger.info(f"🔐 PRIVATE KEY DEBUG - Private key length: {len(key_pair.private_key)}")
+        logger.info(f"🔐 PRIVATE KEY DEBUG - Private key (hex): {key_pair.private_key.hex()}")
+        logger.info(f"🔐 PRIVATE KEY DEBUG - Public key length: {len(key_pair.public_key)}")
+        logger.info(f"🔐 PRIVATE KEY DEBUG - Public key (hex): {key_pair.public_key.hex()}")
         
         # 根据密钥类型进行签名
         try:
@@ -161,27 +173,47 @@ class DIDCredentials(BaseModel):
             from cryptography.hazmat.primitives import hashes
             
             # 检查私钥长度来判断密钥类型
-            if len(key_pair.private_key) == 32:
-                # Ed25519 私钥
+            # 但是32字节可能是Ed25519或secp256k1，需要根据公钥长度来更准确地判断
+            if len(key_pair.private_key) == 32 and len(key_pair.public_key) == 32:
+                # Ed25519 私钥 (32 bytes) + Ed25519 公钥 (32 bytes)
                 try:
                     private_key_obj = ed25519.Ed25519PrivateKey.from_private_bytes(key_pair.private_key)
-                    logger.info(f"private key:{key_pair.private_key},method:ed25519")
-                    return private_key_obj.sign(data_to_sign)
-                except:
+                    logger.info(f"🔐 PRIVATE KEY DEBUG - Using Ed25519 signing")
+                    signature_bytes = private_key_obj.sign(data_to_sign)
+                    logger.info(f"🔐 PRIVATE KEY DEBUG - Ed25519 signature length: {len(signature_bytes)}")
+                    logger.info(f"🔐 PRIVATE KEY DEBUG - Ed25519 signature (hex): {signature_bytes.hex()}")
+                    return signature_bytes
+                except Exception as ed25519_error:
+                    logger.info(f"🔐 PRIVATE KEY DEBUG - Ed25519 failed: {ed25519_error}, trying secp256k1")
                     # 如果Ed25519失败，尝试secp256k1
                     pass
             
-            # secp256k1 私钥
+            # secp256k1 私钥 (支持32字节私钥 + 33/65字节公钥的组合)
+            logger.info(f"🔐 PRIVATE KEY DEBUG - Using secp256k1 signing")
             private_key_obj = ec.derive_private_key(
                 int.from_bytes(key_pair.private_key, byteorder="big"), 
                 ec.SECP256K1()
             )
-            logger.info(f"private key:{key_pair.private_key},method:secp256k1")
+            
+            # 生成对应的公钥用于验证
+            public_key_obj = private_key_obj.public_key()
+            from cryptography.hazmat.primitives import serialization
+            public_key_bytes = public_key_obj.public_bytes(
+                encoding=serialization.Encoding.X962,
+                format=serialization.PublicFormat.UncompressedPoint
+            )
+            logger.info(f"🔐 PRIVATE KEY DEBUG - Derived public key length: {len(public_key_bytes)}")
+            logger.info(f"🔐 PRIVATE KEY DEBUG - Derived public key (hex): {public_key_bytes.hex()}")
+            logger.info(f"🔐 PRIVATE KEY DEBUG - Public key matches stored: {public_key_bytes.hex() == key_pair.public_key.hex()}")
 
             # 直接返回 DER 格式签名（与原始 agent_connect 保持一致）
-            return private_key_obj.sign(data_to_sign, ec.ECDSA(hashes.SHA256()))
+            signature_bytes = private_key_obj.sign(data_to_sign, ec.ECDSA(hashes.SHA256()))
+            logger.info(f"🔐 PRIVATE KEY DEBUG - secp256k1 signature length: {len(signature_bytes)}")
+            logger.info(f"🔐 PRIVATE KEY DEBUG - secp256k1 signature (hex): {signature_bytes.hex()}")
+            return signature_bytes
             
         except Exception as e:
+            logger.error(f"🔐 PRIVATE KEY DEBUG - Signing failed: {e}")
             raise ValueError(f"Failed to sign data with key '{key_id}': {e}")
 
     @classmethod
@@ -290,8 +322,33 @@ class DIDCredentials(BaseModel):
             raw_document=user_data.did_doc
         )
         
-        # Create key pair
-        key_pair = DIDKeyPair.from_private_key_bytes(private_key_bytes, key_id)
+        # 🔧 FIX: 使用DID文档中存储的公钥，而不是重新生成
+        # 从DID文档中获取公钥
+        public_key_bytes = None
+        try:
+            public_key_bytes = did_doc.get_public_key_bytes_by_fragment(f"#{key_id}")
+            if public_key_bytes:
+                logger.info(f"🔑 使用DID文档中存储的公钥 (长度: {len(public_key_bytes)} bytes)")
+                logger.info(f"🔑 存储的公钥 (hex): {public_key_bytes.hex()}")
+            else:
+                logger.warning(f"🔑 无法从DID文档获取公钥，将从私钥重新生成")
+        except Exception as e:
+            logger.warning(f"🔑 从DID文档获取公钥失败: {e}，将从私钥重新生成")
+        
+        # 如果无法从DID文档获取公钥，才从私钥重新生成
+        if public_key_bytes is None:
+            logger.info(f"🔑 从私钥重新生成公钥")
+            # Create key pair using from_private_key_bytes (这会重新生成公钥)
+            key_pair = DIDKeyPair.from_private_key_bytes(private_key_bytes, key_id)
+            public_key_bytes = key_pair.public_key
+            logger.info(f"🔑 重新生成的公钥 (hex): {public_key_bytes.hex()}")
+        
+        # 直接创建密钥对，使用存储的公钥
+        key_pair = DIDKeyPair(
+            private_key=private_key_bytes,
+            public_key=public_key_bytes,  # 使用DID文档中的公钥
+            key_id=key_id
+        )
         
         # Get DID from user_data or did_doc
         did = user_data.get_did() if hasattr(user_data, 'get_did') else user_data.did_doc.get('id')

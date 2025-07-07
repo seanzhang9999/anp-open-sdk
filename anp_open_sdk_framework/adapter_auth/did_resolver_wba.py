@@ -25,7 +25,7 @@ class FrameworkDIDResolver(BaseDIDResolver):
         # 1. 优先从本地加载 (如果存在)
         local_user = self.user_data_manager.get_user_data(did)
         if local_user:
-            return DIDDocument.from_dict(local_user.did_document)
+            return DIDDocument(**local_user.did_document, raw_document=local_user.did_document)
 
         # 2. 如果本地没有，通过网络获取
         #    (这里的URL构造逻辑需要根据WBA规范确定)
@@ -39,6 +39,6 @@ class FrameworkDIDResolver(BaseDIDResolver):
         response = await self.transport.send(request)
 
         if response.status_code == 200 and response.json_data:
-            return DIDDocument.from_dict(response.json_data)
+            return DIDDocument(**response.json_data, raw_document=response.json_data)
 
         return None

@@ -39,10 +39,12 @@ class FrameworkAuthManager:
         flow_manager = AuthFlowManager(caller_user_data, self.resolver)
 
         # 1. 首次尝试：使用双向认证
-        request_context = await flow_manager.prepare_request_context(
+        # 捕获 context 和 request_context
+        context, request_context = await flow_manager.prepare_request_context(
             target_did, url, method, json_data, use_two_way_auth=True
         )
         response_context = await self.transport.send(request_context)
+
 
         # 2. 检查是否需要回退到单向认证
         if response_context.status_code in [401, 403]:
@@ -53,13 +55,14 @@ class FrameworkAuthManager:
             response_context = await self.transport.send(request_context_oneway)
 
         # 3. 处理最终的响应
-        auth_result = await flow_manager.process_response(response_context, target_did)
+        # 将捕获的 context 传递给 process_response
+        auth_result = await flow_manager.process_response(context, response_context, target_did)
 
         if not auth_result.is_successful:
             raise Exception(f"Authentication failed or request failed: {auth_result.error_message} - Body: {auth_result.body}")
 
         # 4. 执行副作用：存储Token
         if auth_result.token_to_store:
-            caller_user_data.store_token_from_remote(target_did, auth_result.token_to_store, 3600)
+            caller_user_data.store_token_from_remote(target_did, auth_result.token_to_store)
 
         return auth_result.body

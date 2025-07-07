@@ -21,10 +21,5 @@ paths:
               schema:
                 type: object
           description: 返回结果
-      summary: '
-
-        API处理函数，现在直接使用模块内的 my_llm_client。
-
-        它不再需要从request中获取agent实例。
-
-        '
+      summary: "\n    API处理函数，现在直接使用模块内的 my_llm_client。\n    它不再需要从request中获取agent实例。\n\
+        \    "

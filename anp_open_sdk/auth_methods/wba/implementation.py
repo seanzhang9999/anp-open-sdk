@@ -138,15 +138,38 @@ class PureWBADIDSigner(BaseDIDSigner):
             from cryptography.hazmat.primitives import hashes
             from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
 
+            # DEBUG: 记录验证过程的输入参数
+            logger.info(f"🔍 VERIFY DETAIL - Signature bytes length: {len(signature_bytes)}")
+            logger.info(f"🔍 VERIFY DETAIL - Signature bytes (hex): {signature_bytes.hex()}")
+            logger.info(f"🔍 VERIFY DETAIL - Payload bytes length: {len(payload_bytes)}")
+            logger.info(f"🔍 VERIFY DETAIL - Payload bytes (hex): {payload_bytes.hex()}")
+            logger.info(f"🔍 VERIFY DETAIL - Public key bytes length: {len(public_key_bytes)}")
+            logger.info(f"🔍 VERIFY DETAIL - Public key bytes (hex): {public_key_bytes.hex()}")
+            logger.info(f"🔍 VERIFY DETAIL - Compressed mode: {compressed}")
+
             # 创建公钥对象
             if compressed:
+                logger.info(f"🔍 VERIFY DETAIL - Creating compressed public key from encoded point")
                 public_key_obj = ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256K1(), public_key_bytes)
             else:
                 # 从非压缩格式创建公钥对象
+                logger.info(f"🔍 VERIFY DETAIL - Creating uncompressed public key from coordinates")
+                logger.info(f"🔍 VERIFY DETAIL - Public key format byte: 0x{public_key_bytes[0]:02x}")
+                
                 x = int.from_bytes(public_key_bytes[1:33], byteorder='big')
                 y = int.from_bytes(public_key_bytes[33:65], byteorder='big')
+                
+                logger.info(f"🔍 VERIFY DETAIL - X coordinate: {x}")
+                logger.info(f"🔍 VERIFY DETAIL - Y coordinate: {y}")
+                
+                # 验证坐标是否在曲线上
+                logger.info(f"🔍 VERIFY DETAIL - Attempting to create EllipticCurvePublicNumbers")
                 public_numbers = ec.EllipticCurvePublicNumbers(x, y, ec.SECP256K1())
+                
+                logger.info(f"🔍 VERIFY DETAIL - Attempting to create public key object")
                 public_key_obj = public_numbers.public_key()
+                
+                logger.info(f"🔍 VERIFY DETAIL - Public key object created successfully")
 
             # 确保签名长度是 64 字节（32字节 R + 32字节 S）
             if len(signature_bytes) != 64:
@@ -161,6 +184,9 @@ class PureWBADIDSigner(BaseDIDSigner):
             r = int.from_bytes(r_bytes, 'big')
             s = int.from_bytes(s_bytes, 'big')
             
+            logger.info(f"🔍 VERIFY DETAIL - R value: {r}")
+            logger.info(f"🔍 VERIFY DETAIL - S value: {s}")
+            
             # 验证 R 和 S 的有效性
             if r == 0 or s == 0:
                 logger.error("Invalid signature: R or S is zero")
@@ -168,13 +194,23 @@ class PureWBADIDSigner(BaseDIDSigner):
             
             # 转换为 DER 格式
             signature_der = encode_dss_signature(r, s)
+            logger.info(f"🔍 VERIFY DETAIL - DER signature length: {len(signature_der)}")
+            logger.info(f"🔍 VERIFY DETAIL - DER signature (hex): {signature_der.hex()}")
             
             # 验证签名
-            public_key_obj.verify(signature_der, payload_bytes, ec.ECDSA(hashes.SHA256()))
-            return True
+            try:
+                logger.info(f"🔍 VERIFY DETAIL - Attempting signature verification")
+                public_key_obj.verify(signature_der, payload_bytes, ec.ECDSA(hashes.SHA256()))
+                logger.info(f"🔍 VERIFY DETAIL - Signature verification SUCCESSFUL")
+                return True
+            except Exception as verify_error:
+                logger.error(f"🔍 VERIFY DETAIL - Signature verification FAILED: {verify_error}")
+                logger.error(f"🔍 VERIFY DETAIL - Error type: {type(verify_error).__name__}")
+                raise verify_error
 
         except Exception as e:
-            logger.error(f"secp256k1 签名验证失败: {e}")
+            logger.error(f"🔍 VERIFY DETAIL - secp256k1 verification failed: {e}")
+            logger.error(f"🔍 VERIFY DETAIL - Error type: {type(e).__name__}")
             return False
 
 class PureWBAAuthHeaderBuilder(BaseAuthHeaderBuilder):
@@ -249,6 +285,9 @@ class PureWBAAuthHeaderBuilder(BaseAuthHeaderBuilder):
         timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         service_domain = self._get_domain(context.request_url)
 
+        logger.info(f"🔑 SIGN PAYLOAD DEBUG - Context request URL: {context.request_url}")
+        logger.info(f"🔑 SIGN PAYLOAD DEBUG - Extracted service domain: {service_domain}")
+
         data_to_sign = {
             "nonce": nonce,
             "timestamp": timestamp,
@@ -261,7 +300,19 @@ class PureWBAAuthHeaderBuilder(BaseAuthHeaderBuilder):
         canonical_json = jcs.canonicalize(data_to_sign)
         content_hash = hashlib.sha256(canonical_json).digest()
 
+        # DEBUG: 记录签名时的数据
+        logger.info(f"🔑 SIGN PAYLOAD DEBUG - Data to sign: {data_to_sign}")
+        logger.info(f"🔑 SIGN PAYLOAD DEBUG - Canonical JSON: {canonical_json}")
+        logger.info(f"🔑 SIGN PAYLOAD DEBUG - Content hash: {content_hash.hex()}")
+
         signature_der = credentials.sign(content_hash, verification_method_fragment)
+        
+        # DEBUG: 记录签名过程的关键信息
+        logger.info(f"🔑 SIGN DEBUG - DID: {did}")
+        logger.info(f"🔑 SIGN DEBUG - Verification method fragment: {verification_method_fragment}")
+        logger.info(f"🔑 SIGN DEBUG - Content hash (hex): {content_hash.hex()}")
+        logger.info(f"🔑 SIGN DEBUG - Signature DER length: {len(signature_der)}")
+        logger.info(f"🔑 SIGN DEBUG - Signature DER (hex): {signature_der.hex()}")
         
         # 使用 signer 的 encode_signature 方法处理 DER 到 R|S 的转换和编码
         signature = self.signer.encode_signature(signature_der)
@@ -499,6 +550,13 @@ class PureWBADIDAuthenticator(BaseDIDAuthenticator):
             public_key_bytes = did_doc.get_public_key_bytes_by_fragment(verification_method_fragment)
             if not public_key_bytes:
                 return False, f"Public key with fragment {verification_method_fragment} not found in DID document for {did}."
+            
+            # DEBUG: 记录验证过程的关键信息
+            logger.info(f"🔓 VERIFY DEBUG - DID: {did}")
+            logger.info(f"🔓 VERIFY DEBUG - Verification method fragment: {verification_method_fragment}")
+            logger.info(f"🔓 VERIFY DEBUG - Public key bytes length: {len(public_key_bytes)}")
+            logger.info(f"🔓 VERIFY DEBUG - Public key bytes (hex): {public_key_bytes.hex()}")
+            
             service_domain = self._get_domain(context.request_url)
 
             # 6. 重构签名内容并验证签名
@@ -528,8 +586,74 @@ class PureWBADIDAuthenticator(BaseDIDAuthenticator):
             logger.error(f"Error during request header verification: {e}", exc_info=True)
             return False, f"Exception during verification: {e}"
 
+    async def verify_signature_from_header(self, auth_header: str, context: AuthenticationContext, expected_sender_did: str) -> Tuple[bool, str]:
+        """
+        验证来自响应授权头的签名 (客户端使用)。
+        这个方法与 verify_request_header 逻辑对称。
+        """
+        try:
+            parsed_header = self.header_builder.parse_auth_header(auth_header)
+            if not parsed_header:
+                return False, "无法解析认证头"
 
-    async def verify_response_header(self, auth_header: str, expected_sender_did: str) -> bool:
+            # 从响应头中提取字段
+            server_did = parsed_header.get('did')
+            client_did = parsed_header.get('resp_did')
+            nonce = parsed_header.get('nonce')
+            timestamp = parsed_header.get('timestamp')
+            verification_method_fragment = parsed_header.get('verification_method')
+            signature = parsed_header.get('signature')
+            # 0. 验证响应的发送者是否是预期的服务端
+            if server_did != expected_sender_did:
+                return False, f"响应中的发送者DID '{server_did}' 与预期的服务端DID '{expected_sender_did}' 不匹配"
+
+            # 1. 验证响应的目标是否是本客户端
+            # 修正：应该与 context.caller_did 比较，而不是 context.target_did
+            if client_did != context.caller_did:
+                return False, f"响应中的目标DID '{client_did}' 与预期的客户端DID '{context.caller_did}' 不匹配"
+
+            # 2. 解析服务端的DID文档以获取公钥
+            did_doc = await self.resolver.resolve_did_document(server_did)
+            if not did_doc:
+                return False, f"无法解析服务端DID '{server_did}' 的文档"
+
+            public_key_bytes = did_doc.get_public_key_bytes_by_fragment(verification_method_fragment)
+            if not public_key_bytes:
+                return False, f"在服务端DID文档中找不到片段 '{verification_method_fragment}' 的公钥"
+
+            # 3. 以完全相同的方式重构被签名的数据
+            service_domain = self._get_domain(context.request_url)
+            logger.info(f"🔍 VERIFY PAYLOAD DEBUG - Context request URL: {context.request_url}")
+            logger.info(f"🔍 VERIFY PAYLOAD DEBUG - Extracted service domain: {service_domain}")
+            data_to_sign = {
+                "nonce": nonce,
+                "timestamp": timestamp,
+                "service": service_domain,
+                "did": server_did,
+            }
+            # 修复：只有在双向认证时才添加 resp_did
+            if client_did:
+                data_to_sign["resp_did"] = client_did
+            
+            logger.info(f"🔍 VERIFY PAYLOAD DEBUG - Data to sign: {data_to_sign}")
+            canonical_json_bytes = jcs.canonicalize(data_to_sign)
+            logger.info(f"🔍 VERIFY PAYLOAD DEBUG - Canonical JSON: {canonical_json_bytes}")
+            payload_to_verify = hashlib.sha256(canonical_json_bytes).digest()
+            logger.info(f"🔍 VERIFY PAYLOAD DEBUG - Payload hash: {payload_to_verify.hex()}")
+
+            # 4. 使用签名器验证签名
+            is_valid = self.signer.verify_signature(payload_to_verify, signature, public_key_bytes)
+
+            if is_valid:
+                return True, "服务端签名验证成功。"
+            else:
+                return False, "无效的服务端签名。"
+
+        except Exception as e:
+            logger.error(f"从头验证签名时出错: {e}", exc_info=True)
+            return False, f"签名验证期间发生异常: {e}"
+
+    async def verify_response_header(self, auth_header: str, expected_sender_did: str, context: AuthenticationContext) -> bool:
         """
         验证来自服务端的响应头。
         这是 check_response_DIDAtuhHeader 的纯净替代品。
@@ -537,28 +661,51 @@ class PureWBADIDAuthenticator(BaseDIDAuthenticator):
         if not auth_header or not auth_header.startswith("DIDWba "):
             return False
 
-        parts = auth_header[7:].split(',')
-        if len(parts) != 6:  # 响应头必须是双向的
+        parsed_header = self.header_builder.parse_auth_header(auth_header)
+        if not parsed_header:
             return False
 
-        did, nonce, timestamp, resp_did, key_id, signature = parts
+        # 从响应头中提取字段
+        server_did = parsed_header.get('did')
+        client_did = parsed_header.get('resp_did')
+        nonce = parsed_header.get('nonce')
+        timestamp = parsed_header.get('timestamp')
+        verification_method_fragment = parsed_header.get('verification_method')
+        signature = parsed_header.get('signature')
 
-        if did != expected_sender_did:
+        if server_did != expected_sender_did:
             return False
 
         if not verify_timestamp(timestamp):
             return False
 
         # 使用注入的解析器获取公钥
-        did_doc = await self.resolver.resolve_did_document(did)
+        did_doc = await self.resolver.resolve_did_document(server_did)
         if not did_doc:
             return False
 
-        public_key_bytes = did_doc.get_public_key_bytes(key_id)
+        public_key_bytes = did_doc.get_public_key_bytes_by_fragment(verification_method_fragment)
         if not public_key_bytes:
             return False
 
-        payload_to_verify = ",".join(parts[:-1])
+        # 重构签名内容 - 使用与生成时相同的格式和URL  
+        service_domain = self._get_domain(context.request_url)  # 使用context中的真实请求URL
+        data_to_sign = {
+            "nonce": nonce,
+            "timestamp": timestamp,
+            "service": service_domain,
+            "did": server_did,
+        }
+        if client_did:
+            data_to_sign["resp_did"] = client_did
+        
+        canonical_json_bytes = jcs.canonicalize(data_to_sign)
+        payload_to_verify = hashlib.sha256(canonical_json_bytes).digest()
+        
+        # 确保签名不为空
+        if not signature:
+            return False
+        
         return self.signer.verify_signature(payload_to_verify, signature, public_key_bytes)
 
 

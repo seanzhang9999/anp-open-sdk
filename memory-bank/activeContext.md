@@ -3,114 +3,117 @@
 ## Current Work Focus
 
 ### Primary Objective
-**Fixing DIDCredentials Validation Errors** - Successfully resolved validation errors in the ANP Open SDK authentication system.
+**SDK Layer Refactoring Analysis** - Completed comprehensive analysis of SDK layer refactoring needs to separate I/O operations from core authentication logic.
 
 ### Recent Activities
 
-1. **DIDCredentials Validation Fix** (2025-07-06)
-   - Fixed missing `did` field in `DIDCredentials` factory methods
-   - Updated `from_paths`, `from_memory`, `from_memory_data`, and `from_user_data` methods
-   - Ensured proper extraction of DID from document before creating credentials
+1. **Refactoring Analysis Completion** (2025-07-07)
+   - Analyzed current SDK structure and identified I/O operations still in SDK layer
+   - Created comprehensive refactoring plan with 5 phases
+   - Documented specific tasks for moving network and file operations to framework layer
+   - Identified structural issues: layer violations, auth_server complexity, circular dependencies
 
-2. **LocalUserDataManager Fix** (2025-07-06)
-   - Removed unnecessary `load_users()` call in `LocalAgent.from_did`
-   - Users are already loaded in `__init__`, making the call redundant
+2. **Testing Strategy Development** (2025-07-07)
+   - Created detailed testing strategy for complex refactoring process
+   - Developed baseline tests, unit tests, integration tests, and performance tests
+   - Provided specific test code examples for each testing phase
+   - Established quality gates and continuous integration approach
 
-3. **Authentication Flow Update** (2025-07-06)
-   - Updated `auth_flow.py` to use proper `DIDCredentials.from_user_data()` method
-   - Removed direct access to non-existent `private_keys` attribute
-   - Local method calls now work properly
+3. **Documentation Creation** (2025-07-07)
+   - Created `docs/sdk_refactoring_analysis.md` with complete refactoring plan
+   - Created `docs/refactoring_test_examples.md` with comprehensive test examples
+   - Documented current state, target architecture, and implementation roadmap
 
 ## Next Steps
 
 ### Immediate Priorities
 
-1. **Complete Authentication Flow Fix**
-   - Investigate remaining authentication issues for remote calls
-   - The local methods work but authenticated requests to publisher endpoints fail
-   - Need to ensure proper DID resolution and token management
+1. **Begin Refactoring Implementation**
+   - Start with Phase 1: Create pure interfaces in SDK layer
+   - Implement baseline tests before making any changes
+   - Focus on extracting network operations from `did_auth_wba.py` first
 
-2. **Testing and Validation**
-   - Run comprehensive tests to ensure fixes don't break existing functionality
-   - Validate that all agent-to-agent communications work properly
-   - Test both local and remote authentication scenarios
+2. **Establish Testing Infrastructure**
+   - Set up test directory structure as outlined in testing strategy
+   - Implement mock factories and test data generators
+   - Create baseline tests for current functionality
 
-3. **Documentation Update**
-   - Document the authentication flow changes
-   - Update developer guides with new patterns
-   - Add troubleshooting section for common authentication issues
+3. **Create Pure Authentication Interfaces**
+   - Define `PureWBADIDAuthenticator` without I/O operations
+   - Create abstract interfaces for DID resolution and transport
+   - Ensure dependency injection patterns are established
 
 ### Medium-term Goals
 
-1. **Authentication System Enhancement**
-   - Implement proper token caching and management
-   - Add retry logic for failed authentication attempts
-   - Improve error messages for better debugging
+1. **Complete I/O Operations Migration**
+   - Move all `aiohttp` usage to framework layer's `HttpTransport`
+   - Extract file operations from `auth_server.py` and `anp_sdk_agent.py`
+   - Create framework adapters for DID resolution and user data management
 
-2. **Framework Stability**
-   - Address remaining Pylance errors in the codebase
-   - Ensure type safety throughout the authentication chain
-   - Add comprehensive logging for authentication flows
+2. **Simplify SDK Layer Architecture**
+   - Reduce auth_server complexity by splitting concerns
+   - Eliminate circular dependencies between layers
+   - Create clean separation between authentication logic and I/O operations
 
-3. **Developer Experience**
-   - Create authentication debugging tools
-   - Add authentication status monitoring
-   - Provide clear migration guides for API changes
+3. **Establish Framework Integration**
+   - Create `FrameworkAuthManager` for coordinating I/O operations
+   - Implement adapter pattern for different storage and network implementations
+   - Ensure backward compatibility during transition
 
 ## Active Decisions and Considerations
 
 ### Architectural Decisions
 
-1. **DIDCredentials Design**
-   - **Decision**: Use factory methods with proper DID extraction
-   - **Rationale**: Ensures consistency and prevents validation errors
-   - **Status**: Implemented and working
+1. **Layer Separation Strategy**
+   - **Decision**: Move all I/O operations to framework layer, keep SDK pure
+   - **Rationale**: Improves testability, flexibility, and maintainability
+   - **Status**: Analysis complete, implementation planned
 
-2. **User Data Interface**
-   - **Decision**: Use existing attributes instead of adding new ones
-   - **Rationale**: Maintains backward compatibility
-   - **Status**: Implemented, avoiding breaking changes
+2. **Refactoring Approach**
+   - **Decision**: Gradual, phase-by-phase refactoring with comprehensive testing
+   - **Rationale**: Minimizes risk, maintains functionality throughout process
+   - **Status**: 5-phase plan established with detailed task breakdown
 
-3. **Authentication Flow**
-   - **Decision**: Use `DIDCredentials.from_user_data()` for credential creation
-   - **Rationale**: Leverages existing, tested code paths
-   - **Status**: Partially working, needs completion for remote calls
+3. **Testing Strategy**
+   - **Decision**: Baseline tests first, then progressive refactoring with validation
+   - **Rationale**: Ensures no functionality regression during refactoring
+   - **Status**: Comprehensive testing strategy documented with code examples
 
 ### Technical Considerations
 
-1. **Error Handling**
-   - **Current**: Basic error logging in place
-   - **Target**: Comprehensive error handling with recovery strategies
-   - **Challenge**: Balancing detailed errors with security concerns
+1. **I/O Operation Extraction**
+   - **Current**: Network and file operations mixed with authentication logic
+   - **Target**: Pure SDK layer with I/O operations in framework adapters
+   - **Challenge**: Maintaining interface compatibility during migration
 
-2. **Performance**
-   - **Current**: Credentials created on each request
-   - **Target**: Credential caching for improved performance
-   - **Challenge**: Cache invalidation and security
+2. **Dependency Injection**
+   - **Current**: Direct instantiation of I/O components
+   - **Target**: Interface-based dependency injection throughout
+   - **Challenge**: Refactoring existing code to accept injected dependencies
 
-3. **Compatibility**
-   - **Current**: Maintaining backward compatibility
-   - **Target**: Clean, intuitive API
-   - **Challenge**: Gradual migration without breaking existing code
+3. **Testing Complexity**
+   - **Current**: Limited testing due to I/O dependencies
+   - **Target**: Comprehensive unit testing with mocked I/O operations
+   - **Challenge**: Creating effective mocks and maintaining test coverage
 
 ## Important Patterns and Preferences
 
 ### Code Organization Patterns
 
-1. **Factory Method Pattern**
-   - Used extensively in `DIDCredentials` for flexible object creation
-   - Allows different initialization paths while maintaining consistency
-   - Ensures proper validation at creation time
+1. **Adapter Pattern**
+   - Framework layer provides adapters for different I/O implementations
+   - SDK layer depends only on abstract interfaces
+   - Enables pluggable storage and network implementations
 
 2. **Dependency Injection**
-   - User data passed to authentication components
-   - Allows for testing with mock data
-   - Enables different user data implementations
+   - All I/O operations injected as interfaces
+   - Enables comprehensive unit testing with mocks
+   - Supports different implementations for different environments
 
-3. **Error Propagation**
-   - Detailed error messages with context
-   - Original exceptions preserved with `from e` syntax
-   - Clear error boundaries between layers
+3. **Layer Separation**
+   - SDK layer: Pure authentication logic, no I/O
+   - Framework layer: I/O operations, concrete implementations
+   - Clear boundaries with well-defined interfaces
 
 ### Development Preferences
 
@@ -133,37 +136,37 @@
 
 ### Key Insights from Current Session
 
-1. **Validation Complexity**
-   - Pydantic models require all required fields at initialization
-   - Factory methods must extract and provide all required data
-   - Missing fields cause immediate validation failures
+1. **Architecture Complexity**
+   - Current SDK layer has significant I/O operations mixed with business logic
+   - Layer violations exist with SDK depending on framework components
+   - Clear separation of concerns is essential for maintainability
 
-2. **Authentication Architecture**
-   - The system uses a layered approach to authentication
-   - Different layers have different expectations about data format
-   - Proper abstraction boundaries are crucial
+2. **Refactoring Scope**
+   - Major components need refactoring: auth_server, did_auth_wba, anp_sdk_agent
+   - Network operations (aiohttp) and file operations scattered throughout SDK
+   - Testing strategy is crucial for safe refactoring of complex system
 
-3. **User Data Management**
-   - User data is loaded once at startup
-   - Multiple components depend on consistent user data structure
-   - Changes to user data interface have wide-reaching effects
+3. **Testing Requirements**
+   - Baseline tests needed to capture current behavior before changes
+   - Progressive refactoring requires validation at each step
+   - Performance regression testing important for authentication flows
 
 ### Technical Debt Areas
 
-1. **Type Annotations**
-   - Many Pylance errors indicate incomplete type annotations
-   - Need comprehensive type coverage for better IDE support
-   - Would prevent many runtime errors
+1. **Layer Violations**
+   - SDK layer directly imports and uses framework components
+   - Circular dependencies between layers
+   - Mixed concerns in authentication components
 
-2. **Error Messages**
-   - Some error messages are too generic
-   - Need more context-specific error information
-   - Should guide developers to solutions
+2. **I/O Operations in SDK**
+   - Direct aiohttp usage in authentication logic
+   - File system access in auth_server and agent classes
+   - Network operations embedded in core authentication flows
 
-3. **Testing Coverage**
-   - Authentication flows need more comprehensive tests
-   - Edge cases around credential creation need coverage
-   - Integration tests for full authentication cycle needed
+3. **Testing Infrastructure**
+   - Limited ability to test SDK components in isolation
+   - I/O dependencies make unit testing difficult
+   - Need comprehensive test coverage for refactoring safety
 
 ### Success Patterns
 
@@ -186,20 +189,20 @@
 
 ### Technical Challenges
 
-1. **Remote Authentication**
-   - Local methods work but remote calls fail
-   - Need to investigate token generation and validation
-   - May require updates to server-side authentication
+1. **Refactoring Complexity**
+   - Large-scale architectural changes across multiple components
+   - Need to maintain functionality while restructuring
+   - Complex dependencies between authentication components
 
-2. **Type System Integration**
-   - Pylance shows many type-related errors
-   - Need to balance dynamic Python with static typing
-   - Some patterns don't fit well with static analysis
+2. **Testing Strategy Implementation**
+   - Need to establish comprehensive test infrastructure
+   - Baseline tests must capture current behavior accurately
+   - Performance testing required for authentication flows
 
-3. **Legacy Code Compatibility**
-   - Old code expects certain interfaces
-   - New patterns may not fit old assumptions
-   - Need careful migration strategy
+3. **Backward Compatibility**
+   - Existing APIs must continue to work during transition
+   - Deprecation strategy needed for old patterns
+   - Migration path must be clear for users
 
 ### Process Challenges
 
@@ -220,10 +223,12 @@
 
 ## Session Summary
 
-Successfully resolved the immediate DIDCredentials validation errors that were preventing the demo from running. The fixes involved:
+Completed comprehensive analysis of SDK layer refactoring requirements and created detailed implementation plan. Key accomplishments:
 
-1. Adding proper `did` field extraction in all `DIDCredentials` factory methods
-2. Removing unnecessary `load_users()` calls that were causing AttributeErrors
-3. Updating authentication flow to use proper credential creation methods
+1. **Refactoring Analysis**: Identified all I/O operations still in SDK layer and created 5-phase refactoring plan
+2. **Testing Strategy**: Developed comprehensive testing approach with baseline tests, unit tests, integration tests, and performance tests
+3. **Documentation**: Created detailed refactoring analysis document and test code examples for implementation guidance
 
-The demo now runs and local method calls work properly. However, authenticated remote calls still have issues that need to be addressed in future sessions. The fixes maintain backward compatibility while establishing a foundation for future improvements.
+The analysis reveals significant architectural improvements needed to separate concerns properly. The SDK layer currently contains network operations (aiohttp), file operations, and mixed authentication logic that should be moved to the framework layer. A systematic, test-driven refactoring approach has been planned to ensure safe migration while maintaining backward compatibility.
+
+Next session should focus on implementing Phase 1 of the refactoring plan, starting with baseline tests and creating pure authentication interfaces.

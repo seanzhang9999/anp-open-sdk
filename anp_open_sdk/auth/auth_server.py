@@ -126,7 +126,7 @@ class AgentAuthServer:
         try:
             success, msg = await self.authenticator.verify_request_header(auth_header, context)
             if success:
-                response_data = await generate_auth_response(req_did, context.use_two_way_auth, target_did)
+                response_data = await generate_auth_response(req_did, context.use_two_way_auth, target_did, context)
                 return True, response_data, None
             else:
                 return False, msg, {}
@@ -213,7 +213,7 @@ class AgentAuthServer:
             logger.debug(f"Token verification error: {e}")
             raise HTTPException(status_code=401, detail=f"Token verification failed: {str(e)}")
 
-async def generate_auth_response(did: str, is_two_way_auth: bool, resp_did: str):
+async def generate_auth_response(did: str, is_two_way_auth: bool, resp_did: str, context: AuthenticationContext = None):
     resp_did_agent = LocalAgent.from_did(resp_did)
     config = get_global_config()
 
@@ -235,24 +235,33 @@ async def generate_auth_response(did: str, is_two_way_auth: bool, resp_did: str)
             if did_doc_path.exists() and pk_path.exists():
                 with open(did_doc_path, 'r') as f:
                     did_doc_raw = json.load(f)
-                with open(pk_path, 'r') as f:
-                    pk_data = json.load(f)
+                # 从 DID 文档中获取 key_id
+                key_id_full = did_doc_raw.get('verificationMethod', [{}])[0].get('id')
+                if not key_id_full:
+                    raise ValueError("无法从DID文档中找到 verificationMethod ID")
 
-                key_id = did_doc_raw.get('verificationMethod', [{}])[0].get('id')
-                private_key_b58 = pk_data.get('privateKeyMultibase')
+                # key_id 通常是 '#' 后面的部分
+                key_id = key_id_full.split('#')[-1]
 
-                from .utils import multibase_to_bytes
-                private_key_bytes = multibase_to_bytes(private_key_b58)
+                # 使用 schemas.py 中提供的工厂方法来创建完整的密钥对
+                key_pair = DIDKeyPair.from_file_path(str(pk_path), key_id)
 
+                did_doc = DIDDocument(**did_doc_raw, raw_document=did_doc_raw)
+
+                # 正确地创建 DIDCredentials 实例
                 server_credentials = DIDCredentials(
-                    did_document=DIDDocument.parse_obj(did_doc_raw),
-                    key_pairs=[DIDKeyPair(key_id=key_id, private_key=private_key_bytes)]
+                    did=did_doc.id,
+                    did_document=did_doc,
+                    key_pairs={key_pair.key_id: key_pair}
                 )
 
+                # 使用真实的请求URL，如果context可用的话
+                request_url = context.request_url if context else "http://virtual.WBAback:9999"
+                
                 response_context = AuthenticationContext(
                     caller_did=resp_did,
                     target_did=did,
-                    request_url="http://virtual.WBAback:9999",
+                    request_url=request_url,
                     use_two_way_auth=True
                 )
 

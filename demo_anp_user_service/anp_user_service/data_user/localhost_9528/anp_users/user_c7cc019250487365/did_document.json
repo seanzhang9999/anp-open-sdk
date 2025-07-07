@@ -13,8 +13,8 @@
             "publicKeyJwk": {
                 "kty": "EC",
                 "crv": "secp256k1",
-                "x": "TR6UNf-naZTOffa5K0oqSpUikK6duvMvWK8vkhi4SZs",
-                "y": "M1RxdtdJreHvK3OwEKHnetgAozC8hczk8G_X6QzQlqo",
+                "x": "AA9bhfLTzsuOuNTcC7aTPvPOd7skAGfReF-YbkPE9bc",
+                "y": "JCsH1ejY01p_fpk_aCf5Qm1ydQ2XylZn41gYh1fqN8E",
                 "kid": "GtROScI3fB4gNJe_kRQLDdx_7PK2k8ksLHNHOte2EWc"
             }
         }
