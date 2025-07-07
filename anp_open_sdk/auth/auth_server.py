@@ -56,10 +56,7 @@ class LocalFileDIDResolver(BaseDIDResolver):
                 with open(did_doc_path, 'r') as f:
                     raw_doc = json.load(f)
             return DIDDocument(
-                did=raw_doc.get('id', did),
-                verification_methods=raw_doc.get('verificationMethod', []),
-                authentication=raw_doc.get('authentication', []),
-                service_endpoints=raw_doc.get('service', []),
+                **raw_doc,
                 raw_document=raw_doc
             )
         except Exception as e:

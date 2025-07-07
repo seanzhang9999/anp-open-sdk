@@ -89,6 +89,16 @@ class DIDDocument(BaseModel):
                 public_key_multibase = vm.public_key_multibase
                 if public_key_multibase:
                     return multibase_to_bytes(public_key_multibase)
+
+                jwk = getattr(vm, 'public_key_jwk', None) or getattr(vm, 'publicKeyJwk', None)
+                if jwk and jwk.get('kty') == 'EC' and jwk.get('crv') == 'secp256k1':
+                    import base64
+                    x = jwk.get('x')
+                    y = jwk.get('y')
+                    if x and y:
+                        x_bytes = base64.urlsafe_b64decode(x + '=' * (-len(x) % 4))
+                        y_bytes = base64.urlsafe_b64decode(y + '=' * (-len(y) % 4))
+                        return b'\x04' + x_bytes + y_bytes
         return None
 
     @classmethod

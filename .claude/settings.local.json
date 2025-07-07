@@ -3,7 +3,13 @@
     "allow": [
       "Bash(rg:*)",
       "Bash(python test:*)",
-      "Bash(timeout:*)"
+      "Bash(timeout:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(curl:*)",
+      "Bash(lsof:*)",
+      "Bash(pkill:*)",
+      "Bash(python:*)"
     ],
     "deny": []
   }

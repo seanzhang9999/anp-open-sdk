@@ -38,10 +38,7 @@ class WBADIDResolver(BaseDIDResolver):
             
             if did_doc_dict:
                 return DIDDocument(
-                    did=did_doc_dict.get('id', did),
-                    verification_methods=did_doc_dict.get('verificationMethod', []),
-                    authentication=did_doc_dict.get('authentication', []),
-                    service_endpoints=did_doc_dict.get('service', []),
+                    **did_doc_dict,
                     raw_document=did_doc_dict
                 )
             

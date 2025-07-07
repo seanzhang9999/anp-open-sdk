@@ -25,19 +25,85 @@ logger = logging.getLogger(__name__)
 class PureWBADIDSigner(BaseDIDSigner):
     """纯净的WBA DID签名器，只处理内存中的字节。"""
 
-    def sign_payload(self, payload: str, private_key_bytes: bytes) -> str:
-        from cryptography.hazmat.primitives.asymmetric import ed25519
-        private_key_obj = ed25519.Ed25519PrivateKey.from_private_bytes(private_key_bytes)
-        signature_bytes = private_key_obj.sign(payload.encode('utf-8'))
-        return base64.b64encode(signature_bytes).decode('utf-8')
-
-    def verify_signature(self, payload: str, signature: str, public_key_bytes: bytes) -> bool:
+    def sign_payload(self, payload, private_key_bytes: bytes) -> str:
         try:
-            from cryptography.hazmat.primitives.asymmetric import ed25519
-            public_key_obj = ed25519.Ed25519PublicKey.from_public_bytes(public_key_bytes)
+            # 处理payload，支持字符串和字节类型
+            if isinstance(payload, str):
+                payload_bytes = payload.encode('utf-8')
+            else:
+                payload_bytes = payload
+            
+            # 根据私钥长度判断密钥类型
+            if len(private_key_bytes) == 32:
+                # 尝试 Ed25519 私钥
+                try:
+                    from cryptography.hazmat.primitives.asymmetric import ed25519
+                    private_key_obj = ed25519.Ed25519PrivateKey.from_private_bytes(private_key_bytes)
+                    signature_bytes = private_key_obj.sign(payload_bytes)
+                    return base64.b64encode(signature_bytes).decode('utf-8')
+                except:
+                    # 如果 Ed25519 失败，尝试 secp256k1
+                    pass
+            
+            # secp256k1 私钥
+            from cryptography.hazmat.primitives.asymmetric import ec
+            from cryptography.hazmat.primitives import hashes
+            private_key_obj = ec.derive_private_key(
+                int.from_bytes(private_key_bytes, byteorder="big"), 
+                ec.SECP256K1()
+            )
+            signature_bytes = private_key_obj.sign(payload_bytes, ec.ECDSA(hashes.SHA256()))
+            return base64.b64encode(signature_bytes).decode('utf-8')
+            
+        except Exception as e:
+            logger.error(f"签名失败: {e}")
+            raise
+
+    def verify_signature(self, payload, signature: str, public_key_bytes: bytes) -> bool:
+        try:
+            # 修复base64解码问题，添加填充字符
+            signature = signature.rstrip('=')
+            padding = len(signature) % 4
+            if padding:
+                signature += '=' * (4 - padding)
+            
             signature_bytes = base64.b64decode(signature)
-            public_key_obj.verify(signature_bytes, payload.encode('utf-8'))
-            return True
+            
+            # 处理payload，支持字符串和字节类型
+            if isinstance(payload, str):
+                payload_bytes = payload.encode('utf-8')
+            else:
+                payload_bytes = payload
+            
+            # 根据公钥长度判断密钥类型
+            if len(public_key_bytes) == 32:
+                # Ed25519 公钥 (32 bytes)
+                from cryptography.hazmat.primitives.asymmetric import ed25519
+                public_key_obj = ed25519.Ed25519PublicKey.from_public_bytes(public_key_bytes)
+                public_key_obj.verify(signature_bytes, payload_bytes)
+                return True
+            elif len(public_key_bytes) == 65 and public_key_bytes[0] == 0x04:
+                # secp256k1 非压缩公钥 (65 bytes, 以0x04开头)
+                from cryptography.hazmat.primitives.asymmetric import ec
+                from cryptography.hazmat.primitives import hashes
+                # 从非压缩格式创建公钥对象
+                x = int.from_bytes(public_key_bytes[1:33], byteorder='big')
+                y = int.from_bytes(public_key_bytes[33:65], byteorder='big')
+                public_numbers = ec.EllipticCurvePublicNumbers(x, y, ec.SECP256K1())
+                public_key_obj = public_numbers.public_key()
+                public_key_obj.verify(signature_bytes, payload_bytes, ec.ECDSA(hashes.SHA256()))
+                return True
+            elif len(public_key_bytes) == 33:
+                # secp256k1 压缩公钥 (33 bytes)
+                from cryptography.hazmat.primitives.asymmetric import ec
+                from cryptography.hazmat.primitives import hashes
+                public_key_obj = ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256K1(), public_key_bytes)
+                public_key_obj.verify(signature_bytes, payload_bytes, ec.ECDSA(hashes.SHA256()))
+                return True
+            else:
+                logger.error(f"不支持的公钥长度: {len(public_key_bytes)} bytes")
+                return False
+                
         except Exception as e:
             logger.error(f"签名验证失败: {e}")
             return False
@@ -130,35 +196,15 @@ class PureWBAAuthHeaderBuilder(BaseAuthHeaderBuilder):
         if not auth_header or not auth_header.startswith("DIDWba "):
             return {}
 
-        value = auth_header[7:]  # Remove "DIDWba " prefix
-        parts = value.split(',')
-
+        value = auth_header.replace("DIDWba ", "", 1)
+        import re
         try:
-            if len(parts) == 6:
-                # Two-way auth: did,nonce,ts,resp_did,keyid,sig
-                return {
-                    'did': parts[0],
-                    'nonce': parts[1],
-                    'timestamp': parts[2],
-                    'resp_did': parts[3],
-                    'key_id': parts[4],
-                    'signature': parts[5]
-                }
-            elif len(parts) == 5:
-                # One-way auth: did,nonce,ts,keyid,sig
-                return {
-                    'did': parts[0],
-                    'nonce': parts[1],
-                    'timestamp': parts[2],
-                    'key_id': parts[3],
-                    'signature': parts[4],
-                    'resp_did': None
-                }
-        except IndexError:
-            logger.error(f"解析认证头时发生索引错误: {auth_header}")
+            # This regex finds key="value" pairs.
+            parsed = dict(re.findall(r'(\w+)\s*=\s*\"([^\"]*)\"', value))
+            return parsed
+        except Exception as e:
+            logger.error(f"Failed to parse auth header '{auth_header}': {e}")
             return {}
-
-        return {}
 class PureWBAAuth(BaseAuth):
     """纯净的WBA认证头解析器。"""
 
@@ -166,15 +212,15 @@ class PureWBAAuth(BaseAuth):
         if not auth_header or not auth_header.startswith("DIDWba "):
             return None, None
 
-        parts = auth_header[7:].split(',')
-        # 双向: did,nonce,ts,resp_did,keyid,sig (6 parts)
-        # 单向: did,nonce,ts,keyid,sig (5 parts)
-        if len(parts) == 6:
-            return parts[0], parts[3]  # caller_did, target_did
-        elif len(parts) == 5:
-            return parts[0], None  # caller_did
-        return None, None
-
+        import re
+        try:
+            value_str = auth_header.replace("DIDWba ", "", 1)
+            parsed = dict(re.findall(r'(\w+)\s*=\s*\"([^\"]*)\"', value_str))
+            caller_did = parsed.get('did')
+            target_did = parsed.get('resp_did')  # will be None if not present
+            return caller_did, target_did
+        except Exception:
+            return None, None
 
 class PureWBADIDAuthenticator(BaseDIDAuthenticator):
     """
@@ -289,9 +335,14 @@ class PureWBADIDAuthenticator(BaseDIDAuthenticator):
             parsed_header = self.header_builder.parse_auth_header(auth_header)
             if not parsed_header:
                 return False, "Invalid or unparsable auth header."
-            required_keys = {"did", "nonce", "timestamp", "verification_method", "signature"}
-            if not required_keys.issubset(parsed_header.keys()):
-                return False, "Auth header is missing required fields."
+            # 根据认证类型检查必需字段
+            header_keys = set(parsed_header.keys())
+            one_way_keys = {"did", "nonce", "timestamp", "verification_method", "signature"}
+            two_way_keys = one_way_keys.union({"resp_did"})
+
+            # Check if the header contains exactly the keys for one-way or two-way auth
+            if header_keys != one_way_keys and header_keys != two_way_keys:
+                return False, "Auth header is missing or contains invalid fields."
 
             did = parsed_header['did']
             nonce = parsed_header['nonce']
@@ -314,7 +365,25 @@ class PureWBADIDAuthenticator(BaseDIDAuthenticator):
                     return False, f"Response DID mismatch. Header has {resp_did_from_header}, server is {context.target_did}."
 
             # 4. 解析签名者的DID文档
-            did_doc = await self.resolver.resolve_did_document(did)
+            did_doc = None
+            try:
+                from anp_open_sdk.auth.did_auth_wba_custom_did_resolver import resolve_local_did_document
+                from agent_connect.authentication.did_wba import resolve_did_wba_document
+                from anp_open_sdk.auth.schemas import DIDDocument
+
+                did_doc_dict = await resolve_local_did_document(did)
+                if not did_doc_dict:
+                    did_doc_dict = await resolve_did_wba_document(did)
+
+                if did_doc_dict:
+                    did_doc = DIDDocument(
+                        **did_doc_dict,
+                        raw_document=did_doc_dict
+                    )
+            except Exception as e:
+                logger.error(f"Failed to resolve DID document for {did}: {e}")
+                return False, f"Failed to resolve DID document for {did}."
+
             if not did_doc:
                 return False, f"Failed to resolve DID document for {did}."
 
@@ -334,7 +403,7 @@ class PureWBADIDAuthenticator(BaseDIDAuthenticator):
                 data_to_sign["resp_did"] = resp_did_from_header
 
             canonical_json_bytes = jcs.canonicalize(data_to_sign)
-            payload_to_verify = hashlib.sha256(canonical_json_bytes).hexdigest()
+            payload_to_verify = hashlib.sha256(canonical_json_bytes).digest()
 
             is_valid = self.signer.verify_signature(payload_to_verify, signature, public_key_bytes)
 

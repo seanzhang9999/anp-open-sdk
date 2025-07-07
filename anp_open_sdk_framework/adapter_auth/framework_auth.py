@@ -1,4 +1,5 @@
 # anp_open_sdk_framework/auth/framework_auth.py
+import json
 from typing import Optional, Dict, Any, Tuple
 from anp_open_sdk.core.auth_flow import AuthFlowManager
 from anp_open_sdk.core.base_user_data import BaseUserDataManager
