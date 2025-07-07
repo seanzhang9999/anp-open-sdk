@@ -6,6 +6,10 @@ import asyncio
 import threading
 import json
 
+# 确保当前工作目录在Python路径中，以便能够导入anp_open_sdk模块
+if os.getcwd() not in sys.path:
+    sys.path.insert(0, os.getcwd())
+
 from anp_open_sdk.sdk_mode import SdkMode
 
 from anp_open_sdk.config import UnifiedConfig, set_global_config
@@ -432,11 +436,17 @@ async def main():
             break
     if discovery_agent:
         logger.info(f"✅ 找到发现智能体: '{discovery_agent.name}'，开始演示...")
+        #try:
+        #    result = await discovery_agent.run_ai_root_crawler_demo()
+        #    print(f"\n🤖 AI根爬虫演示结果:\n{result}")
+        #except Exception as e:
+        #    logger.error(f"❌ AI根爬虫演示失败: {e}")
         try:
-            result = await discovery_agent.run_ai_root_crawler_demo()
-            print(f"\n🤖 AI根爬虫演示结果:\n{result}")
+            result = await discovery_agent.run_calculator_add_demo()
+            print(f"\n🔧 直接调用加法:\n{result}")
         except Exception as e:
-            logger.error(f"❌ AI根爬虫演示失败: {e}")
+            logger.error(f"❌直接调用加法失败: {e}")
+
         try:
             result = await discovery_agent.run_agent_002_demo(sdk)
             print(f"\n🔧 Agent 002 演示结果:\n{result}")

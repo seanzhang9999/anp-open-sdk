@@ -103,72 +103,120 @@ def rename_directory_with_prefix(user_dir, prefix):
         print(f"目标目录 {new_dir} 已存在，跳过重命名。")
         return user_dir
 
-# 设置根目录
-root_dir = os.path.join('data_user', 'localhost_9528', 'anp_users')
+import sys
+
+# 从命令行参数获取根目录
+if len(sys.argv) < 2:
+    print("Usage: python script.py <root_directory>")
+    sys.exit(1)
+
+root_dir = sys.argv[1]
+from pathlib import Path
+
+root_dir = Path(root_dir).resolve()
+
+from Crypto.PublicKey import RSA
 
 # 遍历所有 user_* 目录
 for user_dir in glob.glob(os.path.join(root_dir, 'user_*')):
 
+    # 获取目录名用于特殊判断
+    dir_name = os.path.basename(user_dir)
 
-    print(f"\n处理目录: {user_dir}")
     
     # 检查文件路径
-    key_private_path = os.path.join(user_dir, 'key-1_private.pem')
-    private_key_path = os.path.join(user_dir, 'private_key.pem')
-    public_key_path = os.path.join(user_dir, 'public_key.pem')
+    jwt_key_public_path = os.path.join(user_dir, 'public_key.pem')
+    jwt_key_private_path = os.path.join(user_dir, 'private_key.pem')
+    private_key_path = os.path.join(user_dir, 'key-1_private.pem')
+    public_key_path = os.path.join(user_dir, 'key-1_public.pem')
     did_doc_path = os.path.join(user_dir, 'did_document.json')
-    
-    # 1. 原有功能：检查 key-1_private.pem
-    if not os.path.isfile(key_private_path):
-        print(f"  缺少 key-1_private.pem")
-        user_dir = rename_directory_with_prefix(user_dir, 'nojwtkey')
-        continue
-    
-    # 2. 新功能1：检查 did_document.json
+
+
+
+    # 1. 功能1：检查 did_document.json
     if not os.path.isfile(did_doc_path):
         print(f"  缺少 did_document.json")
         user_dir = rename_directory_with_prefix(user_dir, 'nodiddoc')
         continue
-    
-    # 3. 新功能2：检查 private_key.pem，如果没有则生成密钥对并更新DID文档
-    if not os.path.isfile(private_key_path):
-        print(f"  缺少 private_key.pem，开始生成新密钥对...")
-        
-        try:
-            # 生成密钥对
-            private_key, public_key = generate_secp256k1_keypair()
-            
-            # 转换为PEM格式
-            private_pem = private_key_to_pem(private_key)
-            public_pem = public_key_to_pem(public_key)
-            
-            # 保存私钥
-            with open(private_key_path, 'wb') as f:
-                f.write(private_pem)
-            print(f"  已生成 private_key.pem")
-            
-            # 保存公钥
-            with open(public_key_path, 'wb') as f:
-                f.write(public_pem)
-            print(f"  已生成 public_key.pem")
-            
-            # 转换为JWK格式
-            jwk = public_key_to_jwk(public_key)
-            print(f"  生成的JWK: {jwk}")
-            
-            # 更新DID文档
-            if update_did_document_jwk(did_doc_path, jwk):
-                print(f"  ✓ 成功更新DID文档中的publicKeyJwk")
-            else:
-                print(f"  ✗ 更新DID文档失败")
-                
-        except Exception as e:
-            print(f"  生成密钥对失败: {e}")
-            continue
-    else:
+    print(f"\n处理目录: {user_dir}")
 
-        print(f"  已存在 private_key.pem，跳过生成")
-    
+    # 1. 检查并创建JWT密钥
+    if dir_name == "user_hosted_agent-did.com_80_":
+        # 特殊处理：只检查并创建固定的 key-1_private.pem
+        if not os.path.isfile(private_key_path):
+            print(f"  缺少 key-1_private.pem，正在创建固定密钥...")
+            try:
+                fixed_private_key = """-----BEGIN PRIVATE KEY-----
+    MIGEAgEAMBAGByqGSM49AgEGBSuBBAAKBG0wawIBAQQgvt5dMwF4pTOFv1BBD1IV
+    ezSrGc0X/aDMesV57FeDvpKhRANCAASQ1x9W59virFSlMLuRPpXnrNIURdvKjedM
+    NQXGpplsq7qR6TaCJvIenA0WajVo2+FV22p4qts8+N8kKIkfGX6r
+    -----END PRIVATE KEY-----"""
+
+                with open(private_key_path, "w") as f:
+                    f.write(fixed_private_key)
+
+                print(f"  固定密钥创建成功")
+            except Exception as e:
+                print(f"  密钥创建失败: {e}")
+                user_dir = rename_directory_with_prefix(user_dir, 'nokey')
+                continue
+        else:
+            print(f"  已存在 key-1_private.pem，跳过创建")
+    else:
+        # 2. 普通用户：检查并创建JWT密钥
+        if not os.path.isfile(jwt_key_private_path):
+            print(f"  缺少 JWT密钥，正在创建...")
+            try:
+                private_key = RSA.generate(2048).export_key()
+                public_key = RSA.import_key(private_key).publickey().export_key()
+
+                with open(jwt_key_private_path, "wb") as f:
+                    f.write(private_key)
+                with open(jwt_key_public_path, "wb") as f:
+                    f.write(public_key)
+
+                print(f"  JWT密钥创建成功")
+            except Exception as e:
+                print(f"  JWT密钥创建失败: {e}")
+                user_dir = rename_directory_with_prefix(user_dir, 'nojwtkey')
+                continue
+
+        # 3. 检查并创建 key-1_private.pem
+        if not os.path.isfile(private_key_path):
+            print(f"  缺少 key-1_private.pem，开始生成新密钥对...")
+
+            try:
+                private_key, public_key = generate_secp256k1_keypair()
+
+                private_pem = private_key_to_pem(private_key)
+                public_pem = public_key_to_pem(public_key)
+
+                with open(private_key_path, 'wb') as f:
+                    f.write(private_pem)
+                print(f"  已生成 key-1_private.pem")
+
+                with open(public_key_path, 'wb') as f:
+                    f.write(public_pem)
+                print(f"  已生成 key-1_public.pem")
+
+                jwk = public_key_to_jwk(public_key)
+                print(f"  生成的JWK: {jwk}")
+
+                # 更新DID文档
+                if os.path.isfile(did_doc_path):
+                    if update_did_document_jwk(did_doc_path, jwk):
+                        print(f"  ✓ 成功更新DID文档")
+                    else:
+                        print(f"  ✗ 更新DID文档失败")
+                else:
+                    print(f"  警告：DID文档不存在，无法更新")
+
+            except Exception as e:
+                print(f"  生成密钥对失败: {e}")
+                continue
+        else:
+            print(f"  已存在 key-1_private.pem，跳过生成")
+
     print(f"  ✓ {user_dir} 处理完成")
 
 print(f"\n所有目录处理完成！")

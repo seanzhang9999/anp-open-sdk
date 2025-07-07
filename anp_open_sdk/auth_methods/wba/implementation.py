@@ -23,9 +23,41 @@ logger = logging.getLogger(__name__)
 # --- 纯粹的WBA认证逻辑实现 ---
 
 class PureWBADIDSigner(BaseDIDSigner):
-    """纯净的WBA DID签名器，只处理内存中的字节。"""
+    """纯净的WBA DID签名器，完全遵循原版 EcdsaSecp256k1VerificationKey2019 的逻辑。"""
+
+    def encode_signature(self, signature_bytes: bytes) -> str:
+        """
+        将签名字节编码为 base64url 格式。如果签名是 DER 格式，先转换为 R|S 格式。
+        完全复制原版的 encode_signature 逻辑。
+        """
+        try:
+            from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
+            
+            # 尝试解析 DER 格式
+            try:
+                r, s = decode_dss_signature(signature_bytes)
+                # 如果成功解析为 DER 格式，转换为 R|S 格式（使用固定32字节长度）
+                r_bytes = r.to_bytes(32, byteorder='big')
+                s_bytes = s.to_bytes(32, byteorder='big')
+                signature = r_bytes + s_bytes
+            except Exception:
+                # 如果不是 DER 格式，假设已经是 R|S 格式
+                if len(signature_bytes) % 2 != 0:
+                    raise ValueError("Invalid R|S signature format: length must be even")
+                signature = signature_bytes
+            
+            # 编码为 base64url
+            return base64.urlsafe_b64encode(signature).rstrip(b'=').decode('ascii')
+            
+        except Exception as e:
+            logger.error(f"Failed to encode signature: {str(e)}")
+            raise ValueError(f"Invalid signature format: {str(e)}")
 
     def sign_payload(self, payload, private_key_bytes: bytes) -> str:
+        """
+        签名 payload，返回 base64url 编码的签名。
+        对于 secp256k1，生成 DER 签名然后转换为 R|S 格式。
+        """
         try:
             # 处理payload，支持字符串和字节类型
             if isinstance(payload, str):
@@ -33,48 +65,49 @@ class PureWBADIDSigner(BaseDIDSigner):
             else:
                 payload_bytes = payload
             
-            # 根据私钥长度判断密钥类型
-            if len(private_key_bytes) == 32:
-                # 尝试 Ed25519 私钥
-                try:
-                    from cryptography.hazmat.primitives.asymmetric import ed25519
-                    private_key_obj = ed25519.Ed25519PrivateKey.from_private_bytes(private_key_bytes)
-                    signature_bytes = private_key_obj.sign(payload_bytes)
-                    return base64.b64encode(signature_bytes).decode('utf-8')
-                except:
-                    # 如果 Ed25519 失败，尝试 secp256k1
-                    pass
-            
-            # secp256k1 私钥
+            # 直接使用 secp256k1 处理（因为我们的密钥都是 secp256k1）
             from cryptography.hazmat.primitives.asymmetric import ec
             from cryptography.hazmat.primitives import hashes
+            from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
+            
             private_key_obj = ec.derive_private_key(
                 int.from_bytes(private_key_bytes, byteorder="big"), 
                 ec.SECP256K1()
             )
-            signature_bytes = private_key_obj.sign(payload_bytes, ec.ECDSA(hashes.SHA256()))
-            return base64.b64encode(signature_bytes).decode('utf-8')
+            
+            # 生成 DER 格式签名
+            signature_der = private_key_obj.sign(payload_bytes, ec.ECDSA(hashes.SHA256()))
+            
+            # 解析 DER 签名得到 R, S
+            r, s = decode_dss_signature(signature_der)
+            
+            # 转换为固定长度的 R|S 格式（32字节 R + 32字节 S）
+            r_bytes = r.to_bytes(32, byteorder='big')
+            s_bytes = s.to_bytes(32, byteorder='big')
+            signature_rs = r_bytes + s_bytes
+            
+            # 编码为 base64url
+            return base64.urlsafe_b64encode(signature_rs).rstrip(b'=').decode('ascii')
             
         except Exception as e:
             logger.error(f"签名失败: {e}")
             raise
 
     def verify_signature(self, payload, signature: str, public_key_bytes: bytes) -> bool:
+        """
+        验证签名，完全复制原版的 verify_signature 逻辑。
+        修复了 R|S 到 DER 转换中的前导零处理问题。
+        """
         try:
-            # 修复base64解码问题，添加填充字符
-            signature = signature.rstrip('=')
-            padding = len(signature) % 4
-            if padding:
-                signature += '=' * (4 - padding)
-            
-            signature_bytes = base64.b64decode(signature)
-            
+            # 解码 base64url 签名（与原版保持一致）
+            signature_bytes = base64.urlsafe_b64decode(signature + '=' * (-len(signature) % 4))
+
             # 处理payload，支持字符串和字节类型
             if isinstance(payload, str):
                 payload_bytes = payload.encode('utf-8')
             else:
                 payload_bytes = payload
-            
+
             # 根据公钥长度判断密钥类型
             if len(public_key_bytes) == 32:
                 # Ed25519 公钥 (32 bytes)
@@ -84,30 +117,65 @@ class PureWBADIDSigner(BaseDIDSigner):
                 return True
             elif len(public_key_bytes) == 65 and public_key_bytes[0] == 0x04:
                 # secp256k1 非压缩公钥 (65 bytes, 以0x04开头)
-                from cryptography.hazmat.primitives.asymmetric import ec
-                from cryptography.hazmat.primitives import hashes
+                return self._verify_secp256k1_signature(signature_bytes, payload_bytes, public_key_bytes)
+            elif len(public_key_bytes) == 33:
+                # secp256k1 压缩公钥 (33 bytes)
+                return self._verify_secp256k1_signature(signature_bytes, payload_bytes, public_key_bytes, compressed=True)
+            else:
+                logger.error(f"不支持的公钥长度: {len(public_key_bytes)} bytes")
+                return False
+
+        except Exception as e:
+            logger.error(f"签名验证失败: {e}")
+            return False
+
+    def _verify_secp256k1_signature(self, signature_bytes: bytes, payload_bytes: bytes, public_key_bytes: bytes, compressed: bool = False) -> bool:
+        """
+        验证 secp256k1 签名，正确处理 R|S 到 DER 的转换。
+        """
+        try:
+            from cryptography.hazmat.primitives.asymmetric import ec
+            from cryptography.hazmat.primitives import hashes
+            from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
+
+            # 创建公钥对象
+            if compressed:
+                public_key_obj = ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256K1(), public_key_bytes)
+            else:
                 # 从非压缩格式创建公钥对象
                 x = int.from_bytes(public_key_bytes[1:33], byteorder='big')
                 y = int.from_bytes(public_key_bytes[33:65], byteorder='big')
                 public_numbers = ec.EllipticCurvePublicNumbers(x, y, ec.SECP256K1())
                 public_key_obj = public_numbers.public_key()
-                public_key_obj.verify(signature_bytes, payload_bytes, ec.ECDSA(hashes.SHA256()))
-                return True
-            elif len(public_key_bytes) == 33:
-                # secp256k1 压缩公钥 (33 bytes)
-                from cryptography.hazmat.primitives.asymmetric import ec
-                from cryptography.hazmat.primitives import hashes
-                public_key_obj = ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256K1(), public_key_bytes)
-                public_key_obj.verify(signature_bytes, payload_bytes, ec.ECDSA(hashes.SHA256()))
-                return True
-            else:
-                logger.error(f"不支持的公钥长度: {len(public_key_bytes)} bytes")
-                return False
-                
-        except Exception as e:
-            logger.error(f"签名验证失败: {e}")
-            return False
 
+            # 确保签名长度是 64 字节（32字节 R + 32字节 S）
+            if len(signature_bytes) != 64:
+                logger.error(f"Invalid signature length: {len(signature_bytes)}, expected 64")
+                return False
+
+            # 从固定长度 R|S 格式提取 R 和 S
+            r_bytes = signature_bytes[:32]
+            s_bytes = signature_bytes[32:]
+            
+            # 转换为整数（去除前导零）
+            r = int.from_bytes(r_bytes, 'big')
+            s = int.from_bytes(s_bytes, 'big')
+            
+            # 验证 R 和 S 的有效性
+            if r == 0 or s == 0:
+                logger.error("Invalid signature: R or S is zero")
+                return False
+            
+            # 转换为 DER 格式
+            signature_der = encode_dss_signature(r, s)
+            
+            # 验证签名
+            public_key_obj.verify(signature_der, payload_bytes, ec.ECDSA(hashes.SHA256()))
+            return True
+
+        except Exception as e:
+            logger.error(f"secp256k1 签名验证失败: {e}")
+            return False
 
 class PureWBAAuthHeaderBuilder(BaseAuthHeaderBuilder):
     """纯净的WBA认证头构建器。"""
@@ -115,6 +183,23 @@ class PureWBAAuthHeaderBuilder(BaseAuthHeaderBuilder):
     def __init__(self, signer: BaseDIDSigner):
         self.signer = signer
 
+    def _get_domain(self, url: str) -> str:
+        """Extract domain from URL"""
+        try:
+            from starlette.requests import Request
+        except ImportError:
+            Request = None
+
+        if Request and isinstance(url, Request):
+            # Prefer base_url (remove path), otherwise use url
+            url_str = str(getattr(url, "base_url", None) or getattr(url, "url", None))
+        else:
+            url_str = str(url)
+
+        from urllib.parse import urlparse
+        parsed_url = urlparse(url_str)
+        domain = parsed_url.netloc.split(':')[0]
+        return domain
     def _select_authentication_method(self, did_document) -> Tuple[Dict, str]:
         """从DID文档中选择第一个认证方法。"""
         # Check if it's a DIDDocument (Pydantic model) or a dict
@@ -162,11 +247,12 @@ class PureWBAAuthHeaderBuilder(BaseAuthHeaderBuilder):
 
         nonce = secrets.token_hex(16)
         timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        service_domain = self._get_domain(context.request_url)
 
         data_to_sign = {
             "nonce": nonce,
             "timestamp": timestamp,
-            "service": context.request_url,
+            "service": service_domain,
             "did": did,
         }
         if context.use_two_way_auth:
@@ -175,8 +261,10 @@ class PureWBAAuthHeaderBuilder(BaseAuthHeaderBuilder):
         canonical_json = jcs.canonicalize(data_to_sign)
         content_hash = hashlib.sha256(canonical_json).digest()
 
-        signature_bytes = credentials.sign(content_hash, verification_method_fragment)
-        signature = base64.urlsafe_b64encode(signature_bytes).rstrip(b"=").decode("utf-8")
+        signature_der = credentials.sign(content_hash, verification_method_fragment)
+        
+        # 使用 signer 的 encode_signature 方法处理 DER 到 R|S 的转换和编码
+        signature = self.signer.encode_signature(signature_der)
 
         parts = [
             f'DIDWba did="{did}"',
@@ -189,6 +277,8 @@ class PureWBAAuthHeaderBuilder(BaseAuthHeaderBuilder):
         parts.extend([f'verification_method="{verification_method_fragment}"', f'signature="{signature}"'])
 
         auth_header_value = ", ".join(parts)
+        logger.info(f"\nData to sign:{data_to_sign},\ncontent_hash:{content_hash},\nsignature:{signature}")
+
         return {"Authorization": auth_header_value}
 
     def parse_auth_header(self, auth_header: str) -> Dict[str, Any]:
@@ -327,6 +417,24 @@ class PureWBADIDAuthenticator(BaseDIDAuthenticator):
             logger.error(f"Error during response verification: {e}", exc_info=True)
             return False, f"Exception during verification: {e}"
 
+    def _get_domain(self, url: str) -> str:
+        """Extract domain from URL"""
+        try:
+            from starlette.requests import Request
+        except ImportError:
+            Request = None
+
+        if Request and isinstance(url, Request):
+            # Prefer base_url (remove path), otherwise use url
+            url_str = str(getattr(url, "base_url", None) or getattr(url, "url", None))
+        else:
+            url_str = str(url)
+
+        from urllib.parse import urlparse
+        parsed_url = urlparse(url_str)
+        domain = parsed_url.netloc.split(':')[0]
+        return domain
+
     async def verify_request_header(self, auth_header: str, context: AuthenticationContext) -> Tuple[bool, str]:
         """
         验证来自客户端的请求认证头 (服务端使用)。
@@ -391,19 +499,24 @@ class PureWBADIDAuthenticator(BaseDIDAuthenticator):
             public_key_bytes = did_doc.get_public_key_bytes_by_fragment(verification_method_fragment)
             if not public_key_bytes:
                 return False, f"Public key with fragment {verification_method_fragment} not found in DID document for {did}."
+            service_domain = self._get_domain(context.request_url)
 
             # 6. 重构签名内容并验证签名
             data_to_sign = {
                 "nonce": nonce,
                 "timestamp": timestamp,
-                "service": context.request_url,
+                "service": service_domain,
                 "did": did,
             }
             if resp_did_from_header:
                 data_to_sign["resp_did"] = resp_did_from_header
 
+
             canonical_json_bytes = jcs.canonicalize(data_to_sign)
+
             payload_to_verify = hashlib.sha256(canonical_json_bytes).digest()
+            logger.info(
+                f"\nData to verify:{data_to_sign},\npayload_to_verify_hash:{payload_to_verify},\npublic_bytes:{public_key_bytes}")
 
             is_valid = self.signer.verify_signature(payload_to_verify, signature, public_key_bytes)
 

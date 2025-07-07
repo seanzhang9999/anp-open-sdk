@@ -5,6 +5,8 @@ from cryptography.hazmat.primitives import serialization
 from datetime import datetime
 from anp_open_sdk.auth.utils import multibase_to_bytes
 
+import logging
+logger = logging.getLogger(__name__)
 
 class VerificationMethod(BaseModel):
     id: str
@@ -163,6 +165,7 @@ class DIDCredentials(BaseModel):
                 # Ed25519 私钥
                 try:
                     private_key_obj = ed25519.Ed25519PrivateKey.from_private_bytes(key_pair.private_key)
+                    logger.info(f"private key:{key_pair.private_key},method:ed25519")
                     return private_key_obj.sign(data_to_sign)
                 except:
                     # 如果Ed25519失败，尝试secp256k1
@@ -173,6 +176,9 @@ class DIDCredentials(BaseModel):
                 int.from_bytes(key_pair.private_key, byteorder="big"), 
                 ec.SECP256K1()
             )
+            logger.info(f"private key:{key_pair.private_key},method:secp256k1")
+
+            # 直接返回 DER 格式签名（与原始 agent_connect 保持一致）
             return private_key_obj.sign(data_to_sign, ec.ECDSA(hashes.SHA256()))
             
         except Exception as e:
