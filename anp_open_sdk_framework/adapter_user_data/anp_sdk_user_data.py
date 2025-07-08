@@ -462,7 +462,7 @@ def get_user_dir_did_doc_by_did(did):
     return False, None, None
 
 def did_create_user(user_iput: dict, *, did_hex: bool = True, did_check_unique: bool = True):
-    from agent_connect.authentication.did_wba import create_did_wba_document
+    from anp_open_sdk.agent_connect_hotpatch.authentication.did_wba import create_did_wba_document
     import json
     import os
     from datetime import datetime

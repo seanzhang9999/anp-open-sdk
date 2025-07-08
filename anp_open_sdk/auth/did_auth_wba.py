@@ -1,6 +1,6 @@
 # anp_open_sdk/adapter_auth/wba_auth.py
 
-from agent_connect.authentication import resolve_did_wba_document
+from anp_open_sdk.protocol import resolve_did_document
 from anp_open_sdk.config import get_global_config
 
 from .did_auth_base import BaseDIDResolver, BaseDIDSigner, BaseAuthHeaderBuilder, BaseDIDAuthenticator, BaseAuth
@@ -14,7 +14,7 @@ import re
 import logging
 logger = logging.getLogger(__name__)
 
-from agent_connect.authentication.did_wba import extract_auth_header_parts
+from anp_open_sdk.agent_connect_hotpatch.authentication.did_wba import extract_auth_header_parts_two_way
 
 from ..agent_connect_hotpatch.authentication.did_wba import extract_auth_header_parts_two_way, \
     verify_auth_header_signature_two_way

@@ -37,7 +37,7 @@ from cryptography.hazmat.primitives.serialization import (
 )
 import base58  # Need to add this dependency
 import traceback
-from agent_connect.authentication.verification_methods import create_verification_method, CURVE_MAPPING
+from anp_open_sdk.protocol import create_verification_method, CURVE_MAPPING
 import jcs
 
 
