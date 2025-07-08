@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 
 from anp_open_sdk.anp_sdk_agent import LocalAgent
-from anp_open_sdk.auth.did_auth_wba import parse_wba_did_host_port
+from anp_open_sdk.utils.did_utils import parse_wba_did_host_port
 from anp_open_sdk_framework.adapter_user_data.anp_sdk_user_data import LocalUserDataManager
 import logging
 
@@ -69,6 +69,8 @@ class ANPTool:
             self,
             auth_client: Optional[AuthClient] = None,
             local_caller: Optional[LocalMethodsCaller] = None,
+            did_document_path: Optional[str] = None,
+            private_key_path: Optional[str] = None,
             **data,
     ):
         """
@@ -77,11 +79,16 @@ class ANPTool:
                 参数:
                     auth_client (AuthClient, 可选): 用于执行认证请求的客户端实例。
                     local_caller (LocalMethodsCaller, 可选): 用于执行本地方法的调用器实例。
+                    did_document_path (str, 可选): DID文档路径，用于向后兼容。
+                    private_key_path (str, 可选): 私钥路径，用于向后兼容。
                 """
-        super().__init__(**data)
+        # 移除super().__init__(**data)调用，因为object.__init__不接受额外参数
         self.local_caller = local_caller
         # 直接使用传入的 auth_client 实例
         self.auth_client = auth_client
+        # 保存兼容性参数，但不使用它们（这是一个过渡版本）
+        self.did_document_path = did_document_path
+        self.private_key_path = private_key_path
 
 
 

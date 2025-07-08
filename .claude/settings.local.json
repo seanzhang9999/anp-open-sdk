@@ -28,7 +28,13 @@
       "Bash(chmod:*)",
       "Bash(git check-ignore:*)",
       "Bash(PYTHONPATH=/Users/seanzhang/seanwork/anp-open-sdk python /Users/seanzhang/seanwork/anp-open-sdk/test_suite/tests/test_simplified_did_auth.py)",
-      "Bash(PYTHONPATH=/Users/seanzhang/seanwork/anp-open-sdk python /Users/seanzhang/seanwork/anp-open-sdk/test_suite/run_tests.py --type simplified_e2e)"
+      "Bash(PYTHONPATH=/Users/seanzhang/seanwork/anp-open-sdk python /Users/seanzhang/seanwork/anp-open-sdk/test_suite/run_tests.py --type simplified_e2e)",
+      "Bash(git add:*)",
+      "Bash(git push:*)",
+      "Bash(gtimeout:*)",
+      "Bash(git checkout:*)",
+      "Bash(git restore:*)",
+      "Bash(git stash:*)"
     ],
     "deny": []
   }

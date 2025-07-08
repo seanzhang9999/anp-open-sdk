@@ -12,13 +12,18 @@ from .unified_caller import UnifiedCaller
 from .unified_crawler import UnifiedCrawler
 from .master_agent import MasterAgent
 
-# 智能体管理
-from .agent_manager import LocalAgentManager
+# 智能体管理 - 延迟导入以避免循环依赖
+# from .agent_manager import LocalAgentManager
 
 # 本地方法相关
 from .local_methods.local_methods_caller import LocalMethodsCaller
 from .local_methods.local_methods_doc import LocalMethodsDocGenerator
 from .local_methods.local_methods_decorators import local_method, register_local_methods_to_agent
+
+# 服务层组件（从 anp_open_sdk 迁移） - 延迟导入以避免循环依赖
+# from .service.router.router_agent import AgentRouter, wrap_business_handler
+# from .service.interaction.anp_tool import ANPTool, ANPToolCrawler
+# from .service.publisher.anp_sdk_publisher import ANPSDKPublisher
 
 # 导出的主要类和函数
 __all__ = [
@@ -27,14 +32,21 @@ __all__ = [
     'UnifiedCrawler', 
     'MasterAgent',
     
-    # 智能体管理
-    'LocalAgentManager',
+    # 智能体管理 - 注释掉以避免循环导入
+    # 'LocalAgentManager',
     
     # 本地方法
     'LocalMethodsCaller',
     'LocalMethodsDocGenerator',
     'local_method',
     'register_local_methods_to_agent',
+    
+    # 服务层组件 - 注释掉以避免循环导入
+    # 'AgentRouter',
+    # 'wrap_business_handler',
+    # 'ANPTool',
+    # 'ANPToolCrawler',
+    # 'ANPSDKPublisher',
 ]
 
 # 框架信息
@@ -46,9 +58,32 @@ FRAMEWORK_INFO = {
         'UnifiedCaller': '统一调用器 - 合并本地方法和远程API调用',
         'UnifiedCrawler': '统一爬虫 - 整合资源发现和智能调用',
         'MasterAgent': '主智能体 - 提供任务级别的统一调度',
-        'LocalAgentManager': '本地智能体管理器',
+        # 'LocalAgentManager': '本地智能体管理器',
+        'AgentRouter': '智能体路由器 - 管理多智能体请求路由',
+        'ANPTool': 'ANP工具 - 代理网络协议交互工具',
+        'ANPSDKPublisher': 'ANP发布器 - DID发布和注册服务',
     }
 }
+
+def get_local_agent_manager():
+    """延迟导入 LocalAgentManager 以避免循环依赖"""
+    from .agent_manager import LocalAgentManager
+    return LocalAgentManager
+
+def get_agent_router():
+    """延迟导入 AgentRouter 以避免循环依赖"""
+    from .service.router.router_agent import AgentRouter, wrap_business_handler
+    return AgentRouter, wrap_business_handler
+
+def get_anp_tool():
+    """延迟导入 ANPTool 以避免循环依赖"""
+    from .service.interaction.anp_tool import ANPTool, ANPToolCrawler
+    return ANPTool, ANPToolCrawler
+
+def get_anp_sdk_publisher():
+    """延迟导入 ANPSDKPublisher 以避免循环依赖"""
+    from .service.publisher.anp_sdk_publisher import ANPSDKPublisher
+    return ANPSDKPublisher
 
 def get_framework_info():
     """获取框架信息"""

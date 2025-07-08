@@ -234,18 +234,14 @@ def test_signature_components():
     print("-" * 50)
     
     try:
-        from anp_open_sdk.auth_methods.wba.implementation import PureWBADIDSigner, PureWBAAuthHeaderBuilder, PureWBAAuth
+        from anp_open_sdk.auth_methods.wba.implementation import PureWBAAuth
         import hashlib
         import jcs
         
-        # Create components
-        signer = PureWBADIDSigner()
-        header_builder = PureWBAAuthHeaderBuilder(signer)
+        # Create main auth component (new architecture pattern)
         base_auth = PureWBAAuth()
         
-        print("✅ Created PureWBADIDSigner")
-        print("✅ Created PureWBAAuthHeaderBuilder")
-        print("✅ Created PureWBAAuth")
+        print("✅ Created PureWBAAuth (main authentication component)")
         
         # Test signature creation with test data
         test_data = {
@@ -260,15 +256,19 @@ def test_signature_components():
         
         print(f"✅ Created test payload hash: {content_hash.hex()[:16]}...")
         
-        # Test auth header parsing
+        # Test auth header parsing through main auth component (correct architecture)
         sample_header = 'DIDWba did="test", nonce="123", timestamp="2025-01-01T00:00:00Z", verification_method="#key-1", signature="test"'
-        parsed = header_builder.parse_auth_header(sample_header)
+        parsed = base_auth.header_builder.parse_auth_header(sample_header)
         
         print(f"✅ Parsed auth header: {len(parsed)} fields")
         
         assert "did" in parsed
         assert "nonce" in parsed
         assert parsed["did"] == "test"
+        
+        # Test DID extraction through main interface
+        caller_did, target_did = base_auth.extract_did_from_auth_header(sample_header)
+        assert caller_did == "test"
         
         print("✅ Signature components test passed")
         return True

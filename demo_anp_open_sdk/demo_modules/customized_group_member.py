@@ -5,8 +5,8 @@ from typing import Dict, Any, Callable, List
 from datetime import datetime
 
 from anp_open_sdk.config import UnifiedConfig
-from anp_open_sdk.service.interaction.anp_sdk_group_member import GroupMemberSDK
-from anp_open_sdk.service.interaction.anp_sdk_group_runner import Message, MessageType
+from anp_open_sdk_framework.service.interaction.anp_sdk_group_member import GroupMemberSDK
+from anp_open_sdk_framework.service.interaction.anp_sdk_group_runner import Message, MessageType
 from anp_open_sdk.utils.log_base import logging as logger
 
 class GroupMemberWithStorage(GroupMemberSDK):

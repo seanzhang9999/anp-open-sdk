@@ -182,6 +182,102 @@ class WBADIDProtocol(DIDMethodProtocol):
             "service": payload_data.get('service'),
             "resp_did": payload_data.get('resp_did')
         }
+    
+    def extract_dids_from_header(self, auth_header: str) -> tuple:
+        """从认证头提取DID信息"""
+        try:
+            from ..authentication.did_wba import extract_auth_header_parts_two_way
+            parts = extract_auth_header_parts_two_way(auth_header)
+            if parts and len(parts) >= 2:
+                return parts[0], parts[1]  # caller_did, target_did
+            return None, None
+        except Exception as e:
+            logger.error(f"提取DID失败: {e}")
+            return None, None
+    
+    def parse_auth_header(self, auth_header: str) -> Optional[Dict[str, Any]]:
+        """解析认证头获取完整信息"""
+        try:
+            from ..authentication.did_wba import DIDWbaAuthHeader
+            dummy_header = DIDWbaAuthHeader("dummy")
+            return dummy_header.parse_auth_header(auth_header)
+        except Exception as e:
+            logger.error(f"解析认证头失败: {e}")
+            return None
+    
+    def reconstruct_signed_payload(self, parsed_header: Dict[str, Any], service_domain: str) -> Dict[str, Any]:
+        """重构用于验证签名的载荷"""
+        payload = {
+            "nonce": parsed_header['nonce'],
+            "timestamp": parsed_header['timestamp'],
+            "service": service_domain,
+            "did": parsed_header['did']
+        }
+        if parsed_header.get('resp_did'):
+            payload["resp_did"] = parsed_header['resp_did']
+        return payload
+    
+    def verify_signature_with_public_key(self, payload_data: Dict[str, Any], signature: str, public_key_bytes: bytes) -> bool:
+        """使用公钥验证签名"""
+        try:
+            # 创建规范化的JSON
+            canonical_json = jcs.canonicalize(payload_data)
+            content_hash = hashlib.sha256(canonical_json).digest()
+            
+            # 解码base64 URL安全编码的签名
+            from ..authentication.did_wba import decode_signature
+            signature_bytes = decode_signature(signature)
+            
+            # 如果是secp256k1签名，需要将R|S格式转换为DER格式
+            if len(signature_bytes) == 64:  # R|S格式 (32字节R + 32字节S)
+                # 将R|S转换为DER格式
+                r = int.from_bytes(signature_bytes[:32], byteorder='big')
+                s = int.from_bytes(signature_bytes[32:], byteorder='big')
+                
+                from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
+                signature_bytes = encode_dss_signature(r, s)
+            
+            # 验证签名
+            return self.crypto_signer.verify(content_hash, signature_bytes, public_key_bytes)
+        except Exception as e:
+            logger.error(f"签名验证失败: {e}")
+            return False
+    
+    def build_auth_header(self, context: Any, credentials: Any) -> Dict[str, str]:
+        """构建认证头"""
+        try:
+            # 构建签名载荷数据
+            context_data = {
+                'did': credentials.did_document.id,  # 使用.id而不是.did
+                'request_url': context.request_url,
+                'verification_method_fragment': '#key-1'
+            }
+            
+            if hasattr(context, 'use_two_way_auth') and context.use_two_way_auth and hasattr(context, 'target_did'):
+                context_data['target_did'] = context.target_did
+            
+            # 获取私钥 - 从key_pair中获取
+            key_pair = credentials.get_key_pair("key-1")
+            if not key_pair:
+                raise ValueError("未找到密钥对 key-1")
+            private_key_bytes = key_pair.private_key
+            
+            # 创建签名载荷
+            signed_payload = self.create_signed_payload(context_data, private_key_bytes)
+            
+            # 构建认证头
+            if context_data.get('target_did'):
+                auth_type = "DIDWba"
+                auth_value = f'did="{signed_payload["did"]}",nonce="{signed_payload["nonce"]}",timestamp="{signed_payload["timestamp"]}",service="{signed_payload["service_domain"]}",verification_method="{signed_payload["verification_method"]}",signature="{signed_payload["signature"]}",resp_did="{signed_payload["resp_did"]}"'
+            else:
+                auth_type = "DIDWba"  
+                auth_value = f'did="{signed_payload["did"]}",nonce="{signed_payload["nonce"]}",timestamp="{signed_payload["timestamp"]}",service="{signed_payload["service_domain"]}",verification_method="{signed_payload["verification_method"]}",signature="{signed_payload["signature"]}"'
+            
+            return {"Authorization": f"{auth_type} {auth_value}"}
+            
+        except Exception as e:
+            logger.error(f"构建认证头失败: {e}")
+            return {}
 
 
 class KeyDIDProtocol(DIDMethodProtocol):

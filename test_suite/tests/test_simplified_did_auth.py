@@ -114,19 +114,17 @@ class TestDIDAuthenticationComponents:
         logger.info("✅ Authentication context creation test passed")
         
     def test_signature_components(self, test_config):
-        """Test signature creation and verification components"""
-        # Test WBA components creation
-        signer = PureWBADIDSigner()
-        header_builder = PureWBAAuthHeaderBuilder(signer)
+        """Test signature creation and verification components with correct new architecture"""
+        # Test main WBA auth component creation (correct pattern)
         base_auth = PureWBAAuth()
         
-        assert signer is not None
-        assert header_builder is not None
         assert base_auth is not None
+        assert base_auth.header_builder is not None
+        assert base_auth.signer is not None
         
-        # Test auth header parsing
+        # Test auth header parsing through main auth component (correct architecture)
         sample_header = 'DIDWba did="test:did", nonce="abc123", timestamp="2025-01-01T00:00:00Z", verification_method="#key-1", signature="test_sig"'
-        parsed = header_builder.parse_auth_header(sample_header)
+        parsed = base_auth.header_builder.parse_auth_header(sample_header)
         
         assert "did" in parsed
         assert "nonce" in parsed
@@ -138,7 +136,7 @@ class TestDIDAuthenticationComponents:
         assert parsed["nonce"] == "abc123"
         assert parsed["verification_method"] == "#key-1"
         
-        # Test DID extraction
+        # Test DID extraction through main interface (correct pattern)
         caller_did, target_did = base_auth.extract_did_from_auth_header(sample_header)
         assert caller_did == "test:did"
         assert target_did is None  # No resp_did in this header

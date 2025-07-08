@@ -15,9 +15,9 @@ import aiofiles
 from anp_open_sdk.utils.log_base import  logging as logger
 
 from anp_open_sdk.anp_sdk import ANPSDK, LocalAgent
-from anp_open_sdk.service.interaction.agent_api_call import agent_api_call_post, agent_api_call_get
-from anp_open_sdk.service.interaction.agent_message_p2p import agent_msg_post
-from anp_open_sdk.service.interaction.anp_tool import ANPTool
+from anp_open_sdk_framework.service.interaction.agent_api_call import agent_api_call_post, agent_api_call_get
+from anp_open_sdk_framework.service.interaction.agent_message_p2p import agent_msg_post
+from anp_open_sdk_framework.service.interaction.anp_tool import ANPTool
 from .step_helper import DemoStepHelper
 
 
@@ -118,7 +118,7 @@ class DemoTaskRunner:
                 'type': 'user'# 用户可以自定义did 路由的did.json服务在路径，确保和did名称路径一致即可
             }
 
-            did_document = did_create_user(temp_user_params)
+            did_document = await did_create_user(temp_user_params)
             if not did_document:
                 logger.error("临时用户创建失败")
                 return
@@ -252,8 +252,9 @@ class DemoTaskRunner:
             
             # 加载用户数据
             user_data_manager = self.sdk.user_data_manager
-            user_data_manager.load_users()
+            # 使用get_all_users()替代load_users()
             user_datas = user_data_manager.get_all_users()
+            logger.debug(f"获取到 {len(user_datas)} 个用户数据")
             
             # 查找并注册托管智能体
             hosted_agents = find_and_register_hosted_agent(self.sdk, user_datas)
@@ -363,7 +364,9 @@ class DemoTaskRunner:
         
         
         user_data_manager = self.sdk.user_data_manager
-        user_data_manager.load_users()
+        # 使用get_all_users()替代load_users()
+        all_users = user_data_manager.get_all_users()
+        logger.debug(f"获取到 {len(all_users)} 个用户数据")
    
         user_data = user_data_manager.get_user_data_by_name("托管智能体_did:wba:agent-did.com:test:public")
         agent_anptool = LocalAgent.from_did(user_data.did)
@@ -496,7 +499,7 @@ class DemoTaskRunner:
         self.step_helper.pause(f"启动{agent_name}智能爬取: {initial_url}")
         
         # 引入必要的依赖
-        from anp_open_sdk.service.interaction.anp_tool import ANPTool
+        from anp_open_sdk_framework.service.interaction.anp_tool import ANPTool
         
         # 初始化变量
         visited_urls = set()

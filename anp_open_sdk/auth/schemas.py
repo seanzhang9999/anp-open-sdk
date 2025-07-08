@@ -294,7 +294,24 @@ class DIDCredentials(BaseModel):
     @classmethod
     def from_user_data(cls, user_data):
         """从用户数据对象创建DID凭证"""
-        with open(user_data.did_private_key_file_path, "rb") as key_file:
+        # Handle both LocalAgent and user_data objects
+        if hasattr(user_data, 'private_key_path'):
+            private_key_file_path = user_data.private_key_path
+            # For LocalAgent, we need to get did_doc from user_data
+            if hasattr(user_data, 'user_data') and hasattr(user_data.user_data, 'did_doc'):
+                did_doc_data = user_data.user_data.did_doc
+            else:
+                # Fallback: read from did_document_path
+                import json
+                with open(user_data.did_document_path, 'r', encoding='utf-8') as f:
+                    did_doc_data = json.load(f)
+        elif hasattr(user_data, 'did_private_key_file_path'):
+            private_key_file_path = user_data.did_private_key_file_path
+            did_doc_data = user_data.did_doc
+        else:
+            raise AttributeError(f"User data object {type(user_data)} does not have private key path attribute")
+        
+        with open(private_key_file_path, "rb") as key_file:
             private_key_pem = key_file.read()
         private_key = serialization.load_pem_private_key(private_key_pem, password=None)
         if isinstance(private_key, ec.EllipticCurvePrivateKey):
@@ -318,8 +335,8 @@ class DIDCredentials(BaseModel):
         
         # Create DIDDocument first
         did_doc = DIDDocument(
-            **user_data.did_doc,
-            raw_document=user_data.did_doc
+            **did_doc_data,
+            raw_document=did_doc_data
         )
         
         # 🔧 FIX: 使用DID文档中存储的公钥，而不是重新生成
@@ -350,8 +367,13 @@ class DIDCredentials(BaseModel):
             key_id=key_id
         )
         
-        # Get DID from user_data or did_doc
-        did = user_data.get_did() if hasattr(user_data, 'get_did') else user_data.did_doc.get('id')
+        # Get DID from user_data or did_doc_data
+        if hasattr(user_data, 'get_did'):
+            did = user_data.get_did()
+        elif hasattr(user_data, 'id'):
+            did = user_data.id
+        else:
+            did = did_doc_data.get('id')
         
         # Create credentials with the DID
         credentials = cls(did=did, did_document=did_doc)

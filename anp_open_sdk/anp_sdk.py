@@ -21,12 +21,12 @@ from datetime import datetime
 from typing import Dict, Any, Optional, List
 from fastapi.middleware.cors import CORSMiddleware
 from anp_open_sdk.auth.auth_server import auth_middleware
-from anp_open_sdk.service.router import router_did, router_publisher, router_auth
+from anp_open_sdk_framework.service.router import router_did, router_publisher, router_auth
 from anp_open_sdk.config import get_global_config
 from fastapi import Request, WebSocket, WebSocketDisconnect, FastAPI
 from fastapi.responses import StreamingResponse
 from anp_open_sdk.anp_sdk_agent import LocalAgent
-from anp_open_sdk.service.interaction.anp_sdk_group_runner import GroupManager, GroupRunner, Message, MessageType, Agent
+from anp_open_sdk_framework.service.interaction.anp_sdk_group_runner import GroupManager, GroupRunner, Message, MessageType, Agent
 from anp_open_sdk.sdk_mode import SdkMode
 
 # 在模块顶部获取 logger，这是标准做法
@@ -104,7 +104,7 @@ class ANPSDK:
         async def auth_middleware_wrapper(request, call_next):
             return await auth_middleware(request, call_next)
 
-        from anp_open_sdk.service.router.router_agent import AgentRouter
+        from anp_open_sdk_framework.service.router.router_agent import AgentRouter
         self.router = AgentRouter()
         if mode == SdkMode.MULTI_AGENT_ROUTER:
             for agent in self.agents:

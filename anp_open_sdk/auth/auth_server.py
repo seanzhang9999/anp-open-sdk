@@ -91,7 +91,7 @@ class AgentAuthServer:
         
         # For DID-WBA headers
         if auth_header.startswith("DIDWba "):
-            from ..protocol.did_methods.wba import create_wba_authenticator
+            from ..protocol.did_methods import create_wba_authenticator
             temp_auth = create_wba_authenticator()
             req_did, target_did = temp_auth.extract_dids_from_header(auth_header)
 

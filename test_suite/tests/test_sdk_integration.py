@@ -294,7 +294,7 @@ class TestSDKRouterIntegration:
                 sdk.register_agent(mock_agent)
             else:
                 # Via agent router
-                from anp_open_sdk.service.router.router_agent import AgentRouter
+                from anp_open_sdk_framework.service.router.router_agent import AgentRouter
                 if not hasattr(sdk, 'agent_router'):
                     sdk.agent_router = AgentRouter()
                 sdk.agent_router.register_agent(mock_agent)

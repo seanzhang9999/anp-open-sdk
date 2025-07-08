@@ -148,7 +148,7 @@ class TestAgentConnectNetworkOperations:
             test_did = "did:wba:localhost:test"
             
             # Mock fallback 实现
-            with patch('anp_open_sdk.agent_connect_hotpatch.authentication.did_wba.resolve_did_wba_document') as mock_fallback:
+            with patch('anp_open_sdk.protocol.authentication.did_wba.resolve_did_wba_document') as mock_fallback:
                 mock_fallback.return_value = {"id": test_did, "verificationMethod": []}
                 
                 result = await network.resolve_did_document(test_did)

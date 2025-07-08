@@ -1,5 +1,5 @@
 from anp_open_sdk.anp_sdk import ANPSDK
-from anp_open_sdk.service.interaction.anp_tool import ANPTool, ANPToolCrawler
+from anp_open_sdk_framework.service.interaction.anp_tool import ANPTool, ANPToolCrawler
 from anp_open_sdk_framework.local_methods.local_methods_caller import LocalMethodsCaller
 from anp_open_sdk_framework.local_methods.local_methods_doc import LocalMethodsDocGenerator
 import logging

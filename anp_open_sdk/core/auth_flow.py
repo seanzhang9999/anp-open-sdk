@@ -66,7 +66,7 @@ class AuthFlowManager:
             use_two_way_auth=use_two_way_auth
         )
 
-        auth_headers = self.authenticator.header_builder.build_auth_header(context, caller_credentials)
+        auth_headers = await self.authenticator.header_builder.build_auth_header(context, caller_credentials)
         request_context = RequestContext(method=method, url=url, headers=auth_headers, json_data=json_data)
         return context, request_context
 
@@ -138,7 +138,11 @@ class AuthFlowManager:
             auth_data = json.loads(auth_header_str)
             if isinstance(auth_data, list) and len(auth_data) > 0:
                 token = auth_data[0].get("access_token")
-                peer_auth_header = auth_data[0].get("resp_did_auth_header", {}).get("Authorization")
+                resp_did_auth_header = auth_data[0].get("resp_did_auth_header")
+                peer_auth_header = None
+                if resp_did_auth_header and isinstance(resp_did_auth_header, dict):
+                    peer_auth_header = resp_did_auth_header.get("Authorization")
+                
                 if token and peer_auth_header:
                     return "TwoWayAuth", token, peer_auth_header
                 elif token:

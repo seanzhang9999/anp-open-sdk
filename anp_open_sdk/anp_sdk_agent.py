@@ -26,8 +26,8 @@ from starlette.responses import JSONResponse
 
 
 from anp_open_sdk.config import get_global_config
-from anp_open_sdk.service.publisher.anp_sdk_publisher_mail_backend import EnhancedMailManager
-from anp_open_sdk.auth.did_auth_wba import parse_wba_did_host_port
+from anp_open_sdk_framework.service.publisher.anp_sdk_publisher_mail_backend import EnhancedMailManager
+from anp_open_sdk.utils.did_utils import parse_wba_did_host_port
 from anp_open_sdk.contact_manager import ContactManager
 from anp_open_sdk.sdk_mode import SdkMode
 
@@ -262,9 +262,10 @@ class LocalAgent:
                 except Exception as e:
                     self.logger.debug(
                         f"发送到 handler的请求数据{request_data}\n"                        
-                        f"完整请求为 url: {request.url} \n"
-                        f"body: {await request.body()}")
+                        f"完整请求为 url: {request.url}")
                     self.logger.error(f"API调用错误: {e}")
+                    import traceback
+                    self.logger.error(f"详细错误信息: {traceback.format_exc()}")
                     return JSONResponse(
                         status_code=500,
                         content={"status": "error", "error_message": str(e)}
@@ -370,7 +371,7 @@ class LocalAgent:
 
     async def register_hosted_did(self, sdk):
         try:
-            from anp_open_sdk.service.publisher.anp_sdk_publisher_mail_backend import EnhancedMailManager
+            from anp_open_sdk_framework.service.publisher.anp_sdk_publisher_mail_backend import EnhancedMailManager
             user_data_manager = sdk.user_data_manager
             user_data = user_data_manager.get_user_data(self.id)
             did_document = user_data.did_doc

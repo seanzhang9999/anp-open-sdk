@@ -1,6 +1,6 @@
 import asyncio
 
-from anp_open_sdk.service.router.router_agent import wrap_business_handler
+from anp_open_sdk_framework.service.router.router_agent import wrap_business_handler
 from anp_open_sdk_framework.local_methods.local_methods_decorators import local_method, register_local_methods_to_agent
 
 

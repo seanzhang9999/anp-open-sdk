@@ -27,8 +27,8 @@ from anp_open_sdk.utils.log_base import setup_logging
 from anp_open_sdk.anp_sdk import ANPSDK
 from anp_open_sdk.anp_sdk_agent import LocalAgent
 from anp_open_sdk.sdk_mode import SdkMode
-from anp_open_sdk.service.router.router_did import router as did_router
-from anp_open_sdk.service.router.router_agent import AgentRouter, wrap_business_handler
+from anp_open_sdk_framework.service.router.router_did import router as did_router
+from anp_open_sdk_framework.service.router.router_agent import AgentRouter, wrap_business_handler
 from anp_open_sdk_framework.adapter_user_data.anp_sdk_user_data import LocalUserDataManager
 import logging
 
@@ -328,7 +328,7 @@ class TestCompleteRouterFlow:
     
     def test_url_did_format_utility(self, test_config):
         """Test URL DID formatting utility"""
-        from anp_open_sdk.service.router.utils import url_did_format
+        from anp_open_sdk_framework.service.router.utils import url_did_format
         
         # Create mock request
         mock_request = Mock()
@@ -386,7 +386,7 @@ class TestRouterIntegrationFlow:
         mock_agent.is_hosted_did = False
         
         # 3. Register agent (using AgentRouter if SDK doesn't have direct method)
-        from anp_open_sdk.service.router.router_agent import AgentRouter
+        from anp_open_sdk_framework.service.router.router_agent import AgentRouter
         router = AgentRouter()
         router.register_agent(mock_agent)
         

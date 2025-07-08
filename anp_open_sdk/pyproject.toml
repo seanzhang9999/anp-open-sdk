@@ -16,4 +16,4 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["auth", "config", "service", "auth_methods", "core", "utils", "agent_connect_hotpatch"]
+packages = ["auth", "config", "auth_methods", "core", "utils", "protocol"]

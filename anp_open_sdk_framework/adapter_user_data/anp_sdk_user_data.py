@@ -461,7 +461,7 @@ def get_user_dir_did_doc_by_did(did):
     logger.error(f"未找到DID为 {did} 的用户文档")
     return False, None, None
 
-def did_create_user(user_iput: dict, *, did_hex: bool = True, did_check_unique: bool = True):
+async def did_create_user(user_iput: dict, *, did_hex: bool = True, did_check_unique: bool = True):
     from anp_open_sdk.protocol import create_did_wba_document
     import json
     import os
@@ -546,7 +546,7 @@ def did_create_user(user_iput: dict, *, did_hex: bool = True, did_check_unique: 
         path_segments.append(unique_id)
     agent_description_url = f"http://{userdid_hostname}:{userdid_port}/{user_iput['dir']}/{user_iput['type']}/{unique_id if did_hex else ''}/ad.json"
 
-    did_document, keys = create_did_wba_document(
+    did_document, keys = await create_did_wba_document(
         hostname=userdid_hostname,
         port=userdid_port,
         path_segments=path_segments,

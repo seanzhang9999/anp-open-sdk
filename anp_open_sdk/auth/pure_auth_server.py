@@ -19,7 +19,7 @@ from fastapi import Request, HTTPException, Response
 from fastapi.responses import JSONResponse
 
 from anp_open_sdk.auth.schemas import AuthenticationContext, DIDDocument, DIDKeyPair, DIDCredentials
-from anp_open_sdk.protocol.did_methods.wba import create_wba_authenticator
+from anp_open_sdk.protocol.did_methods import create_wba_authenticator
 from anp_open_sdk_framework.adapters.did_auth_adapter import FrameworkDIDAuthAdapter
 from anp_open_sdk.config import get_global_config
 from anp_open_sdk.anp_sdk_agent import LocalAgent

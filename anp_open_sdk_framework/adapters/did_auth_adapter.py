@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 import aiohttp
 
 from anp_open_sdk.auth.schemas import DIDDocument
-from anp_open_sdk.protocol.did_methods.wba import DIDResolver, TokenStorage, HttpTransport
+from anp_open_sdk.protocol.did_methods import DIDResolver, TokenStorage, HttpTransport
 from anp_open_sdk.anp_sdk_agent import LocalAgent
 
 logger = logging.getLogger(__name__)
@@ -210,7 +210,7 @@ class FrameworkDIDAuthAdapter:
                 return False, f"Public key not found for {parsed_header['verification_method']}."
 
             # 4. Reconstruct signed payload (pure operation)
-            service_domain = authenticator.header_builder._get_domain(context.request_url)
+            service_domain = authenticator._get_domain(context.request_url)
             payload_to_verify = authenticator.reconstruct_signed_payload(parsed_header, service_domain)
 
             # 5. Verify signature (pure operation)

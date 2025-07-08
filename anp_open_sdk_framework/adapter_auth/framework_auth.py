@@ -49,7 +49,7 @@ class FrameworkAuthManager:
         # 2. 检查是否需要回退到单向认证
         if response_context.status_code in [401, 403]:
             # 收到401/403，可能是对方不支持双向认证，按旧逻辑回退
-            request_context_oneway = await flow_manager.prepare_request_context(
+            context_oneway, request_context_oneway = await flow_manager.prepare_request_context(
                 target_did, url, method, json_data, use_two_way_auth=False
             )
             response_context = await self.transport.send(request_context_oneway)

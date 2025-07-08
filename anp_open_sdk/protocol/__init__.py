@@ -12,7 +12,7 @@ from .agent_connect_wrapper import (
     get_curve_mapping,
     resolve_did_document,
     
-    # Hotpatch operations
+    # Authentication operations  
     create_did_wba_document,
     extract_auth_header_parts_two_way,
     verify_auth_header_signature_two_way,
@@ -26,6 +26,19 @@ from .agent_connect_wrapper import (
     PureAgentConnectCrypto,
     AgentConnectNetworkOperations,
     AgentConnectHotpatchOperations
+)
+
+# Direct access to authentication modules
+from .authentication import (
+    create_did_wba_document as create_did_wba_document_direct,
+    resolve_did_wba_document,
+    resolve_did_wba_document_sync,
+    generate_auth_header_two_way,
+    extract_auth_header_parts_two_way as extract_auth_header_parts_two_way_direct,
+    verify_auth_header_signature_two_way as verify_auth_header_signature_two_way_direct,
+    generate_auth_json,
+    verify_auth_json_signature,
+    DIDWbaAuthHeader
 )
 
 # Fallback implementations
@@ -43,11 +56,22 @@ __all__ = [
     'get_curve_mapping', 
     'resolve_did_document',
     
-    # Hotpatch operations
+    # Authentication operations
     'create_did_wba_document',
     'extract_auth_header_parts_two_way',
     'verify_auth_header_signature_two_way',
     'create_did_wba_auth_header',
+    
+    # Direct authentication access
+    'create_did_wba_document_direct',
+    'resolve_did_wba_document',
+    'resolve_did_wba_document_sync',
+    'generate_auth_header_two_way',
+    'extract_auth_header_parts_two_way_direct',
+    'verify_auth_header_signature_two_way_direct',
+    'generate_auth_json',
+    'verify_auth_json_signature',
+    'DIDWbaAuthHeader',
     
     # Status monitoring
     'get_agent_connect_status',

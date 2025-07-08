@@ -19,7 +19,8 @@ from typing import Any, Dict, Optional, List, Union
 from urllib.parse import urlencode, quote
 
 from anp_open_sdk.auth.auth_client import agent_auth_request, handle_response
-from anp_open_sdk.anp_sdk_agent import RemoteAgent, LocalAgent
+# 延迟导入以避免循环依赖
+# from anp_open_sdk.anp_sdk_agent import RemoteAgent, LocalAgent
 from anp_open_sdk_framework.local_methods.local_methods_decorators import LOCAL_METHODS_REGISTRY
 from anp_open_sdk_framework.local_methods.local_methods_doc import LocalMethodsDocGenerator
 
@@ -30,6 +31,11 @@ class UnifiedCaller:
     def __init__(self, sdk):
         self.sdk = sdk
         self.doc_generator = LocalMethodsDocGenerator()
+
+    def _get_agent_classes(self):
+        """延迟导入 agent 类以避免循环依赖"""
+        from anp_open_sdk.anp_sdk_agent import RemoteAgent, LocalAgent
+        return RemoteAgent, LocalAgent
 
     async def call(self, target: str, method_or_path: str, *args, **kwargs) -> Any:
         """
@@ -106,6 +112,7 @@ class UnifiedCaller:
 
     async def _agent_api_call(self, caller_agent: str, target_agent: str, api_path: str, params: Optional[Dict] = None, method: str = "GET") -> Dict:
         """执行Agent API调用"""
+        RemoteAgent, LocalAgent = self._get_agent_classes()
         caller_agent_obj = LocalAgent.from_did(caller_agent)
         target_agent_obj = RemoteAgent(target_agent)
         target_agent_path = quote(target_agent)

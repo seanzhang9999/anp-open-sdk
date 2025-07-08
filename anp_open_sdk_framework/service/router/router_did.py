@@ -22,7 +22,7 @@ from fastapi.responses import JSONResponse
 import sys
 import os
 
-from anp_open_sdk.service.router.utils import url_did_format
+from anp_open_sdk_framework.service.router.utils import url_did_format
 from anp_open_sdk_framework.adapter_user_data.anp_sdk_user_data import get_user_dir_did_doc_by_did, \
     get_agent_cfg_by_user_dir
 

@@ -29,6 +29,7 @@ async def agent_auth_request(
     method: str = "GET",
     json_data: Optional[Dict] = None,
     custom_headers: Optional[Dict[str, str]] = None,
+    use_two_way_auth: bool = True,  # 添加 use_two_way_auth 参数用于兼容
     # use_two_way_auth 和 auth_method 参数现在由内部逻辑处理
 ) -> Tuple[int, Any, str, bool]:
     """

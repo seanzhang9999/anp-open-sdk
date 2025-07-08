@@ -146,8 +146,8 @@ class DIDManager:
         return did_document
 
     async def check_did_host_request(self):
-        from anp_open_sdk.service.publisher.anp_sdk_publisher_mail_backend import EnhancedMailManager
-        from anp_open_sdk.service.publisher.anp_sdk_publisher import DIDManager
+        from anp_open_sdk_framework.service.publisher.anp_sdk_publisher_mail_backend import EnhancedMailManager
+        from anp_open_sdk_framework.service.publisher.anp_sdk_publisher import DIDManager
         try:
             config = get_global_config()
             use_local = config.mail.use_local_backend

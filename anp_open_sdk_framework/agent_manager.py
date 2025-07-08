@@ -7,7 +7,7 @@ from typing import Dict, Optional, Tuple, Any
 
 from anp_open_sdk.anp_sdk_agent import LocalAgent
 from anp_open_sdk_framework.adapter_user_data.anp_sdk_user_data import LocalUserDataManager, save_interface_files
-from anp_open_sdk.service.router.router_agent import wrap_business_handler
+from anp_open_sdk_framework.service.router.router_agent import wrap_business_handler
 from anp_open_sdk_framework.local_methods.local_methods_decorators import register_local_methods_to_agent
 
 logger = logging.getLogger(__name__)

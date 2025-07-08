@@ -155,7 +155,7 @@ class AgentConnectNetworkOperations:
     
     async def _fallback_resolve_did_document(self, did: str) -> Optional[Dict]:
         """Fallback implementation using our local DID resolution"""
-        from anp_open_sdk.agent_connect_hotpatch.authentication.did_wba import resolve_did_wba_document
+        from anp_open_sdk.protocol.authentication.did_wba import resolve_did_wba_document
         return await resolve_did_wba_document(did)
 
 
@@ -169,58 +169,58 @@ class AgentConnectHotpatchOperations:
         self._hotpatch_available = self._check_hotpatch_availability()
     
     def _check_hotpatch_availability(self) -> bool:
-        """Check if agent_connect_hotpatch is available"""
+        """Check if protocol authentication is available"""
         try:
-            import anp_open_sdk.agent_connect_hotpatch.authentication.did_wba
+            import anp_open_sdk.protocol.authentication.did_wba
             return True
         except ImportError:
-            logger.info("agent_connect_hotpatch not available")
+            logger.info("protocol authentication not available")
             return False
     
     async def create_did_wba_document(self, *args, **kwargs) -> Dict[str, Any]:
-        """Create DID WBA document using hotpatch or fallback"""
+        """Create DID WBA document using protocol authentication"""
         if self._hotpatch_available:
             try:
-                from anp_open_sdk.agent_connect_hotpatch.authentication.did_wba import create_did_wba_document
-                return await create_did_wba_document(*args, **kwargs)
+                from anp_open_sdk.protocol.authentication.did_wba import create_did_wba_document
+                return create_did_wba_document(*args, **kwargs)
             except Exception as e:
-                logger.error(f"Hotpatch create_did_wba_document failed: {e}")
+                logger.error(f"Protocol create_did_wba_document failed: {e}")
                 raise
         else:
             raise RuntimeError("No DID WBA document creation implementation available")
     
     def extract_auth_header_parts_two_way(self, auth_header: str) -> Dict[str, Any]:
-        """Extract auth header parts using hotpatch or fallback"""
+        """Extract auth header parts using protocol authentication"""
         if self._hotpatch_available:
             try:
-                from anp_open_sdk.agent_connect_hotpatch.authentication.did_wba import extract_auth_header_parts_two_way
+                from anp_open_sdk.protocol.authentication.did_wba import extract_auth_header_parts_two_way
                 return extract_auth_header_parts_two_way(auth_header)
             except Exception as e:
-                logger.error(f"Hotpatch extract_auth_header_parts_two_way failed: {e}")
+                logger.error(f"Protocol extract_auth_header_parts_two_way failed: {e}")
                 raise
         else:
             raise RuntimeError("No auth header parsing implementation available")
     
     def verify_auth_header_signature_two_way(self, *args, **kwargs):
-        """Verify auth header signature using hotpatch or fallback"""
+        """Verify auth header signature using protocol authentication"""
         if self._hotpatch_available:
             try:
-                from anp_open_sdk.agent_connect_hotpatch.authentication.did_wba import verify_auth_header_signature_two_way
+                from anp_open_sdk.protocol.authentication.did_wba import verify_auth_header_signature_two_way
                 return verify_auth_header_signature_two_way(*args, **kwargs)
             except Exception as e:
-                logger.error(f"Hotpatch verify_auth_header_signature_two_way failed: {e}")
+                logger.error(f"Protocol verify_auth_header_signature_two_way failed: {e}")
                 raise
         else:
             raise RuntimeError("No auth header signature verification implementation available")
     
     def create_did_wba_auth_header(self, *args, **kwargs):
-        """Create DID WBA auth header using hotpatch or fallback"""
+        """Create DID WBA auth header using protocol authentication"""
         if self._hotpatch_available:
             try:
-                from anp_open_sdk.agent_connect_hotpatch.authentication.did_wba_auth_header import DIDWbaAuthHeader
+                from anp_open_sdk.protocol.authentication.did_wba_auth_header import DIDWbaAuthHeader
                 return DIDWbaAuthHeader(*args, **kwargs)
             except Exception as e:
-                logger.error(f"Hotpatch DIDWbaAuthHeader creation failed: {e}")
+                logger.error(f"Protocol DIDWbaAuthHeader creation failed: {e}")
                 raise
         else:
             raise RuntimeError("No DID WBA auth header implementation available")
