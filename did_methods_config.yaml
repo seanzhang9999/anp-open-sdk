@@ -1,0 +1,92 @@
+# DID Method Protocols Configuration
+# This file defines which DID methods are enabled and how to load them
+
+did_methods:
+  # Built-in WBA method (always enabled by default)
+  wba:
+    enabled: true
+    description: "Web-Based Authentication DID method"
+  
+  # Built-in Key method (placeholder, not implemented yet)
+  key:
+    enabled: false
+    description: "Key-based DID method using cryptographic keys"
+  
+  # Built-in Web method (placeholder, not implemented yet)  
+  web:
+    enabled: false
+    description: "Web-based DID method using domain names"
+  
+  # Example of external/custom DID method
+  custom_enterprise:
+    enabled: false
+    description: "Custom enterprise DID method"
+    module: "enterprise_did.protocols"
+    class: "EnterpriseDIDProtocol"
+    parameters:
+      enterprise_id: "corp_123"
+      key_algorithm: "secp256k1"
+      signature_format: "der"
+  
+  # Example of blockchain-based DID method
+  ethereum:
+    enabled: false
+    description: "Ethereum-based DID method"
+    module: "ethereum_did.protocols"
+    class: "EthereumDIDProtocol"
+    parameters:
+      network: "mainnet"
+      contract_address: "0x..."
+      gas_limit: 100000
+  
+  # Example of another protocol with different parameters
+  hyperledger:
+    enabled: false
+    description: "Hyperledger Indy DID method"
+    module: "indy_did.protocols"
+    class: "IndyDIDProtocol"
+    parameters:
+      pool_name: "sovrin"
+      wallet_config: 
+        storage_type: "default"
+      endorser_did: "did:sov:..."
+
+# Session configuration (if session management is enabled)
+session:
+  enabled: true
+  default_expiry_hours: 24
+  cleanup_interval_minutes: 60
+  storage_type: "memory"  # or "redis", "database", etc.
+  
+# Token configuration
+tokens:
+  jwt:
+    enabled: true
+    algorithm: "RS256"
+    expiry_hours: 1
+  
+  bearer:
+    enabled: true
+    expiry_hours: 12
+  
+  custom:
+    enabled: false
+    handler_module: "custom_tokens.handlers"
+    handler_class: "CustomTokenHandler"
+
+# Framework layer configuration
+framework:
+  did_resolver:
+    type: "hybrid"  # "filesystem", "network", "hybrid"
+    filesystem_path: "./data_user"
+    network_timeout: 30
+    cache_expiry_minutes: 30
+  
+  token_storage:
+    type: "local_agent"  # "local_agent", "redis", "database"
+    cleanup_interval_minutes: 30
+  
+  http_transport:
+    type: "aiohttp"
+    timeout: 30
+    max_connections: 100

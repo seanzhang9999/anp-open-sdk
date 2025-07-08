@@ -1,47 +1,31 @@
-# Copyright 2024 ANP Open SDK Authors
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 """
-Authentication Server - Framework Integration Layer
+Pure Authentication Server Implementation
 
-This module provides FastAPI integration for the authentication system.
-It uses the SDK layer (auth_manager) for business logic and the framework layer for I/O.
+This implementation uses the layered architecture:
+- Protocol layer: Pure DID authentication logic (no I/O)
+- Framework layer: I/O operations (network, file, storage)
+
+All I/O operations are delegated to the framework layer adapters.
 """
 
-from datetime import timezone, datetime, timedelta
-from pathlib import Path
-import random
-import string
+import json
+import logging
+from datetime import timezone, datetime
 from typing import Optional, Callable, Any, Dict, Tuple
 import fnmatch
-import json
 
 import jwt
 from fastapi import Request, HTTPException, Response
 from fastapi.responses import JSONResponse
-from .schemas import AuthenticationContext, DIDDocument, DIDKeyPair, DIDCredentials
-from .auth_manager import create_auth_manager, AuthMethod
-from .pure_auth_server import get_auth_server
+
+from anp_open_sdk.auth.schemas import AuthenticationContext, DIDDocument, DIDKeyPair, DIDCredentials
+from anp_open_sdk.protocol.did_methods.wba import create_wba_authenticator
 from anp_open_sdk_framework.adapters.did_auth_adapter import FrameworkDIDAuthAdapter
-from ..config import get_global_config
-from ..anp_sdk_agent import LocalAgent
-from .token_nonce_auth import get_jwt_public_key, create_access_token
+from anp_open_sdk.config import get_global_config
+from anp_open_sdk.anp_sdk_agent import LocalAgent
+from anp_open_sdk.auth.token_nonce_auth import get_jwt_public_key, create_access_token
 
-
-import logging
 logger = logging.getLogger(__name__)
-
 
 
 EXEMPT_PATHS = [
@@ -50,55 +34,52 @@ EXEMPT_PATHS = [
     "/agents/example/ad.json"
 ]
 
+
 def is_exempt(path):
     return any(fnmatch.fnmatch(path, pattern) for pattern in EXEMPT_PATHS)
 
 
-class AgentAuthServer:
+class PureAgentAuthServer:
     """
-    Authentication server for FastAPI integration.
+    Pure authentication server using layered architecture.
     
-    Uses SDK layer (auth_manager) for business logic and framework layer for I/O.
+    - Uses protocol layer for pure authentication logic
+    - Uses framework layer for all I/O operations
     """
     
-    def __init__(self):
+    def __init__(self, auth_method: str = "wba"):
         self.config = get_global_config()
+        self.auth_method = auth_method
+        
+        # Create pure authenticator (no I/O)
+        self.authenticator = create_wba_authenticator()
+        
         # Create framework adapter for I/O operations
         self.framework_adapter = FrameworkDIDAuthAdapter()
-        # Create SDK layer authentication manager
-        self.auth_manager = create_auth_manager(self.framework_adapter)
 
     async def verify_request(self, request: Request) -> Tuple[bool, Any, Optional[Dict[str, Any]]]:
-        """Verify authentication request using SDK layer auth manager"""
+        """Verify authentication request using layered architecture"""
         auth_header = request.headers.get("Authorization")
         if not auth_header:
             raise HTTPException(status_code=401, detail="Missing Authorization header")
 
-        # Handle Bearer token authentication
+        # Handle Bearer token authentication (I/O via framework)
         if auth_header.startswith("Bearer "):
             req_did = request.headers.get("req_did")
             target_did = request.headers.get("resp_did")
+            token = auth_header[len("Bearer "):]
             try:
-                result = await self.handle_bearer_auth(auth_header, req_did, target_did)
+                result = await self.handle_bearer_auth(token, req_did, target_did)
                 return True, "Bearer token verified", result
             except Exception as e:
                 logger.debug(f"Bearer authentication failed: {e}")
                 return False, str(e), {}
 
-        # Extract DIDs for context
-        # Try to extract DIDs from different auth methods
-        req_did, target_did = None, None
-        
-        # For DID-WBA headers
-        if auth_header.startswith("DIDWba "):
-            from ..protocol.did_methods.wba import create_wba_authenticator
-            temp_auth = create_wba_authenticator()
-            req_did, target_did = temp_auth.extract_dids_from_header(auth_header)
-
+        # Handle DID-based authentication
+        req_did, target_did = self.authenticator.extract_dids_from_header(auth_header)
         if not req_did:
             return False, "Failed to extract DID from auth header", {}
 
-        # Create authentication context
         context = AuthenticationContext(
             caller_did=req_did,
             target_did=target_did,
@@ -111,27 +92,29 @@ class AgentAuthServer:
         )
 
         try:
-            # Use SDK layer auth manager for verification
-            auth_result = await self.auth_manager.verify_request(auth_header, context)
+            # Use framework adapter for verification (pure logic + I/O)
+            success, msg = await self.framework_adapter.verify_request_with_io(
+                self.authenticator, auth_header, context
+            )
             
-            if auth_result.success:
+            if success:
                 response_data = await self.generate_auth_response(req_did, context.use_two_way_auth, target_did, context)
                 return True, response_data, None
             else:
-                return False, auth_result.message, {}
+                return False, msg, {}
         except Exception as e:
             logger.debug(f"Server authentication verification failed: {e}", exc_info=True)
             return False, str(e), {}
 
-    async def handle_bearer_auth(self, auth_header: str, req_did, resp_did) -> Dict:
-        """Handle Bearer token authentication using framework layer"""
+    async def handle_bearer_auth(self, token: str, req_did, resp_did) -> Dict:
+        """Handle Bearer token authentication - uses framework layer for I/O"""
         try:
-            if auth_header.startswith("Bearer "):
-                token_body = auth_header[7:]
+            if token.startswith("Bearer "):
+                token_body = token[7:]
             else:
-                token_body = auth_header
+                token_body = token
 
-            # Check cached token using framework adapter
+            # Check cached token (I/O operation via framework)
             token_info = await self.framework_adapter.token_storage.get_token(req_did, resp_did)
             
             if token_info:
@@ -139,7 +122,7 @@ class AgentAuthServer:
                 if token_body == token_info["token"]:
                     logger.debug(f"Token for {req_did} found in cache and is valid")
                     return {
-                        "access_token": auth_header,
+                        "access_token": token,
                         "token_type": "bearer", 
                         "req_did": req_did,
                         "resp_did": resp_did,
@@ -180,7 +163,7 @@ class AgentAuthServer:
 
                 logger.debug(f"JWT verification successful for {req_did}")
                 return {
-                    "access_token": auth_header,
+                    "access_token": token,
                     "token_type": "bearer",
                     "req_did": req_did,
                     "resp_did": resp_did,
@@ -193,51 +176,35 @@ class AgentAuthServer:
             logger.debug(f"Token verification error: {e}")
             raise HTTPException(status_code=401, detail=f"Token verification failed: {str(e)}")
 
-async def generate_auth_response(did: str, is_two_way_auth: bool, resp_did: str, context: AuthenticationContext = None):
-    resp_did_agent = LocalAgent.from_did(resp_did)
-    config = get_global_config()
+    async def generate_auth_response(self, did: str, is_two_way_auth: bool, resp_did: str, context: AuthenticationContext = None):
+        """Generate authentication response - uses file I/O for credentials"""
+        resp_did_agent = LocalAgent.from_did(resp_did)
+        config = get_global_config()
 
-    from anp_open_sdk.auth.token_nonce_auth import create_access_token
-    expiration_time = config.anp_sdk.token_expire_time
-    access_token = create_access_token(
-        resp_did_agent.jwt_private_key_path,
-        data={"req_did": did, "resp_did": resp_did},
-        expires_delta=expiration_time
-    )
-    resp_did_agent.contact_manager.store_token_to_remote(did, access_token, expiration_time)
+        # Create access token (file I/O for private key)
+        expiration_time = config.anp_sdk.token_expire_time
+        access_token = create_access_token(
+            resp_did_agent.jwt_private_key_path,
+            data={"req_did": did, "resp_did": resp_did},
+            expires_delta=expiration_time
+        )
+        
+        # Store token (I/O operation via framework)
+        await self.framework_adapter.token_storage.store_token(
+            did, resp_did, {
+                "token": access_token,
+                "expires_delta": expiration_time
+            }
+        )
 
-    resp_did_auth_header = None
-    if is_two_way_auth:
-        try:
-            did_doc_path = Path(resp_did_agent.did_document_path)
-            pk_path = Path(resp_did_agent.private_key_path)
-
-            if did_doc_path.exists() and pk_path.exists():
-                with open(did_doc_path, 'r') as f:
-                    did_doc_raw = json.load(f)
-                # 从 DID 文档中获取 key_id
-                key_id_full = did_doc_raw.get('verificationMethod', [{}])[0].get('id')
-                if not key_id_full:
-                    raise ValueError("无法从DID文档中找到 verificationMethod ID")
-
-                # key_id 通常是 '#' 后面的部分
-                key_id = key_id_full.split('#')[-1]
-
-                # 使用 schemas.py 中提供的工厂方法来创建完整的密钥对
-                key_pair = DIDKeyPair.from_file_path(str(pk_path), key_id)
-
-                did_doc = DIDDocument(**did_doc_raw, raw_document=did_doc_raw)
-
-                # 正确地创建 DIDCredentials 实例
-                server_credentials = DIDCredentials(
-                    did=did_doc.id,
-                    did_document=did_doc,
-                    key_pairs={key_pair.key_id: key_pair}
-                )
-
-                # 使用真实的请求URL，如果context可用的话
-                request_url = context.request_url if context else "http://virtual.WBAback:9999"
+        resp_did_auth_header = None
+        if is_two_way_auth:
+            try:
+                # Load credentials (file I/O)
+                credentials = DIDCredentials.from_user_data(resp_did_agent)
                 
+                # Use pure authenticator to build auth header
+                request_url = context.request_url if context else "http://virtual.WBAback:9999"
                 response_context = AuthenticationContext(
                     caller_did=resp_did,
                     target_did=did,
@@ -245,35 +212,42 @@ async def generate_auth_response(did: str, is_two_way_auth: bool, resp_did: str,
                     use_two_way_auth=True
                 )
 
-                signer = PureWBADIDSigner()
-                header_builder = PureWBAAuthHeaderBuilder(signer)
-                resp_did_auth_header = header_builder.build_auth_header(response_context, server_credentials)
-            else:
-                logger.warning(f"resp_did的DID文档或私钥不存在: {did_doc_path} or {pk_path}")
+                resp_did_auth_header = self.authenticator.build_auth_header(response_context, credentials)
+            except Exception as e:
+                logger.error(f"Error generating two-way auth header for {resp_did}: {e}", exc_info=True)
 
-        except Exception as e:
-            logger.error(f"为 {resp_did} 生成双向认证头时出错: {e}", exc_info=True)
-
-    if is_two_way_auth:
-        return [
-            {
-                "access_token": access_token,
-                "token_type": "bearer",
-                "req_did": did,
-                "resp_did": resp_did,
-                "resp_did_auth_header": resp_did_auth_header
-            }
-        ]
-    else:
-        return f"bearer {access_token}"
+        if is_two_way_auth:
+            return [
+                {
+                    "access_token": access_token,
+                    "token_type": "bearer",
+                    "req_did": did,
+                    "resp_did": resp_did,
+                    "resp_did_auth_header": resp_did_auth_header
+                }
+            ]
+        else:
+            return f"bearer {access_token}"
 
 
-async def authenticate_request(request: Request, auth_server: AgentAuthServer) -> Optional[dict]:
+# Cache for auth servers
+_auth_server_cache: Dict[str, PureAgentAuthServer] = {}
+
+
+def get_auth_server(auth_method: str = "wba") -> PureAgentAuthServer:
+    """Get cached auth server instance"""
+    if auth_method not in _auth_server_cache:
+        _auth_server_cache[auth_method] = PureAgentAuthServer(auth_method)
+    return _auth_server_cache[auth_method]
+
+
+async def authenticate_request(request: Request, auth_server: PureAgentAuthServer) -> Optional[dict]:
+    """Authenticate request using pure auth server"""
     if request.url.path == "/wba/adapter_auth":
-        logger.debug(f"安全中间件拦截/wba/auth进行认证")
+        logger.debug(f"Security middleware intercepted /wba/auth for authentication")
         success, msg, _ = await auth_server.verify_request(request)
         if not success:
-            raise HTTPException(status_code=401, detail=f"认证失败: {msg}")
+            raise HTTPException(status_code=401, detail=f"Authentication failed: {msg}")
         return msg
     else:
         for exempt_path in EXEMPT_PATHS:
@@ -283,13 +257,16 @@ async def authenticate_request(request: Request, auth_server: AgentAuthServer) -
                 return None
             elif is_exempt(request.url.path):
                 return None
-    logger.debug(f"安全中间件拦截检查url:\n{request.url}")
+    
+    logger.debug(f"Security middleware checking URL: {request.url}")
     success, msg, _ = await auth_server.verify_request(request)
     if not success:
-        raise HTTPException(status_code=401, detail=f"认证失败: {msg}")
+        raise HTTPException(status_code=401, detail=f"Authentication failed: {msg}")
     return msg
 
-async def auth_middleware(request: Request, call_next: Callable, auth_method: str = "wba" ) -> Response:
+
+async def auth_middleware(request: Request, call_next: Callable, auth_method: str = "wba") -> Response:
+    """Authentication middleware using pure auth server"""
     try:
         auth_server = get_auth_server(auth_method)
         response_auth = await authenticate_request(request, auth_server)
@@ -310,7 +287,7 @@ async def auth_middleware(request: Request, call_next: Callable, auth_method: st
             content={"detail": exc.detail}
         )
     except Exception as e:
-        logger.debug(f"Unexpected error in adapter_auth middleware: {e}")
+        logger.debug(f"Unexpected error in auth middleware: {e}")
         return JSONResponse(
             status_code=500,
             content={"detail": "Internal server error"}
