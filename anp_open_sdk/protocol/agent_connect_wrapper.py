@@ -159,17 +159,85 @@ class AgentConnectNetworkOperations:
         return await resolve_did_wba_document(did)
 
 
+class AgentConnectHotpatchOperations:
+    """
+    Hotpatch operations that use agent_connect_hotpatch.
+    This class provides centralized access to hotpatch functionality.
+    """
+    
+    def __init__(self):
+        self._hotpatch_available = self._check_hotpatch_availability()
+    
+    def _check_hotpatch_availability(self) -> bool:
+        """Check if agent_connect_hotpatch is available"""
+        try:
+            import anp_open_sdk.agent_connect_hotpatch.authentication.did_wba
+            return True
+        except ImportError:
+            logger.info("agent_connect_hotpatch not available")
+            return False
+    
+    async def create_did_wba_document(self, *args, **kwargs) -> Dict[str, Any]:
+        """Create DID WBA document using hotpatch or fallback"""
+        if self._hotpatch_available:
+            try:
+                from anp_open_sdk.agent_connect_hotpatch.authentication.did_wba import create_did_wba_document
+                return await create_did_wba_document(*args, **kwargs)
+            except Exception as e:
+                logger.error(f"Hotpatch create_did_wba_document failed: {e}")
+                raise
+        else:
+            raise RuntimeError("No DID WBA document creation implementation available")
+    
+    def extract_auth_header_parts_two_way(self, auth_header: str) -> Dict[str, Any]:
+        """Extract auth header parts using hotpatch or fallback"""
+        if self._hotpatch_available:
+            try:
+                from anp_open_sdk.agent_connect_hotpatch.authentication.did_wba import extract_auth_header_parts_two_way
+                return extract_auth_header_parts_two_way(auth_header)
+            except Exception as e:
+                logger.error(f"Hotpatch extract_auth_header_parts_two_way failed: {e}")
+                raise
+        else:
+            raise RuntimeError("No auth header parsing implementation available")
+    
+    def verify_auth_header_signature_two_way(self, *args, **kwargs):
+        """Verify auth header signature using hotpatch or fallback"""
+        if self._hotpatch_available:
+            try:
+                from anp_open_sdk.agent_connect_hotpatch.authentication.did_wba import verify_auth_header_signature_two_way
+                return verify_auth_header_signature_two_way(*args, **kwargs)
+            except Exception as e:
+                logger.error(f"Hotpatch verify_auth_header_signature_two_way failed: {e}")
+                raise
+        else:
+            raise RuntimeError("No auth header signature verification implementation available")
+    
+    def create_did_wba_auth_header(self, *args, **kwargs):
+        """Create DID WBA auth header using hotpatch or fallback"""
+        if self._hotpatch_available:
+            try:
+                from anp_open_sdk.agent_connect_hotpatch.authentication.did_wba_auth_header import DIDWbaAuthHeader
+                return DIDWbaAuthHeader(*args, **kwargs)
+            except Exception as e:
+                logger.error(f"Hotpatch DIDWbaAuthHeader creation failed: {e}")
+                raise
+        else:
+            raise RuntimeError("No DID WBA auth header implementation available")
+
+
 class AgentConnectProtocolWrapper:
     """
     Main protocol wrapper that provides centralized agent_connect interface.
-    This class orchestrates pure crypto and network operations, leveraging the 
-    existing core/ architecture.
+    This class orchestrates pure crypto, network operations, and hotpatch functionality,
+    leveraging the existing core/ architecture.
     """
     
     def __init__(self):
         self.crypto = PureAgentConnectCrypto()
         self.network = AgentConnectNetworkOperations()
-        logger.info("AgentConnect Protocol Wrapper initialized with core/ integration")
+        self.hotpatch = AgentConnectHotpatchOperations()
+        logger.info("AgentConnect Protocol Wrapper initialized with core/ integration including hotpatch")
     
     def create_verification_method(self, verification_method: Dict) -> Any:
         """Create verification method (pure crypto operation)"""
@@ -183,6 +251,22 @@ class AgentConnectProtocolWrapper:
         """Resolve DID document (network operation)"""
         return await self.network.resolve_did_document(did)
     
+    async def create_did_wba_document(self, *args, **kwargs) -> Dict[str, Any]:
+        """Create DID WBA document (hotpatch operation)"""
+        return await self.hotpatch.create_did_wba_document(*args, **kwargs)
+    
+    def extract_auth_header_parts_two_way(self, auth_header: str) -> Dict[str, Any]:
+        """Extract auth header parts (hotpatch operation)"""
+        return self.hotpatch.extract_auth_header_parts_two_way(auth_header)
+    
+    def verify_auth_header_signature_two_way(self, *args, **kwargs):
+        """Verify auth header signature (hotpatch operation)"""
+        return self.hotpatch.verify_auth_header_signature_two_way(*args, **kwargs)
+    
+    def create_did_wba_auth_header(self, *args, **kwargs):
+        """Create DID WBA auth header (hotpatch operation)"""
+        return self.hotpatch.create_did_wba_auth_header(*args, **kwargs)
+    
     def get_crypto_interface(self) -> PureAgentConnectCrypto:
         """Get pure crypto interface for advanced operations"""
         return self.crypto
@@ -191,9 +275,17 @@ class AgentConnectProtocolWrapper:
         """Get network interface for advanced operations"""
         return self.network
     
+    def get_hotpatch_interface(self) -> AgentConnectHotpatchOperations:
+        """Get hotpatch interface for advanced operations"""
+        return self.hotpatch
+    
     def is_agent_connect_available(self) -> bool:
         """Check if agent_connect is available for operations"""
         return self.crypto._agent_connect_available and self.network._agent_connect_available
+    
+    def is_hotpatch_available(self) -> bool:
+        """Check if hotpatch is available for operations"""
+        return self.hotpatch._hotpatch_available
     
     def get_status_report(self) -> Dict[str, Any]:
         """Get detailed status of agent_connect integration"""
@@ -201,6 +293,7 @@ class AgentConnectProtocolWrapper:
             "crypto_available": self.crypto._agent_connect_available,
             "crypto_fallback_available": self.crypto._fallback_available,
             "network_available": self.network._agent_connect_available,
+            "hotpatch_available": self.hotpatch._hotpatch_available,
             "overall_status": "healthy" if self.is_agent_connect_available() else "fallback_mode"
         }
 
@@ -231,6 +324,26 @@ def get_curve_mapping() -> Dict:
 async def resolve_did_document(did: str) -> Optional[Dict]:
     """Resolve DID document using centralized protocol wrapper"""
     return await get_protocol_wrapper().resolve_did_document(did)
+
+
+async def create_did_wba_document(*args, **kwargs) -> Dict[str, Any]:
+    """Create DID WBA document using centralized protocol wrapper"""
+    return await get_protocol_wrapper().create_did_wba_document(*args, **kwargs)
+
+
+def extract_auth_header_parts_two_way(auth_header: str) -> Dict[str, Any]:
+    """Extract auth header parts using centralized protocol wrapper"""
+    return get_protocol_wrapper().extract_auth_header_parts_two_way(auth_header)
+
+
+def verify_auth_header_signature_two_way(*args, **kwargs):
+    """Verify auth header signature using centralized protocol wrapper"""
+    return get_protocol_wrapper().verify_auth_header_signature_two_way(*args, **kwargs)
+
+
+def create_did_wba_auth_header(*args, **kwargs):
+    """Create DID WBA auth header using centralized protocol wrapper"""
+    return get_protocol_wrapper().create_did_wba_auth_header(*args, **kwargs)
 
 
 def get_agent_connect_status() -> Dict[str, Any]:

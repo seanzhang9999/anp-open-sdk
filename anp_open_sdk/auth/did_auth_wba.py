@@ -14,7 +14,7 @@ import re
 import logging
 logger = logging.getLogger(__name__)
 
-from anp_open_sdk.agent_connect_hotpatch.authentication.did_wba import extract_auth_header_parts_two_way
+from anp_open_sdk.protocol import extract_auth_header_parts_two_way
 
 from ..agent_connect_hotpatch.authentication.did_wba import extract_auth_header_parts_two_way, \
     verify_auth_header_signature_two_way
@@ -106,7 +106,7 @@ class WBAAuthHeaderBuilder(BaseAuthHeaderBuilder):
 
         return {"Authorization": auth_header_value}
     def parse_auth_header(self, auth_header: str) -> Dict[str, Any]:
-            from anp_open_sdk.agent_connect_hotpatch.authentication.did_wba import extract_auth_header_parts_two_way
+            from anp_open_sdk.protocol import extract_auth_header_parts_two_way
             try:
                 header_parts = extract_auth_header_parts_two_way(auth_header)
                 if header_parts:
@@ -187,7 +187,7 @@ class WBADIDAuthenticator(BaseDIDAuthenticator):
     async def verify_response(self, auth_header: str  ,context: AuthenticationContext) -> Tuple[bool, str]:
         """验证WBA响应（借鉴 handle_did_auth 主要认证逻辑）"""
         try:
-            from anp_open_sdk.agent_connect_hotpatch.authentication.did_wba import (
+            from anp_open_sdk.protocol import (
                 extract_auth_header_parts_two_way, verify_auth_header_signature_two_way, resolve_did_wba_document
             )
             from anp_open_sdk.auth.did_auth_wba_custom_did_resolver import resolve_local_did_document
@@ -278,7 +278,7 @@ class WBAAuth(BaseAuth):
         """
         try:
             # 优先尝试两路认证
-            from anp_open_sdk.agent_connect_hotpatch.authentication.did_wba import extract_auth_header_parts_two_way
+            from anp_open_sdk.protocol import extract_auth_header_parts_two_way
             parts = extract_auth_header_parts_two_way(auth_header)
             if parts and len(parts) == 6:
                 did, nonce, timestamp, resp_did, keyid, signature = parts

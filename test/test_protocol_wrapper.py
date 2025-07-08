@@ -157,6 +157,36 @@ class TestAgentConnectNetworkOperations:
                 print(f"✅ fallback DID resolution successful")
 
 
+class TestAgentConnectHotpatchOperations:
+    """测试 hotpatch 操作功能"""
+    
+    def test_hotpatch_availability_check(self):
+        """测试 hotpatch 可用性检查"""
+        from anp_open_sdk.protocol.agent_connect_wrapper import AgentConnectHotpatchOperations
+        
+        hotpatch = AgentConnectHotpatchOperations()
+        
+        assert hasattr(hotpatch, '_hotpatch_available')
+        assert isinstance(hotpatch._hotpatch_available, bool)
+        print(f"✅ hotpatch available: {hotpatch._hotpatch_available}")
+    
+    def test_hotpatch_functions_accessible(self):
+        """测试 hotpatch 函数可访问性"""
+        from anp_open_sdk.protocol import (
+            create_did_wba_document,
+            extract_auth_header_parts_two_way,
+            verify_auth_header_signature_two_way,
+            create_did_wba_auth_header
+        )
+        
+        # 这些函数应该可以导入，即使hotpatch不可用
+        assert callable(create_did_wba_document)
+        assert callable(extract_auth_header_parts_two_way)
+        assert callable(verify_auth_header_signature_two_way)
+        assert callable(create_did_wba_auth_header)
+        print(f"✅ hotpatch functions importable")
+
+
 class TestAgentConnectProtocolWrapper:
     """测试主要的协议包装器"""
     
@@ -166,8 +196,11 @@ class TestAgentConnectProtocolWrapper:
         
         assert wrapper.crypto is not None
         assert wrapper.network is not None
+        assert wrapper.hotpatch is not None
         assert isinstance(wrapper.crypto, PureAgentConnectCrypto)
         assert isinstance(wrapper.network, AgentConnectNetworkOperations)
+        from anp_open_sdk.protocol.agent_connect_wrapper import AgentConnectHotpatchOperations
+        assert isinstance(wrapper.hotpatch, AgentConnectHotpatchOperations)
     
     def test_crypto_interface_delegation(self):
         """测试加密接口委托"""
@@ -217,20 +250,22 @@ class TestAgentConnectProtocolWrapper:
         
         status = wrapper.get_status_report()
         
-        # 验证状态报告结构
+        # 验证状态报告结构（包含hotpatch）
         assert isinstance(status, dict)
         assert "crypto_available" in status
         assert "crypto_fallback_available" in status
         assert "network_available" in status
+        assert "hotpatch_available" in status
         assert "overall_status" in status
         
         # 验证状态值类型
         assert isinstance(status["crypto_available"], bool)
         assert isinstance(status["crypto_fallback_available"], bool)
         assert isinstance(status["network_available"], bool)
+        assert isinstance(status["hotpatch_available"], bool)
         assert status["overall_status"] in ["healthy", "fallback_mode"]
         
-        print(f"✅ wrapper status report: {status}")
+        print(f"✅ wrapper status report with hotpatch: {status}")
     
     def test_interface_access(self):
         """测试接口访问方法"""
@@ -238,15 +273,19 @@ class TestAgentConnectProtocolWrapper:
         
         crypto_interface = wrapper.get_crypto_interface()
         network_interface = wrapper.get_network_interface()
+        hotpatch_interface = wrapper.get_hotpatch_interface()
         
         assert isinstance(crypto_interface, PureAgentConnectCrypto)
         assert isinstance(network_interface, AgentConnectNetworkOperations)
+        from anp_open_sdk.protocol.agent_connect_wrapper import AgentConnectHotpatchOperations
+        assert isinstance(hotpatch_interface, AgentConnectHotpatchOperations)
         
         # 验证接口是同一个实例
         assert crypto_interface is wrapper.crypto
         assert network_interface is wrapper.network
+        assert hotpatch_interface is wrapper.hotpatch
         
-        print(f"✅ wrapper interface access successful")
+        print(f"✅ wrapper interface access with hotpatch successful")
 
 
 class TestGlobalFunctions:

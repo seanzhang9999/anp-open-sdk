@@ -18,7 +18,7 @@ from anp_open_sdk_framework.local_methods.local_methods_caller import LocalMetho
 
 logger = logging.getLogger(__name__)
 
-from anp_open_sdk.agent_connect_hotpatch.authentication.did_wba_auth_header import DIDWbaAuthHeader
+from anp_open_sdk.protocol import create_did_wba_auth_header as DIDWbaAuthHeader
 from anp_open_sdk.auth.auth_client import agent_auth_request
 
 

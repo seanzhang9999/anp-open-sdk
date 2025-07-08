@@ -11,10 +11,21 @@ from .agent_connect_wrapper import (
     create_verification_method,
     get_curve_mapping,
     resolve_did_document,
+    
+    # Hotpatch operations
+    create_did_wba_document,
+    extract_auth_header_parts_two_way,
+    verify_auth_header_signature_two_way,
+    create_did_wba_auth_header,
+    
+    # Status monitoring
+    get_agent_connect_status,
+    
     CURVE_MAPPING,
     AgentConnectProtocolWrapper,
     PureAgentConnectCrypto,
-    AgentConnectNetworkOperations
+    AgentConnectNetworkOperations,
+    AgentConnectHotpatchOperations
 )
 
 # Fallback implementations
@@ -31,12 +42,22 @@ __all__ = [
     'create_verification_method',
     'get_curve_mapping', 
     'resolve_did_document',
+    
+    # Hotpatch operations
+    'create_did_wba_document',
+    'extract_auth_header_parts_two_way',
+    'verify_auth_header_signature_two_way',
+    'create_did_wba_auth_header',
+    
+    # Status monitoring
+    'get_agent_connect_status',
     'CURVE_MAPPING',
     
     # Advanced interfaces
     'AgentConnectProtocolWrapper',
     'PureAgentConnectCrypto',
     'AgentConnectNetworkOperations',
+    'AgentConnectHotpatchOperations',
     
     # Fallback implementations
     'BaseVerificationMethod',
