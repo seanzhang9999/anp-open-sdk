@@ -1,0 +1,40 @@
+# ANP Open SDK Test Suite Configuration
+# 专门为测试套件创建的配置文件
+
+anp_sdk:
+  host: "localhost"
+  port: 9527
+  jwt_algorithm: "RS256"
+  token_expire_time: 3600
+  auth_method: "wba"
+  debug_mode: true
+  # 指向测试套件数据目录
+  user_did_path: "test_suite/data/data_user"
+
+multi_agent_mode:
+  # 指向测试套件中的agent配置目录
+  agents_cfg_path: "test_suite/data/data_user/localhost_9527/agents_config"
+
+llm:
+  openai_api_key: "test_key_placeholder"
+  openai_api_model_name: "gpt-3.5-turbo"
+  openai_api_base_url: "https://api.openai.com/v1"
+
+env_mapping:
+  OPENAI_API_KEY: "llm.openai_api_key"
+  OPENAI_API_MODEL_NAME: "llm.openai_api_model_name"
+  OPENAI_API_BASE_URL: "llm.openai_api_base_url"
+
+logging:
+  level: "INFO"
+  console_output: true
+  file_output: false
+  
+# 测试套件特定配置
+test_suite:
+  # 测试数据目录
+  test_data_root: "test_suite/data/data_user"
+  # 临时文件目录
+  temp_dir: "test_suite/temp"
+  # 测试输出目录
+  output_dir: "test_suite/output"

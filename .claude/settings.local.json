@@ -20,7 +20,15 @@
       "WebFetch(domain:www.cnblogs.com)",
       "WebFetch(domain:docs.ag-ui.com)",
       "WebFetch(domain:github.com)",
-      "WebFetch(domain:zhuanlan.zhihu.com)"
+      "WebFetch(domain:zhuanlan.zhihu.com)",
+      "Bash(pip install:*)",
+      "Bash(mkdir:*)",
+      "Bash(mv:*)",
+      "Bash(cp:*)",
+      "Bash(chmod:*)",
+      "Bash(git check-ignore:*)",
+      "Bash(PYTHONPATH=/Users/seanzhang/seanwork/anp-open-sdk python /Users/seanzhang/seanwork/anp-open-sdk/test_suite/tests/test_simplified_did_auth.py)",
+      "Bash(PYTHONPATH=/Users/seanzhang/seanwork/anp-open-sdk python /Users/seanzhang/seanwork/anp-open-sdk/test_suite/run_tests.py --type simplified_e2e)"
     ],
     "deny": []
   }

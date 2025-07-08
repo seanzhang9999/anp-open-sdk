@@ -112,9 +112,14 @@ desktop.ini
 local_settings.py
 *.local
 
-# 私钥和证书
+# 私钥和证书（全局排除）
 *.pem
 *.key
+
+# 但是特定目录下的测试用户数据需要被同步
+!**/data_user/**/*.pem
+!**/data_user/**/*.key
+!**/data_user/**/*keys.json
 
 # 凭证文件
 credentials.json
@@ -139,11 +144,6 @@ yarn-error.log*
 .aider*
 CLAUDE.md
 
-# 测试用户私钥和证书需要被同步
-!**data_user/
-!**data_user/**/*.pem
-!**data_user/**/*.key
-!**data_user/**/*keys.json
 thought_doc_link
 .vscode/settings.json
 uv.lock
