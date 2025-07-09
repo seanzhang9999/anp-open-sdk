@@ -12,6 +12,7 @@ class DIDKeyPair(BaseModel):
     private_key: bytes = Field(..., description="私钥字节")
     public_key: bytes = Field(..., description="公钥字节")
     key_id: str = Field(..., description="密钥ID")
+
     """DID密钥对内存对象"""
     class Config:
         arbitrary_types_allowed = True
@@ -41,6 +42,7 @@ class DIDKeyPair(BaseModel):
                 key_file.read(),
                 password=None
             )
+
             if not isinstance(private_key, ec.EllipticCurvePrivateKey):
                 raise ValueError("Loaded private key is not an EC key")
             if private_key.curve.name != "secp256k1":

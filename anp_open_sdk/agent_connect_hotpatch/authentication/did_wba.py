@@ -252,6 +252,78 @@ def resolve_did_wba_document_sync(did: str) -> Dict:
     """
     return asyncio.run(resolve_did_wba_document(did))
 
+
+def generate_auth_header(
+        did_document: Dict,
+        service_domain: str,
+        sign_callback: Callable[[bytes, str], bytes]
+) -> str:
+    """
+    Generate the Authorization header for DID authentication.
+
+    Args:
+        did_document: DID document dictionary.
+        service_domain: Server domain.
+        sign_callback: Signature callback function that takes the content to sign and the verification method fragment as parameters.
+            callback(content_to_sign: bytes, verification_method_fragment: str) -> bytes.
+            If ECDSA, return signature in DER format.
+
+    Returns:
+        str: Value of the Authorization header. Do not include "Authorization:" prefix.
+
+    Raises:
+        ValueError: If the DID document format is invalid.
+    """
+    logging.info("Starting to generate DID authentication header.")
+
+    # Validate DID document
+    did = did_document.get('id')
+    if not did:
+        raise ValueError("DID document is missing the id field.")
+
+    # Select authentication method
+    method_dict, verification_method_fragment = _select_authentication_method(did_document)
+
+    # Generate a 16-byte random nonce
+    nonce = secrets.token_hex(16)
+
+    # Generate ISO 8601 formatted UTC timestamp
+    timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+
+    # Construct the data to sign
+    data_to_sign = {
+        "nonce": nonce,
+        "timestamp": timestamp,
+        "service": service_domain,
+        "did": did
+    }
+
+    # Normalize JSON using JCS
+    canonical_json = jcs.canonicalize(data_to_sign)
+    logging.debug(f"generate_auth_header Canonical JSON: {canonical_json}")
+
+    # Calculate SHA-256 hash
+    content_hash = hashlib.sha256(canonical_json).digest()
+
+    # Create verifier and encode signature
+    verifier = create_verification_method(method_dict)
+    signature_bytes = sign_callback(content_hash, verification_method_fragment)
+    signature = verifier.encode_signature(signature_bytes)
+
+    # Construct the Authorization header
+    auth_header = (
+        f'DIDWba did="{did}", '
+        f'nonce="{nonce}", '
+        f'timestamp="{timestamp}", '
+        f'verification_method="{verification_method_fragment}", '
+        f'signature="{signature}"'
+    )
+
+    logging.info("Successfully generated DID authentication header.")
+    logging.debug(f"Generated Authorization header: {auth_header}")
+
+    return auth_header
+
 def generate_auth_header_two_way(
     did_document: Dict,
     resp_did: str,

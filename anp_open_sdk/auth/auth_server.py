@@ -30,9 +30,10 @@ from fastapi import Request, HTTPException, Response
 from fastapi.responses import JSONResponse
 from .did_auth_base import BaseDIDAuthenticator
 from .schemas import AuthenticationContext
+from ..file_tool import load_private_key_from_path, load_did_doc_from_path
+from ..agent_connect_hotpatch.authentication.did_wba_auth_header_memory import DIDWbaAuthHeaderMemory
 # ... existing imports ...
 # 在模块顶部获取 logger，这是标准做法
-from ..config.config_types import BaseUnifiedConfigProtocol # 导入协议
 from anp_open_sdk.config import get_global_config
 import logging
 logger = logging.getLogger(__name__)
@@ -45,7 +46,6 @@ from .token_nonce_auth import get_jwt_public_key
 VALID_SERVER_NONCES: Dict[str, datetime] = {}
 
 # ... rest of code ...
-from ..agent_connect_hotpatch.authentication.did_wba_auth_header import DIDWbaAuthHeader
 from ..anp_sdk_agent import LocalAgent
 
 
@@ -251,16 +251,19 @@ async def generate_auth_response(did, is_two_way_auth, resp_did):
     if resp_did and resp_did != "没收到":
         try:
             # 获取resp_did用户目录
-
             did_document_path = resp_did_agent.did_document_path
+
             private_key_path = resp_did_agent.private_key_path
 
-            # 检查文件是否存在
+              # 检查文件是否存在
             if Path(did_document_path).exists() and Path(private_key_path).exists():
                 # 创建DID认证客户端
-                resp_auth_client = DIDWbaAuthHeader(
-                    did_document_path=str(did_document_path),
-                    private_key_path=str(private_key_path)
+
+                did_document = load_did_doc_from_path(did_document_path)
+                private_key = load_private_key_from_path(private_key_path)
+                resp_auth_client = DIDWbaAuthHeaderMemory(
+                    did_document,
+                    private_key
                 )
 
                 # 获取认证头（用于返回给req_did进行验证,此时 req是现在的did）
@@ -288,6 +291,7 @@ async def generate_auth_response(did, is_two_way_auth, resp_did):
         ]
     else:
         return f"bearer {access_token}"
+
 
 def is_valid_server_nonce(nonce: str) -> bool:
     """

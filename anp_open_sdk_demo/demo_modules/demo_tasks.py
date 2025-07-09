@@ -415,7 +415,7 @@ class DemoTaskRunner:
         """
         # 获取 did_document_path, private_key_path
         did_document_path = user_data.did_doc_path
-        private_key_path = user_data.jwt_private_key_file_path
+        private_key_path = user_data.did_private_key_file_path
         
 
         # 调用通用智能爬虫
@@ -603,7 +603,7 @@ class DemoTaskRunner:
                 
                 # 显示模型分析
                 if response_message.content:
-                    logger.debug(f"模型分析:\n{response_message.content}")
+                    logger.info(f"模型分析:\n{response_message.content}")
                 
                 # 检查对话是否应该结束
                 if not response_message.tool_calls:
@@ -612,7 +612,7 @@ class DemoTaskRunner:
                     
                 # 处理工具调用
                 self.step_helper.pause(f"迭代 {current_iteration}: 执行工具调用")
-                logger.debug(f"执行 {len(response_message.tool_calls)} 个工具调用")
+                logger.info(f"执行 {len(response_message.tool_calls)} 个工具调用")
                 
                 for tool_call in response_message.tool_calls:
 
@@ -678,7 +678,7 @@ class DemoTaskRunner:
         # 显示结果
         self.step_helper.pause(f"{agent_name}智能爬取完成，显示结果")
         logger.debug(f"\n=== {agent_name}响应 ===")
-        logger.debug(result["content"])
+        logger.info(result["content"])
 
         logger.debug("\n=== 访问过的URL ===")
         for url in result.get("visited_urls", []):

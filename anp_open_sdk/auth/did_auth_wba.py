@@ -2,6 +2,7 @@
 
 from agent_connect.authentication import resolve_did_wba_document
 from anp_open_sdk.config import get_global_config
+from ..file_tool import load_private_key_from_path, load_did_doc_from_path
 
 from .did_auth_base import BaseDIDResolver, BaseDIDSigner, BaseAuthHeaderBuilder, BaseDIDAuthenticator, BaseAuth
 from .did_auth_wba_custom_did_resolver import resolve_local_did_document
@@ -87,23 +88,15 @@ class WBAAuthHeaderBuilder(BaseAuthHeaderBuilder):
         did_document_path = user_data.did_doc_path
         private_key_path =user_data.did_private_key_file_path
 
+        from anp_open_sdk.agent_connect_hotpatch.authentication.did_wba_auth_header_memory import \
+            DIDWbaAuthHeaderMemory as TwoWayDIDWbaAuthHeader
+        did_document = load_did_doc_from_path(did_document_path)
+        private_key = load_private_key_from_path(private_key_path)
+        auth_client = TwoWayDIDWbaAuthHeader(
+            did_document,
+            private_key
+        )
         if context.use_two_way_auth:
-            # 优先用 hotpatch 的 DIDWbaAuthHeader
-            from anp_open_sdk.agent_connect_hotpatch.authentication.did_wba_auth_header import DIDWbaAuthHeader as TwoWayDIDWbaAuthHeader
-            auth_client = TwoWayDIDWbaAuthHeader(
-                did_document_path=did_document_path,
-                private_key_path=private_key_path
-            )
-        else:
-            # 用 agent_connect 的 DIDWbaAuthHeader
-            from agent_connect.authentication.did_wba_auth_header import DIDWbaAuthHeader as OneWayDIDWbaAuthHeader
-            auth_client = OneWayDIDWbaAuthHeader(
-                did_document_path=did_document_path,
-                private_key_path=private_key_path
-            )
-
-        # 判断是否有 get_auth_header_two_way 方法
-        if hasattr(auth_client, 'get_auth_header_two_way'):
             # 双向认证
             auth_headers = auth_client.get_auth_header_two_way(
                 context.request_url, context.target_did

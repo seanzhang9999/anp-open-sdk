@@ -29,15 +29,15 @@ import logging
 logger = logging.getLogger(__name__)
 # Import agent_connect for DID authentication
 from .did_wba import (
-    generate_auth_header_two_way
+    generate_auth_header_two_way, generate_auth_header
 )
 
-class DIDWbaAuthHeader:
+class DIDWbaAuthHeaderMemory:
     """
     Simplified DID authentication client providing HTTP authentication headers.
     """
     
-    def __init__(self, did_document_path: str, private_key_path: str):
+    def __init__(self, did_document: str, private_key:ec.EllipticCurvePrivateKey):
         """
         Initialize the DID authentication client.
         
@@ -45,11 +45,10 @@ class DIDWbaAuthHeader:
             did_document_path: Path to the DID document (absolute or relative path)
             private_key_path: Path to the private key (absolute or relative path)
         """
-        self.did_document_path = did_document_path
-        self.private_key_path = private_key_path
-        
+
         # State variables
-        self.did_document = None
+        self.did_document = did_document
+        self.private_key =private_key
         self.auth_headers = {}  # Store DID authentication headers by domain
         self.tokens = {}  # Store tokens by domain
         
@@ -70,61 +69,13 @@ class DIDWbaAuthHeader:
         parsed_url = urlparse(url_str)
         domain = parsed_url.netloc.split(':')[0]
         return domain
-    
-    def _load_did_document(self) -> Dict:
-        """Load DID document"""
-        try:
-            if self.did_document:
-                return self.did_document
-            
-            # Use the provided path directly, without resolving absolute path
-            did_path = self.did_document_path
-            
-            with open(did_path, 'r') as f:
-                did_document = json.load(f)
-            
-            self.did_document = did_document
-            # logger.debug(f"Loaded DID document: {did_path}")
-            return did_document
-        except Exception as e:
-            logger.debug(f"Error loading DID document: {e}")
-            raise
-    
-    def _load_private_key(self) -> ec.EllipticCurvePrivateKey:
-        """Load private key"""
-        try:
-            # Use the provided path directly, without resolving absolute path
-            key_path = self.private_key_path
-            
-            with open(key_path, 'rb') as f:
-                private_key_data = f.read()
-            
-            private_key = serialization.load_pem_private_key(
-                private_key_data,
-                password=None
-            )
-            
-            logger.debug(f"Loaded private key: {key_path}")
-            return private_key
-        except FileNotFoundError:
-            # 根据请求，对特定的 user_hosted_agent 路径只记录 info
-            if 'user_hosted_agent-did.com_80_' in key_path:
-                logger.info(f"Optional private key for hosted agent not found (this is expected): {key_path}")
-            else:
-                logger.error(f"Error loading private key: File not found at {key_path}")
-            return None
-        except Exception as e:
-            logger.debug(f"Error loading private key: {e}")
-            raise
+
     
     def _sign_callback(self, content: bytes, method_fragment: str) -> bytes:
         """Sign callback function. Returns None on failure."""
-        private_key = self._load_private_key()
-        if not private_key:
-            # 失败原因已在 _load_private_key 中记录
-            return None
+
         try:
-            signature = private_key.sign(
+            signature = self.private_key.sign(
                 content,
                 ec.ECDSA(hashes.SHA256())
             )
@@ -138,17 +89,12 @@ class DIDWbaAuthHeader:
     def _generate_auth_header_two_way(self, domain: str, resp_did:str) -> str:
         """Generate DID authentication header"""
         try:
-            did_document = self._load_did_document()
-        
-            # logger.debug("尝试添加DID认证头自")
-            
-
+            did_document = self.did_document
             auth_header = generate_auth_header_two_way(
                 did_document,
                 resp_did,
                 domain,
                 self._sign_callback
-
             )
             if not auth_header:
                 logger.warning(f"Failed to generate auth header for domain {domain}, possibly due to signing failure.")
@@ -160,7 +106,50 @@ class DIDWbaAuthHeader:
         except Exception as e:
             logger.debug(f"Error generating authentication header: {e}")
             raise
-    
+
+    def get_auth_header(self, server_url: str, force_new: bool = False) -> Dict[str, str]:
+        """
+        Get authentication header.
+
+        Args:
+            server_url: Server URL
+            force_new: Whether to force generate a new DID authentication header
+
+        Returns:
+            Dict[str, str]: HTTP header dictionary
+        """
+        domain = self._get_domain(server_url)
+
+        # If there is a token and not forcing a new authentication header, return the token
+        if domain in self.tokens and not force_new:
+            token = self.tokens[domain]
+            logging.info(f"Using existing token for domain {domain}")
+            return {"Authorization": f"Bearer {token}"}
+
+        # Otherwise, generate or use existing DID authentication header
+        if domain not in self.auth_headers or force_new:
+            self.auth_headers[domain] = self._generate_auth_header(domain)
+
+        logging.info(f"Using DID authentication header for domain {domain}")
+        return {"Authorization": self.auth_headers[domain]}
+
+    def _generate_auth_header(self, domain: str) -> str:
+        """Generate DID authentication header"""
+        try:
+            did_document = self.did_document
+
+            auth_header = generate_auth_header(
+                did_document,
+                domain,
+                self._sign_callback
+            )
+
+            logging.info(f"Generated authentication header for domain {domain}: {auth_header[:30]}...")
+            return auth_header
+        except Exception as e:
+            logging.error(f"Error generating authentication header: {e}")
+            raise
+
     def get_auth_header_two_way(self, server_url: str, resp_did: str, force_new: bool = False) -> Dict[str, str]:
         """
         获取认证头。

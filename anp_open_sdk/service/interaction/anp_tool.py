@@ -8,9 +8,13 @@ import os
 from pathlib import Path
 from typing import Dict, Any, Optional
 
+from anp_open_sdk.agent_connect_hotpatch.authentication.did_wba_auth_header_memory import DIDWbaAuthHeaderMemory
 from anp_open_sdk.anp_sdk_agent import LocalAgent
 from anp_open_sdk.anp_sdk_user_data import LocalUserDataManager
 import logging
+
+from anp_open_sdk.file_tool import load_private_key_from_path, load_did_doc_from_path
+
 logger = logging.getLogger(__name__)
 
 from anp_open_sdk.agent_connect_hotpatch.authentication.did_wba_auth_header import DIDWbaAuthHeader
@@ -100,9 +104,13 @@ class ANPTool:
             f"ANPTool 初始化 - DID 路径: {did_document_path}, 私钥路径: {private_key_path}"
         )
 
-        self.auth_client = DIDWbaAuthHeader(
-            did_document_path=did_document_path, private_key_path=private_key_path
+        did_document = load_did_doc_from_path(did_document_path)
+        private_key = load_private_key_from_path(private_key_path)
+        self.auth_client = DIDWbaAuthHeaderMemory(
+            did_document,
+            private_key
         )
+
 
     async def execute(
         self,
