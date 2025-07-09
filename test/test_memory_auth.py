@@ -10,6 +10,9 @@ import asyncio
 import logging
 from pathlib import Path
 
+import anp_open_sdk.auth.auth_client
+import anp_open_sdk.did_tool
+
 # 添加项目路径
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -23,7 +26,8 @@ set_global_config(config)
 
 from anp_open_sdk.auth.schemas import DIDCredentials, AuthenticationContext
 from anp_open_sdk.auth.memory_auth_header_builder import MemoryWBAAuthHeaderBuilder, create_memory_auth_header_client
-from anp_open_sdk.anp_sdk_user_data import LocalUserDataManager, did_create_user
+from anp_open_sdk.anp_sdk_user_data import LocalUserDataManager
+from anp_open_sdk.did_tool import create_did_user
 
 # 设置日志
 logging.basicConfig(
@@ -45,7 +49,7 @@ def test_memory_credentials_creation():
         'type': 'agent'
     }
     
-    did_doc = did_create_user(config)
+    did_doc = create_did_user(config)
     if not did_doc:
         logger.error("❌ 用户创建失败")
         return None
@@ -91,7 +95,7 @@ def test_memory_auth_header_building(credentials):
         
         # 使用内存版本构建器
         builder = MemoryWBAAuthHeaderBuilder()
-        auth_headers = builder.build_auth_header(context, credentials)
+        auth_headers = anp_open_sdk.auth.auth_client._build_wba_auth_header(context, credentials)
         
         logger.info(f"✅ 内存版本认证头构建成功")
         logger.info(f"  认证头键数量: {len(auth_headers)}")
@@ -120,7 +124,7 @@ def test_memory_auth_wrapper(credentials):
         )
         
         # 测试单向认证
-        auth_headers_one_way = wrapper.get_auth_header("http://example.com/test")
+        auth_headers_one_way = anp_open_sdk.did_tool.create_did_auth_header_from_path("http://example.com/test")
         
         logger.info(f"✅ 内存认证包装器测试成功")
         logger.info(f"  双向认证头: {len(auth_headers_two_way)} 个键")

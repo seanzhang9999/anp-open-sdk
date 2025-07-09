@@ -1,7 +1,7 @@
 import os
 import yaml
 from openai import AsyncOpenAI
-from anp_open_sdk.anp_sdk_agent import LocalAgent
+from anp_open_sdk.anp_user import ANPUser
 
 # --- 模块级变量，代表这个Agent实例的状态 ---
 # 这些变量在模块被加载时创建，并贯穿整个应用的生命周期

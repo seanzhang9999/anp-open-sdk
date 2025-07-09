@@ -12,19 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from anp_open_sdk.config import get_global_config
-import json
-import time
-import imaplib
-import smtplib
 import email
-from email.mime.text import MIMEText
-from email.header import Header
-from typing import List, Dict, Tuple
-from pathlib import Path
-from anp_open_sdk.utils.log_base import  logging as logger
+import imaplib
+import json
+import smtplib
+import time
 from abc import ABC, abstractmethod
+from email.header import Header
+from email.mime.text import MIMEText
+from pathlib import Path
+from typing import List, Dict, Tuple
+
 from anp_open_sdk.config import get_global_config
+from anp_open_sdk.utils.log_base import logging as logger
+
 
 class MailBackend(ABC):
     """邮件后端抽象基类"""

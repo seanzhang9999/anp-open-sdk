@@ -20,12 +20,13 @@
 # This project is open-sourced under the MIT License. For details, please see the LICENSE file.
 
 import json
-from typing import Dict, Optional
-from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives import hashes
-from urllib.parse import urlparse
 import logging
+from typing import Dict, Optional
+from urllib.parse import urlparse
+
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import ec
+
 logger = logging.getLogger(__name__)
 # Import agent_connect for DID authentication
 from .did_wba import (

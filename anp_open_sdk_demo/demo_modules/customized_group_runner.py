@@ -5,7 +5,7 @@ from typing import Dict, Any
 from datetime import datetime
 
 from anp_open_sdk.config import UnifiedConfig
-from anp_open_sdk.service.interaction.anp_sdk_group_runner import GroupRunner, Message, MessageType, Agent
+from anp_open_sdk_framework.agent_adaptation.anp_service.interaction.anp_sdk_group_runner import GroupRunner, Message, MessageType, Agent
 from anp_open_sdk.utils.log_base import logging  as logger
 
 

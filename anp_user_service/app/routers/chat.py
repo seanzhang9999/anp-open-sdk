@@ -44,7 +44,7 @@ async def chat_with_personal_agent(request: ChatAgentRequest):
 
     reply, error = await get_llm_response_with_rag(
         user_message=request.message,
-        personal_data_path=personal_data_path, # Will be None if not found, handled in service
+        personal_data_path=personal_data_path, # Will be None if not found, handled in anp_service
         llm_config=llm_config
     )
 

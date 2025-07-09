@@ -151,7 +151,7 @@ class AgentUserBindingManager:
         """为 agent 创建新的用户 DID"""
         try:
             # 导入必要的模块（延迟导入避免配置依赖）
-            from anp_open_sdk.anp_sdk_user_data import did_create_user
+            from anp_open_sdk.did_tool import create_did_user
             import uuid
             
             # 生成用户ID
@@ -186,7 +186,7 @@ class AgentUserBindingManager:
             print(f"      参数: {params}")
             
             # 创建用户
-            did_doc = did_create_user(params)
+            did_doc = create_did_user(params)
             
             if did_doc and 'id' in did_doc:
                 new_did = did_doc['id']

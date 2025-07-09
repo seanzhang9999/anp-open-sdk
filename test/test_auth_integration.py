@@ -10,6 +10,8 @@ import asyncio
 import logging
 from pathlib import Path
 
+import anp_open_sdk.auth.auth_client
+
 # 添加项目路径
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -24,8 +26,9 @@ set_global_config(config)
 from anp_open_sdk.auth.schemas import DIDCredentials, AuthenticationContext
 from anp_open_sdk.auth.memory_auth_header_builder import create_memory_auth_header_client
 from anp_open_sdk.auth.auth_client import create_authenticator
-from anp_open_sdk.anp_sdk_user_data import LocalUserDataManager, did_create_user
-from anp_open_sdk.anp_sdk_agent import LocalAgent
+from anp_open_sdk.anp_sdk_user_data import LocalUserDataManager
+from anp_open_sdk.did_tool import create_did_user
+from anp_open_sdk.anp_user import ANPUser
 
 # 设置日志
 logging.basicConfig(
@@ -48,7 +51,7 @@ def create_test_users():
             'type': 'agent'
         }
         
-        did_doc = did_create_user(config)
+        did_doc = create_did_user(config)
         if did_doc:
             users.append(did_doc['id'])
             logger.info(f"✅ 用户{i+1}创建成功: {did_doc['id']}")
@@ -121,7 +124,7 @@ def test_auth_header_consistency(user_dids):
         )
         
         authenticator = create_authenticator("wba")
-        auth_headers_old = authenticator.header_builder.build_auth_header(context, credentials_old)
+        auth_headers_old = anp_open_sdk.auth.auth_client._build_wba_auth_header(context, credentials_old)
         
         # 方式2：使用内存版认证器
         credentials_new = user_data.get_memory_credentials()
@@ -169,7 +172,7 @@ def test_agent_integration(user_dids):
         # 创建智能体
         agents = []
         for did in user_dids:
-            agent = LocalAgent.from_did(did)
+            agent = ANPUser.from_did(did)
             agents.append(agent)
             logger.info(f"✅ 智能体创建成功: {agent.name}")
         
@@ -242,7 +245,7 @@ def test_performance_benchmark(user_dids):
                 private_key_path=user_data.did_private_key_file_path
             )
             authenticator = create_authenticator("wba")
-            auth_headers = authenticator.header_builder.build_auth_header(context, creds)
+            auth_headers = anp_open_sdk.auth.auth_client._build_wba_auth_header(context, creds)
         file_auth_time = time.time() - start_time
         
         # 内存版本认证头构建

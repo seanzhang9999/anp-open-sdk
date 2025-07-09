@@ -15,15 +15,18 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from anp_open_sdk.anp_sdk_agent import LocalAgent, RemoteAgent
 from urllib.parse import urlencode, quote
+
+from anp_open_sdk.anp_user import ANPUser, RemoteANPUser
+from anp_open_sdk.auth.auth_client import send_authenticated_request
 from anp_open_sdk.config import get_global_config
-from anp_open_sdk.auth.auth_client import agent_auth_request, handle_response
+from anp_open_sdk.did_tool import response_to_dict
+
 
 async def agent_msg_post(sdk, caller_agent: str, target_agent: str, content: str, message_type: str = "text"):
     """发送消息给目标智能体"""
-    caller_agent_obj = LocalAgent.from_did(caller_agent)
-    target_agent_obj = RemoteAgent(target_agent)
+    caller_agent_obj = ANPUser.from_did(caller_agent)
+    target_agent_obj = RemoteANPUser(target_agent)
     url_params = {
         "req_did": caller_agent_obj.id,
         "resp_did": target_agent_obj.id
@@ -39,7 +42,7 @@ async def agent_msg_post(sdk, caller_agent: str, target_agent: str, content: str
     msg_dir = config.anp_sdk.msg_virtual_dir
     url = f"http://{target_agent_obj.host}:{target_agent_obj.port}{msg_dir}/{target_agent_path}/post?{url_params}"
 
-    status, response, info, is_auth_pass = await agent_auth_request(
+    status, response, info, is_auth_pass = await send_authenticated_request(
         caller_agent, target_agent, url, method="POST", json_data=msg
     )
-    return await handle_response(response)
+    return await response_to_dict(response)

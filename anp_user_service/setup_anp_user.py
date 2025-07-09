@@ -1,5 +1,7 @@
 import argparse
 import getpass
+import logging
+logger = logging.getLogger(__name__)
 from app.services.user_service import create_user_with_anp # Ensure this path is correct
 from app.models.schemas import UserCreate
 

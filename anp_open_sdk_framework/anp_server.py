@@ -12,29 +12,32 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from anp_open_sdk.anp_sdk_user_data import LocalUserDataManager
-import urllib.parse
-import os
-import time
 import asyncio
 import json
-from datetime import datetime
-from typing import Dict, Any, Optional, List
-from fastapi.middleware.cors import CORSMiddleware
-from anp_open_sdk.auth.auth_server import auth_middleware
-from anp_open_sdk.service.router import router_did, router_publisher, router_auth
-from anp_open_sdk.config import get_global_config
-from fastapi import Request, WebSocket, WebSocketDisconnect, FastAPI
-from fastapi.responses import StreamingResponse
-from anp_open_sdk.anp_sdk_agent import LocalAgent
-from anp_open_sdk.service.interaction.anp_sdk_group_runner import GroupManager, GroupRunner, Message, MessageType, Agent
-from anp_open_sdk.sdk_mode import SdkMode
-
 # 在模块顶部获取 logger，这是标准做法
 import logging
+import os
+import time
+import urllib.parse
+from datetime import datetime
+from typing import Dict, Any, Optional, List
+
+from fastapi import Request, WebSocket, WebSocketDisconnect, FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
+
+from anp_open_sdk.anp_user import ANPUser
+from anp_open_sdk.anp_sdk_user_data import LocalUserDataManager
+from anp_open_sdk.auth.auth_server import auth_middleware
+from anp_open_sdk.config import get_global_config
+from anp_open_sdk_framework.server_mode import ServerMode
+from anp_open_sdk_framework.agent_adaptation.anp_service.interaction.anp_sdk_group_runner import GroupManager, GroupRunner, Message, MessageType, Agent
+from anp_open_sdk_framework.agent_adaptation.anp_service.router import router_did
+from anp_open_sdk_framework.agent_adaptation.anp_service.router import router_auth, router_publisher
+
 logger = logging.getLogger(__name__)
 
-class ANPSDK:
+class ANP_Server:
     """ANP SDK主类，支持多种运行模式"""
     
     instance = None
@@ -43,7 +46,7 @@ class ANPSDK:
     @classmethod
     def get_instance(cls, port):
         if port not in cls._instances:
-            cls._instances[port] = cls(SdkMode.MULTI_AGENT_ROUTER, ws_port=port)
+            cls._instances[port] = cls(ServerMode.MULTI_AGENT_ROUTER, ws_port=port)
         return cls._instances[port]
     
     def __new__(cls, *args, **kwargs):
@@ -51,7 +54,7 @@ class ANPSDK:
             cls.instance = super().__new__(cls)
         return cls.instance
     
-    def __init__(self, mode = SdkMode.MULTI_AGENT_ROUTER, agents=None, ws_host="0.0.0.0", ws_port=9527, **kwargs):
+    def __init__(self, mode = ServerMode.MULTI_AGENT_ROUTER, agents=None, ws_host="0.0.0.0", ws_port=9527, **kwargs):
         if hasattr(self, 'initialized'):
             return
         self.mode = mode
@@ -106,15 +109,15 @@ class ANPSDK:
         async def auth_middleware_wrapper(request, call_next):
             return await auth_middleware(request, call_next)
 
-        from anp_open_sdk.service.router.router_agent import AgentRouter
+        from anp_open_sdk_framework.agent_adaptation.anp_service.router.router_agent import AgentRouter
         self.router = AgentRouter()
-        if mode == SdkMode.MULTI_AGENT_ROUTER:
+        if mode == ServerMode.MULTI_AGENT_ROUTER:
             for agent in self.agents:
                 self.register_agent(agent)
             self._register_default_routes()
-        elif mode == SdkMode.DID_REG_PUB_SERVER:
+        elif mode == ServerMode.DID_REG_PUB_SERVER:
             self._register_default_routes()
-        elif mode == SdkMode.SDK_WS_PROXY_SERVER:
+        elif mode == ServerMode.SDK_WS_PROXY_SERVER:
             self._register_default_routes()
             self._register_ws_proxy_server(ws_host, ws_port)
         # 其他模式由LocalAgent主导
@@ -155,64 +158,8 @@ class ANPSDK:
     def list_groups(self) -> List[str]:
         return self.group_manager.list_groups()
 
-    async def check_did_host_request(self):
-        from anp_open_sdk.service.publisher.anp_sdk_publisher_mail_backend import EnhancedMailManager
-        from anp_open_sdk.service.publisher.anp_sdk_publisher import DIDManager
-        try:
-            config = get_global_config()
-            use_local = config.mail.use_local_backend
-            logger.debug(f"管理邮箱检查前初始化，使用本地文件邮件后端参数设置:{use_local}")
-            mail_manager = EnhancedMailManager(use_local_backend=use_local)
-            did_manager = DIDManager()
-            
-            did_requests = mail_manager.get_unread_did_requests()
-            if not did_requests:
-                return "没有新的DID托管请求"
-            
-            result = "开始处理DID托管请求\n"
-            for request in did_requests:
-                did_document = request['content']
-                from_address = request['from_address']
-                message_id = request['message_id']
-                
-                parsed_json = json.loads(did_document)
-                did_document_dict = dict(parsed_json)
 
-                if did_manager.is_duplicate_did(did_document):
-                    mail_manager.send_reply_email(
-                        from_address,
-                        "DID已申请",
-                        "重复的DID申请，请联系管理员"
-                    )
-                    mail_manager.mark_message_as_read(message_id)
-                    result += f"{from_address}的DID {did_document_dict.get('id')} 已申请，退回\n"
-                    continue
-                
-                success, new_did_doc, error = did_manager.store_did_document(did_document_dict)
-                if success:
-                    mail_manager.send_reply_email(
-                        from_address,
-                        "ANP HOSTED DID RESPONSED",
-                        new_did_doc)
-                    
-                    result += f"{from_address}的DID {new_did_doc['id']} 已保存\n"
-                else:
-                    mail_manager.send_reply_email(
-                        from_address,
-                        "DID托管申请失败",
-                        f"处理DID文档时发生错误: {error}"
-                    )
-                    result += f"{from_address}的DID处理失败: {error}\n"
-                
-                mail_manager.mark_message_as_read(message_id)
-            
-            return result
-        except Exception as e:
-            error_msg = f"处理DID托管请求时发生错误: {e}"
-            logger.error(error_msg)
-            return error_msg
-
-    def register_agent(self, agent: LocalAgent):
+    def register_agent(self, agent: ANPUser):
         self.router.register_agent(agent)
         self.logger.debug(f"已注册智能体到SDK: {agent.id}")
 
@@ -389,7 +336,7 @@ class ANPSDK:
         async def root():
             return {
                 "status": "running",
-                "service": "ANP SDK Server",
+                "anp_service": "ANP SDK Server",
                 "version": "0.1.0",
                 "mode": "Server and client",
                 "documentation": "/docs"
@@ -862,3 +809,4 @@ class ANPSDK:
         except Exception as e:
             self.logger.error(f"Failed to unregister agent {agent_id}: {e}")
             return False
+

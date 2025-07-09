@@ -6,12 +6,8 @@ from typing import Dict, Optional, Tuple
 from ..core.config import USERS_CREDENTIALS_FILE, get_anp_user_base_path
 from ..models.schemas import UserCreate
 from anp_open_sdk.anp_sdk_user_data import (
-    did_create_user,
-    get_user_dir_did_doc_by_did,
     LocalUserDataManager)
-
-
-
+from anp_open_sdk.did_tool import find_user_by_did, create_did_user
 
 USER_DATA_MANAGER = LocalUserDataManager(user_dir=str(get_anp_user_base_path()))
 
@@ -46,7 +42,7 @@ def create_user_with_anp(user_data: UserCreate) -> Tuple[Optional[str], Optional
     }
 
     try:
-        did_document = did_create_user(anp_user_params)
+        did_document = create_did_user(anp_user_params)
         if not did_document or 'id' not in did_document:
             return None, "ANP user creation failed: No DID document or ID returned."
 

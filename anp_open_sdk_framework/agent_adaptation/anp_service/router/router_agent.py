@@ -12,9 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import inspect
-
-from anp_open_sdk.service.router.router_did import url_did_format
 import logging
+
+from anp_open_sdk_framework.agent_adaptation.anp_service.router.router_did import url_did_format
+
 logger = logging.getLogger(__name__)
 
 

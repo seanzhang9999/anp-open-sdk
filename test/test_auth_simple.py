@@ -10,6 +10,8 @@ import asyncio
 import logging
 from pathlib import Path
 
+import anp_open_sdk.auth.auth_client
+
 # 添加项目路径
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -23,8 +25,9 @@ set_global_config(config)
 
 from anp_open_sdk.auth.schemas import DIDCredentials, DIDDocument, DIDKeyPair, AuthenticationContext
 from anp_open_sdk.auth.auth_client import create_authenticator
-from anp_open_sdk.anp_sdk_user_data import LocalUserDataManager, did_create_user
-from anp_open_sdk.anp_sdk_agent import LocalAgent
+from anp_open_sdk.anp_sdk_user_data import LocalUserDataManager
+from anp_open_sdk.did_tool import create_did_user
+from anp_open_sdk.anp_user import ANPUser
 
 # 设置日志
 logging.basicConfig(
@@ -45,7 +48,7 @@ def test_user_creation():
         'type': 'agent'
     }
     
-    did_doc = did_create_user(config)
+    did_doc = create_did_user(config)
     if did_doc:
         logger.info(f"✅ 用户创建成功: {did_doc['id']}")
         return did_doc['id']
@@ -103,7 +106,7 @@ def test_local_agent_creation(did):
     logger.info("=== 测试LocalAgent创建 ===")
     
     try:
-        agent = LocalAgent.from_did(did)
+        agent = ANPUser.from_did(did)
         logger.info(f"✅ LocalAgent创建成功")
         logger.info(f"  DID: {agent.id}")
         logger.info(f"  名称: {agent.name}")
@@ -136,7 +139,7 @@ async def test_auth_header_building(user_data):
         
         # 创建认证器并构建认证头
         authenticator = create_authenticator("wba")
-        auth_headers = authenticator.header_builder.build_auth_header(context, credentials)
+        auth_headers = anp_open_sdk.auth.auth_client._build_wba_auth_header(context, credentials)
         
         logger.info(f"✅ 认证头构建成功")
         logger.info(f"  认证头键数量: {len(auth_headers)}")

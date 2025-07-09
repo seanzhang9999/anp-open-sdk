@@ -16,7 +16,6 @@
 Publisher API router for hosted DID documents, agent descriptions, and API forwarding.
 """
 import json
-import yaml
 import logging
 logger = logging.getLogger(__name__)
 from typing import Dict

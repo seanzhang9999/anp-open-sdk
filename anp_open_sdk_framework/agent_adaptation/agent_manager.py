@@ -1,14 +1,17 @@
+import json
 import os
 import importlib
 import inspect
+from pathlib import Path
+
 import yaml
 import logging
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, Optional, Tuple, Any
 
-from anp_open_sdk.anp_sdk_agent import LocalAgent
-from anp_open_sdk.anp_sdk import ANPSDK
-from anp_open_sdk.anp_sdk_user_data import LocalUserDataManager, save_interface_files
-from anp_open_sdk.service.router.router_agent import wrap_business_handler
+from anp_open_sdk.anp_user import ANPUser
+from anp_open_sdk.anp_sdk_user_data import LocalUserDataManager, logger
+from anp_open_sdk.config import UnifiedConfig
+from anp_open_sdk_framework.agent_adaptation.anp_service.router.router_agent import wrap_business_handler
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +19,7 @@ class LocalAgentManager:
     """本地 Agent 管理器，负责加载、注册和生成接口文档"""
 
     @staticmethod
-    def load_agent_from_module(yaml_path: str) -> Tuple[Optional[LocalAgent], Optional[Any]]:
+    def load_agent_from_module(yaml_path: str) -> Tuple[Optional[ANPUser], Optional[Any]]:
         """从模块路径加载 Agent 实例"""
         logger.debug(f"\n🔎 Loading agent module from path: {yaml_path}")
         plugin_dir = os.path.dirname(yaml_path)
@@ -38,7 +41,7 @@ class LocalAgentManager:
         # 1. agent_002: 存在 agent_register.py，优先自定义注册
         if os.path.exists(register_script_path):
             register_module = importlib.import_module(f"{base_module_name}.agent_register")
-            agent = LocalAgent.from_did(cfg["did"])
+            agent = ANPUser.from_did(cfg["did"])
             agent.name = cfg["name"]
             agent.api_config = cfg.get("api", [])
             logger.info(f"  -> self register agent : {agent.name}")
@@ -48,14 +51,14 @@ class LocalAgentManager:
         # 2. agent_llm: 存在 initialize_agent
         if hasattr(handlers_module, "initialize_agent"):
             logger.debug(f"  - Calling 'initialize_agent' in module: {base_module_name}.agent_handlers")
-            agent = LocalAgent.from_did(cfg["did"])
+            agent = ANPUser.from_did(cfg["did"])
             agent.name = cfg["name"]
             agent.api_config = cfg.get("api", [])
             logger.info(f"  - pre-init agent: {agent.name}")
             return agent, handlers_module
 
         # 3. 普通配置型 agent_001 / agent_caculator
-        agent = LocalAgent.from_did(cfg["did"])
+        agent = ANPUser.from_did(cfg["did"])
         agent.name = cfg["name"]
         agent.api_config = cfg.get("api", [])
         logger.debug(f"  -> Self-created agent instance: {agent.name}")
@@ -70,7 +73,7 @@ class LocalAgentManager:
         return agent, None
 
     @staticmethod
-    def generate_custom_openapi_from_router(agent: LocalAgent,sdk) -> Dict:
+    def generate_custom_openapi_from_router(agent: ANPUser, sdk) -> Dict:
         """根据 Agent 的路由生成自定义的 OpenAPI 规范"""
         openapi = {
             "openapi": "3.0.0",
@@ -118,7 +121,7 @@ class LocalAgentManager:
         return openapi
 
     @staticmethod
-    async def generate_and_save_agent_interfaces(agent: LocalAgent,sdk):
+    async def generate_and_save_agent_interfaces(agent: ANPUser, sdk):
         """为指定的 agent 生成并保存 OpenAPI (YAML) 和 JSON-RPC 接口文件"""
         logger.debug(f"开始为 agent '{agent.name}' ({agent.id}) 生成接口文件...")
         user_data_manager = LocalUserDataManager()
@@ -182,3 +185,19 @@ class LocalAgentManager:
             )
         except Exception as e:
             logger.error(f"为 agent '{agent.name}' 生成 JSON-RPC 文件失败: {e}")
+
+
+async def save_interface_files(user_full_path: str, interface_data: dict, inteface_file_name: str, interface_file_type: str):
+
+    """保存接口配置文件"""
+    # 保存智能体描述文件
+    template_ad_path = Path(user_full_path) / inteface_file_name
+    template_ad_path = Path(UnifiedConfig.resolve_path(template_ad_path.as_posix()))
+    template_ad_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with open(template_ad_path, 'w', encoding='utf-8') as f:
+        if interface_file_type.upper() == "JSON" :
+            json.dump(interface_data, f, ensure_ascii=False, indent=2)
+        elif interface_file_type.upper() == "YAML" :
+            yaml.dump(interface_data, f, allow_unicode=True)
+    logger.debug(f"接口文件{inteface_file_name}已保存在: {template_ad_path}")

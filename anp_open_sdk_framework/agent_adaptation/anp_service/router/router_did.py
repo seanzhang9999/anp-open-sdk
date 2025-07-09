@@ -15,13 +15,14 @@
 """
 DID document API router.
 """
+import os
+import sys
 import urllib
 from urllib.parse import quote
 
 from fastapi.responses import JSONResponse
-import sys
-import os
-from anp_open_sdk.anp_sdk_user_data import get_user_dir_did_doc_by_did, get_agent_cfg_by_user_dir
+
+from anp_open_sdk.did_tool import find_user_by_did, get_agent_cfg_by_user_dir
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..","..")))
 import os
@@ -82,7 +83,7 @@ async def get_agent_description(user_id: str, request: Request) -> Dict:
 
     resp_did = url_did_format(user_id,request)
 
-    success, did_doc, user_dir = get_user_dir_did_doc_by_did(resp_did)
+    success, did_doc, user_dir = find_user_by_did(resp_did)
     if not success:
         raise HTTPException(status_code=404, detail=f"Agent with DID {resp_did} not found")
     
@@ -246,7 +247,7 @@ def url_did_format(user_id,request):
 async def get_agent_openapi_yaml(resp_did: str, yaml_file_name, request: Request):
     resp_did = url_did_format(resp_did, request)
 
-    success, did_doc, user_dir = get_user_dir_did_doc_by_did(resp_did)
+    success, did_doc, user_dir = find_user_by_did(resp_did)
     if not success:
         raise HTTPException(status_code=404, detail="User not found")
 
@@ -280,7 +281,7 @@ async def get_agent_jsonrpc(resp_did: str, jsonrpc_file_name, request: Request):
 
     resp_did = url_did_format(resp_did,request)
 
-    success, did_doc, user_dir = get_user_dir_did_doc_by_did(resp_did)
+    success, did_doc, user_dir = find_user_by_did(resp_did)
     if not success:
         raise HTTPException(status_code=404, detail="User not found")
 

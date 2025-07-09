@@ -3,6 +3,8 @@ import os
 import json
 from dotenv import load_dotenv
 
+from anp_open_sdk_framework.agent_adaptation.anp_service.publisher.anp_sdk_publisher import register_hosted_did, \
+    check_hosted_did, check_did_host_request
 from anp_open_sdk.config import UnifiedConfig
 
 load_dotenv()  # 这会加载项目根目录下的 .env 文件
@@ -14,10 +16,10 @@ import requests
 import aiofiles
 from anp_open_sdk.utils.log_base import  logging as logger
 
-from anp_open_sdk.anp_sdk import ANPSDK, LocalAgent
-from anp_open_sdk.service.interaction.agent_api_call import agent_api_call_post, agent_api_call_get
-from anp_open_sdk.service.interaction.agent_message_p2p import agent_msg_post
-from anp_open_sdk.service.interaction.anp_tool import ANPTool
+from anp_open_sdk_framework.anp_server import ANP_Server, ANPUser
+from anp_open_sdk_framework.agent_adaptation.anp_service.interaction.agent_api_call import agent_api_call_post, agent_api_call_get
+from anp_open_sdk_framework.agent_adaptation.anp_service.interaction.agent_message_p2p import agent_msg_post
+from anp_open_sdk_framework.agent_adaptation.anp_service.interaction.anp_tool import ANPTool
 from .step_helper import DemoStepHelper
 
 
@@ -38,7 +40,7 @@ from anp_open_sdk_demo.demo_modules.customized_group_runner import (
 class DemoTaskRunner:
     """演示任务运行器"""
     
-    def __init__(self, sdk: ANPSDK, agents: List[LocalAgent], step_helper: DemoStepHelper, 
+    def __init__(self, sdk: ANP_Server, agents: List[ANPUser], step_helper: DemoStepHelper,
                  dev_mode=False, step_mode=False, fast_mode=False):
         self.sdk = sdk
         self.agents = agents
@@ -56,19 +58,19 @@ class DemoTaskRunner:
         agent1, agent2, agent3 = self.agents[0], self.agents[1], self.agents[2]
 
         try:
-            await self.run_anp_tool_crawler_agent_search_ai_ad_jason(agent1, agent2)
-            await self.run_api_demo(agent1, agent2)
-            await self.run_message_demo(agent2, agent3, agent1)
-            await self.run_agent_lifecycle_demo(agent1,agent2,agent3)
+            #await self.run_anp_tool_crawler_agent_search_ai_ad_jason(agent1, agent2)
+            #await self.run_api_demo(agent1, agent2)
+            #await self.run_message_demo(agent2, agent3, agent1)
+            #await self.run_agent_lifecycle_demo(agent1,agent2,agent3)
             await self.run_hosted_did_demo(agent1)  # 添加托管 DID 演示
-            await self.run_group_chat_demo(agent1, agent2,agent3)
+            #await self.run_group_chat_demo(agent1, agent2,agent3)
             self.step_helper.pause("所有演示完成")
             
         except Exception as e:
             logger.error(f"演示执行过程中发生错误: {e}")
             raise
 
-    async def run_api_demo(self, agent1: LocalAgent, agent2: LocalAgent):
+    async def run_api_demo(self, agent1: ANPUser, agent2: ANPUser):
         """API调用演示"""
         self.step_helper.pause("步骤1: 演示API调用")
 
@@ -96,8 +98,9 @@ class DemoTaskRunner:
 
     async def run_agent_lifecycle_demo(self, agent1,agent2,agent3):
         # 导入必要的模块
-        from anp_open_sdk.anp_sdk_user_data import did_create_user, get_user_dir_did_doc_by_did
-        from anp_open_sdk.anp_sdk_agent import LocalAgent
+        from anp_open_sdk.did_tool import create_did_user
+        from anp_open_sdk.did_tool import find_user_by_did
+        from anp_open_sdk.anp_user import ANPUser
         from anp_open_sdk.config import get_global_config
         import os
         import shutil
@@ -118,7 +121,7 @@ class DemoTaskRunner:
                 'type': 'user'# 用户可以自定义did 路由的did.json服务在路径，确保和did名称路径一致即可
             }
 
-            did_document = did_create_user(temp_user_params)
+            did_document = create_did_user(temp_user_params)
             if not did_document:
                 logger.error("临时用户创建失败")
                 return
@@ -126,7 +129,7 @@ class DemoTaskRunner:
             logger.debug(f"临时用户创建成功，DID: {did_document['id']}")
 
             # 创建LocalAgent实例
-            temp_agent = LocalAgent.from_did(did_document['id'])
+            temp_agent = ANPUser.from_did(did_document['id'])
 
             # 注册到SDK
             self.sdk.register_agent(temp_agent)
@@ -190,7 +193,7 @@ class DemoTaskRunner:
 
             try:
 
-                success, did_doc, user_dir = get_user_dir_did_doc_by_did(temp_agent.id)
+                success, did_doc, user_dir = find_user_by_did(temp_agent.id)
                 if not success:
                     logger.error("无法找到刚创建的用户目录")
                     return
@@ -218,7 +221,7 @@ class DemoTaskRunner:
             except Exception as e:
                 logger.error(f"清理临时用户时发生错误: {e}")
 
-    async def run_hosted_did_demo(self, agent1: LocalAgent):
+    async def run_hosted_did_demo(self, agent1: ANPUser):
         """托管 DID 演示"""
         self.step_helper.pause("步骤5: 演示托管 DID 功能")
         
@@ -227,7 +230,7 @@ class DemoTaskRunner:
             logger.debug("=== Part 1: 申请托管 DID ===")
             self.step_helper.pause("准备申请 hosted_did")
             
-            result = await agent1.register_hosted_did(self.sdk)
+            result = await register_hosted_did(agent1)
             if result:
                 logger.debug(f"✓ {agent1.name} 申请托管 DID 发送成功")
             else:
@@ -238,12 +241,12 @@ class DemoTaskRunner:
             
             # 服务器查询托管申请状态
             logger.debug("服务器查询托管 DID 申请状态...")
-            server_result = await self.sdk.check_did_host_request()
+            server_result = await check_did_host_request()
             await asyncio.sleep(2)
             logger.debug(f"服务器处理托管情况: {server_result}")
             
             # 智能体查询自己的托管状态
-            agent_result = await agent1.check_hosted_did()
+            agent_result = await check_hosted_did(agent1)
             logger.debug(f"{agent1.name} 托管申请查询结果: {agent_result}")
             
             # Part 2: 托管智能体消息交互演示
@@ -279,7 +282,7 @@ class DemoTaskRunner:
             # 查找公共托管智能体
             public_hosted_data = user_data_manager.get_user_data_by_name("托管智能体_did:wba:agent-did.com:test:public")
             if public_hosted_data:
-                public_hosted_agent = LocalAgent.from_did(public_hosted_data.did)
+                public_hosted_agent = ANPUser.from_did(public_hosted_data.did)
                 self.sdk.register_agent(public_hosted_agent)
                 logger.debug(f"注册公共托管智能体: {public_hosted_agent.name}")
                 
@@ -340,7 +343,7 @@ class DemoTaskRunner:
         self.step_helper.pause("托管 DID 演示完成")
         
         
-    async def run_message_demo(self, agent2: LocalAgent, agent3: LocalAgent, agent1: LocalAgent):
+    async def run_message_demo(self, agent2: ANPUser, agent3: ANPUser, agent1: ANPUser):
         """消息发送演示"""
         self.step_helper.pause("步骤2: 演示消息发送")
 
@@ -354,7 +357,7 @@ class DemoTaskRunner:
         resp = await agent_msg_post(self.sdk, agent3.id, agent1.id, f"你好，我是{agent3.name}")
         logger.debug(f"{agent3.name}向{agent1.name}发送消息响应: {resp}")
     
-    async def run_anp_tool_crawler_agent_search_ai_ad_jason(self, agent1: LocalAgent, agent2: LocalAgent):
+    async def run_anp_tool_crawler_agent_search_ai_ad_jason(self, agent1: ANPUser, agent2: ANPUser):
         """ANP工具爬虫演示 - 使用ANP协议进行智能体信息爬取"""
         self.step_helper.pause("步骤3: 演示ANP工具爬虫功能")
 
@@ -366,7 +369,7 @@ class DemoTaskRunner:
         user_data_manager.load_users()
    
         user_data = user_data_manager.get_user_data_by_name("托管智能体_did:wba:agent-did.com:test:public")
-        agent_anptool = LocalAgent.from_did(user_data.did)
+        agent_anptool = ANPUser.from_did(user_data.did)
         self.sdk.register_agent(agent_anptool)    
             
 
@@ -443,7 +446,7 @@ class DemoTaskRunner:
         self.step_helper.pause("显示智能体ad.json信息")
         
         for agent in agents:
-            host, port = ANPSDK.get_did_host_port_from_did(agent.id)
+            host, port = ANP_Server.get_did_host_port_from_did(agent.id)
             user_id = quote(str(agent.id))
             url = f"http://{host}:{port}/wba/user/{user_id}/ad.json"
 
@@ -496,7 +499,7 @@ class DemoTaskRunner:
         self.step_helper.pause(f"启动{agent_name}智能爬取: {initial_url}")
         
         # 引入必要的依赖
-        from anp_open_sdk.service.interaction.anp_tool import ANPTool
+        from anp_open_sdk_framework.agent_adaptation.anp_service.interaction.anp_tool import ANPTool
         
         # 初始化变量
         visited_urls = set()
@@ -768,7 +771,7 @@ class DemoTaskRunner:
                 )
 
     
-    async def run_group_chat_demo(self, agent1: LocalAgent, agent2: LocalAgent, agent3: LocalAgent):
+    async def run_group_chat_demo(self, agent1: ANPUser, agent2: ANPUser, agent3: ANPUser):
         """使用新的 GroupRunner SDK 运行群聊演示"""
         logger.debug("\n" + "=" * 60)
         logger.debug("🚀 运行增强群聊演示 (使用增强的 GroupMember 与 GroupRunner)")
@@ -781,9 +784,9 @@ class DemoTaskRunner:
 
             # 创建 GroupMember 客户端（使用不同的扩展类）
             logger.debug("👥 创建群组成员客户端...")
-            host1, port1 = ANPSDK.get_did_host_port_from_did(agent1.id)
-            host2, port2 = ANPSDK.get_did_host_port_from_did(agent2.id)
-            host3, port3 = ANPSDK.get_did_host_port_from_did(agent3.id)
+            host1, port1 = ANP_Server.get_did_host_port_from_did(agent1.id)
+            host2, port2 = ANP_Server.get_did_host_port_from_did(agent2.id)
+            host3, port3 = ANP_Server.get_did_host_port_from_did(agent3.id)
 
             # 使用不同的扩展 GroupMember
             member1 = GroupMemberWithStorage(agent1.id, port1, enable_storage=True)
@@ -1047,7 +1050,7 @@ class DemoTaskRunner:
 def find_and_register_hosted_agent(sdk, user_datas):
         hosted_agents = []
         for user_data in user_datas:
-            agent = LocalAgent.from_did(user_data.did)
+            agent = ANPUser.from_did(user_data.did)
             if agent.is_hosted_did:
                 logger.debug(f"hosted_did: {agent.id}")
                 logger.debug(f"parent_did: {agent.parent_did}")

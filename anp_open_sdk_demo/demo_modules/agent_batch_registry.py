@@ -8,14 +8,14 @@ from fastapi import Request
 import aiofiles
 
 
-from anp_open_sdk.anp_sdk import LocalAgent
+from anp_open_sdk_framework.anp_server import ANPUser
 
 
 class DemoAgentRegistry:
     """演示用Agent注册器"""
     
     @staticmethod
-    def register_api_handlers(agents: List[LocalAgent]) -> None:
+    def register_api_handlers(agents: List[ANPUser]) -> None:
         """注册API处理器"""
         if len(agents) < 2:
             logger.warning("智能体数量不足，无法注册所有API处理器")
@@ -48,7 +48,7 @@ class DemoAgentRegistry:
         agent2.expose_api("/info", info_api, methods=["POST", "GET"])
 
     @staticmethod
-    def register_message_handlers(agents: List[LocalAgent]) -> None:
+    def register_message_handlers(agents: List[ANPUser]) -> None:
         """注册消息处理器"""
         if len(agents) < 3:
             logger.warning("智能体数量不足，无法注册所有消息处理器")
@@ -75,7 +75,7 @@ class DemoAgentRegistry:
             }
 
     @staticmethod
-    def register_group_event_handlers(agents: List[LocalAgent]) -> None:
+    def register_group_event_handlers(agents: List[ANPUser]) -> None:
         """注册群组事件处理器"""
         for agent in agents:
             async def group_event_handler(group_id, event_type, event_data):
@@ -85,7 +85,7 @@ class DemoAgentRegistry:
             agent.register_group_event_handler(group_event_handler)
 
     @staticmethod
-    async def _save_group_message_to_file(agent: LocalAgent, message: Dict[str, Any]):
+    async def _save_group_message_to_file(agent: ANPUser, message: Dict[str, Any]):
         """保存群聊消息到文件"""
         message_file = UnifiedConfig.resolve_path(f"anp_sdk_demo/demo_data/{agent.name}_group_messages.json")
         try:

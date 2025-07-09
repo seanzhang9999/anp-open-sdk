@@ -1,13 +1,14 @@
 # Agent 端 SDK 用于简化 agent 与群组的交互
 import asyncio
 import json
+import logging
 import time  # 添加缺失的导入
+from typing import Dict, Any, Callable, List
 
 import aiohttp
-from typing import Dict, Any, Callable, List
-from anp_open_sdk.service.interaction.anp_sdk_group_runner import Message, MessageType
 
-import logging
+from anp_open_sdk_framework.agent_adaptation.anp_service.interaction.anp_sdk_group_runner import Message, MessageType
+
 logger = logging.getLogger(__name__)
 
 class GroupMemberSDK:
@@ -34,7 +35,7 @@ class GroupMemberSDK:
             # 本地优化路径
             runner = self._local_sdk.get_group_runner(group_id)
             if runner:
-                from anp_open_sdk.service.interaction.anp_sdk_group_runner import Agent
+                from anp_open_sdk_framework.agent_adaptation.anp_service.interaction.anp_sdk_group_runner import Agent
                 agent = Agent(
                     id=self.agent_id,
                     name=name or self.agent_id,

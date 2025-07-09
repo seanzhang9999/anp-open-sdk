@@ -12,16 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#!/usr/bin/env python3
+import json
+import os
+# !/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import sys
-import os
-
-from anp_open_sdk.auth.auth_client import agent_auth_request, handle_response
-from anp_open_sdk.anp_sdk_agent import RemoteAgent, LocalAgent
-from urllib.parse import urlencode, quote
-import json
 from typing import Optional, Dict
+from urllib.parse import urlencode, quote
+
+from anp_open_sdk.anp_user import RemoteANPUser, ANPUser
+from anp_open_sdk.auth.auth_client import send_authenticated_request
+from anp_open_sdk.did_tool import response_to_dict
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
@@ -33,8 +34,8 @@ async def agent_api_call(
     method: str = "GET"
 ) -> Dict:
         """通用方式调用智能体的 API (支持 GET/POST)"""
-        caller_agent_obj = LocalAgent.from_did(caller_agent)
-        target_agent_obj = RemoteAgent(target_agent)
+        caller_agent_obj = ANPUser.from_did(caller_agent)
+        target_agent_obj = RemoteANPUser(target_agent)
         target_agent_path = quote(target_agent)
         if method.upper() == "POST":
             req = {"params": params or {}}
@@ -44,7 +45,7 @@ async def agent_api_call(
             }
             url_params = urlencode(url_params)
             url = f"http://{target_agent_obj.host}:{target_agent_obj.port}/agent/api/{target_agent_path}{api_path}?{url_params}"
-            status, response, info, is_auth_pass = await agent_auth_request(
+            status, response, info, is_auth_pass = await send_authenticated_request(
                 caller_agent, target_agent, url, method="POST", json_data=req
             )
         else:
@@ -55,9 +56,9 @@ async def agent_api_call(
             }
             url_params = urlencode(url_params)
             url = f"http://{target_agent_obj.host}:{target_agent_obj.port}/agent/api/{target_agent_path}{api_path}?{url_params}"
-            status, response, info, is_auth_pass = await agent_auth_request(
+            status, response, info, is_auth_pass = await send_authenticated_request(
                 caller_agent, target_agent, url, method="GET")
-        return await handle_response(response)
+        return await response_to_dict(response)
 
 async def agent_api_call_post(caller_agent: str, target_agent: str, api_path: str, params: Optional[Dict] = None) -> Dict:
     return await agent_api_call(caller_agent, target_agent, api_path, params, method="POST")

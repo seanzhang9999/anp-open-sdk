@@ -19,10 +19,11 @@
 #
 # This project is open-sourced under the MIT License. For details, please see the LICENSE file.
 
-import re
-import urllib.parse
 import base64
 import logging
+import re
+import urllib.parse
+
 logger = logging.getLogger(__name__)
 from typing import Any, Dict, Tuple, Optional, List, Callable, Union
 import aiohttp
@@ -143,7 +144,7 @@ def create_did_wba_document(
 
     # Add agent description if URL is provided
     if agent_description_url is not None:
-        did_document["service"] = [{
+        did_document["anp_service"] = [{
             "id": f"{did}#ad",
             "type": "AgentDescription",
             "serviceEndpoint": agent_description_url
@@ -294,7 +295,7 @@ def generate_auth_header(
     data_to_sign = {
         "nonce": nonce,
         "timestamp": timestamp,
-        "service": service_domain,
+        "anp_service": service_domain,
         "did": did
     }
 
@@ -367,7 +368,7 @@ def generate_auth_header_two_way(
     data_to_sign = {
         "nonce": nonce,
         "timestamp": timestamp,
-        "service": service_domain,
+        "anp_service": service_domain,
         "did": did,
         "resp_did": resp_did
     }
@@ -727,7 +728,7 @@ def verify_auth_header_signature_two_way(
         data_to_verify = {
             "nonce": nonce,
             "timestamp": timestamp_str,
-            "service": service_domain,
+            "anp_service": service_domain,
             "did": client_did,
             "resp_did": resp_id,
         }
@@ -801,7 +802,7 @@ def generate_auth_json(
     data_to_sign = {
         "nonce": nonce,
         "timestamp": timestamp,
-        "service": service_domain,
+        "anp_service": service_domain,
         "did": did
     }
     
@@ -877,7 +878,7 @@ def verify_auth_json_signature(
         data_to_verify = {
             "nonce": nonce,
             "timestamp": timestamp_str,
-            "service": service_domain,
+            "anp_service": service_domain,
             "did": client_did
         }
         

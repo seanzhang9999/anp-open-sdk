@@ -3,15 +3,15 @@
 import httpx  # 需要安装 httpx: pip install httpx
 import json
 
-from anp_open_sdk.service.interaction.agent_api_call import agent_api_call_get
-from anp_open_sdk.service.interaction.anp_tool import ANPToolCrawler
+from anp_open_sdk_framework.agent_adaptation.anp_service.interaction.agent_api_call import agent_api_call_get
+from anp_open_sdk_framework.agent_adaptation.anp_service.interaction.anp_tool import ANPToolCrawler
 import logging
 logger = logging.getLogger(__name__)
-from anp_open_sdk.anp_sdk import ANPSDK
-from anp_open_sdk.anp_sdk_agent import LocalAgent
-from anp_open_sdk.auth.auth_client import agent_auth_request
-from anp_open_sdk_framework.local_methods.local_methods_caller import LocalMethodsCaller
-from anp_open_sdk_framework.local_methods.local_methods_doc import LocalMethodsDocGenerator
+from anp_open_sdk_framework.anp_server import ANP_Server
+from anp_open_sdk.anp_user import ANPUser
+from anp_open_sdk.auth.auth_client import send_authenticated_request
+from anp_open_sdk_framework.agent_adaptation.local_service.local_methods_caller import LocalMethodsCaller
+from anp_open_sdk_framework.agent_adaptation.local_service.local_methods_doc import LocalMethodsDocGenerator
 
 # 在初始化时创建调用器
 caller = None
@@ -68,11 +68,11 @@ async def discover_and_describe_agents(publisher_url):
 
                 # 2. 获取每个 agent 的 DID Document
                 user_id = did.split(":")[-1]
-                host , port = ANPSDK.get_did_host_port_from_did(user_id)
+                host , port = ANP_Server.get_did_host_port_from_did(user_id)
                 did_doc_url = f"http://{host}:{port}/wba/user/{user_id}/did.json"
 
                 logger.debug(f"    - Step 2: Fetching DID Document from {did_doc_url}")
-                status, did_doc_data, msg, success = await agent_auth_request(
+                status, did_doc_data, msg, success = await send_authenticated_request(
                     caller_agent=my_agent_instance.id,  # 使用 self.id 作为调用者
                     target_agent=did,
                     request_url=did_doc_url
@@ -89,18 +89,18 @@ async def discover_and_describe_agents(publisher_url):
 
                 # 3. 从 DID Document 中提取 ad.json 的地址并获取内容
                 ad_endpoint = None
-                for service in did_document.get("service", []):
+                for service in did_document.get("anp_service", []):
                     if service.get("type") == "AgentDescription":
                         ad_endpoint = service.get("serviceEndpoint")
                         logger.info(f"\n   - ✅ get endpoint from did-doc{did}:{ad_endpoint}")
                         break
 
                 if not ad_endpoint:
-                    logger.debug(f"    - ⚠️  No 'AgentDescription' service found in DID Document for {did}.")
+                    logger.debug(f"    - ⚠️  No 'AgentDescription' anp_service found in DID Document for {did}.")
                     continue
 
                 logger.debug(f"    - Step 3: Fetching Agent Description from {ad_endpoint}")
-                status, ad_data, msg, success = await agent_auth_request(
+                status, ad_data, msg, success = await send_authenticated_request(
                     caller_agent=my_agent_instance.id,
                     target_agent=did,
                     request_url=ad_endpoint
@@ -129,7 +129,7 @@ async def discover_and_describe_agents(publisher_url):
 async def run_calculator_add_demo():
 
     caculator_did = "did:wba:localhost%3A9527:wba:user:28cddee0fade0258"
-    calculator_agent = LocalAgent.from_did(caculator_did)
+    calculator_agent = ANPUser.from_did(caculator_did)
     # 构造 JSON-RPC 请求参数
     params = {
         "a": 1.23,
@@ -145,7 +145,7 @@ async def run_calculator_add_demo():
 
 async def run_hello_demo():
     target_did = "did:wba:localhost%3A9527:wba:user:5fea49e183c6c211"
-    target_agent = LocalAgent.from_did(target_did)
+    target_agent = ANPUser.from_did(target_did)
     # 构造 JSON-RPC 请求参数
     params = {
         "message": "hello"
@@ -168,7 +168,7 @@ async def run_ai_crawler_demo():
     # 协作智能体通过爬虫向组装后的智能体请求服务
     task_description = "我需要计算两个浮点数相加 2.88888+999933.4445556"
 
-    host,port = ANPSDK.get_did_host_port_from_did(target_did)
+    host,port = ANP_Server.get_did_host_port_from_did(target_did)
     try:
         result = await crawler.run_crawler_demo(
             req_did=my_agent_instance.id,  # 请求方是协作智能体
@@ -197,7 +197,7 @@ async def run_ai_root_crawler_demo():
     # 协作智能体通过爬虫向组装后的智能体请求服务
     task_description = "我需要计算两个浮点数相加 2.88888+999933.4445556"
 
-    host,port = ANPSDK.get_did_host_port_from_did(target_did)
+    host,port = ANP_Server.get_did_host_port_from_did(target_did)
     try:
         result = await crawler.run_crawler_demo(
             req_did=my_agent_instance.id,

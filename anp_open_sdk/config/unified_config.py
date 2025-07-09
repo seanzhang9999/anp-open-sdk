@@ -22,21 +22,17 @@
 - 敏感信息保护
 """
 
-import os
-import sys
-import threading
-import time
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Union, TYPE_CHECKING
-import yaml
 import logging
-from types import SimpleNamespace
-from dotenv import load_dotenv
 import os
+import threading
+from pathlib import Path
+from typing import Any, Dict, List, Union
 from typing import Optional, cast
+
+import yaml
+from dotenv import load_dotenv
+
 from .config_types import BaseUnifiedConfigProtocol
-
-
 
 # --- 新增部分 ---
 

@@ -1,12 +1,15 @@
-import imaplib
 import email
-import os
+import imaplib
 import json
+import os
 import smtplib
-import socks
-from email.mime.text import MIMEText
 from email.header import Header
-from anp_open_sdk.utils.log_base import  logging as logger
+from email.mime.text import MIMEText
+
+import socks
+
+from anp_open_sdk.utils.log_base import logging as logger
+
 
 class MailManager:
     """邮箱管理器，用于处理DID托管请求的邮件操作"""

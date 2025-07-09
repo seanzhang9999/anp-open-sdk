@@ -1,32 +1,25 @@
-import importlib
 import glob
 import os
 import sys
 import asyncio
 import threading
 
-from anp_open_sdk.anp_sdk_user_data import save_interface_files, LocalUserDataManager
-from anp_open_sdk.sdk_mode import SdkMode
-from anp_open_sdk.service.router.router_agent import wrap_business_handler
+from anp_open_sdk_framework.server_mode import ServerMode
 
 from anp_open_sdk.config import UnifiedConfig, set_global_config, get_global_config
 from anp_open_sdk.utils.log_base import setup_logging
-from anp_open_sdk.anp_sdk import ANPSDK
+from anp_open_sdk_framework.anp_server import ANP_Server
 
 import logging
 
-from anp_open_sdk_framework.agent_manager import LocalAgentManager
+from anp_open_sdk_framework.agent_adaptation.agent_manager import LocalAgentManager
 
-from anp_open_sdk_framework.local_methods.local_methods_caller import LocalMethodsCaller
-from anp_open_sdk_framework.local_methods.local_methods_doc import LocalMethodsDocGenerator
+from anp_open_sdk_framework.agent_adaptation.local_service.local_methods_doc import LocalMethodsDocGenerator
 
 app_config = UnifiedConfig(config_file='anp_open_sdk_framework_demo_agent_unified_config.yaml')
 set_global_config(app_config)
 setup_logging() # 假设 setup_logging 内部也改用 get_global_config()
 logger = logging.getLogger(__name__)
-
-import inspect
-
 
 
 async def main():
@@ -57,7 +50,7 @@ async def main():
 
     # --- 启动SDK ---
     logger.info("\n✅ All agents pre-loaded. Creating SDK instance...")
-    sdk = ANPSDK(mode=SdkMode.MULTI_AGENT_ROUTER, agents=all_agents)
+    svr = ANP_Server(mode=ServerMode.MULTI_AGENT_ROUTER, agents=all_agents)
 
     # --- 新增：后期初始化循环 ---
     logger.info("\n🔄 Running post-initialization for agents...")
@@ -65,15 +58,15 @@ async def main():
         module = lifecycle_modules.get(agent.id)
         if module and hasattr(module, "initialize_agent"):
             logger.info(f"  - Calling initialize_agent for {agent.name}...")
-            await module.initialize_agent(agent, sdk)  # 传入 agent 和 sdk 实例
+            await module.initialize_agent(agent, svr)  # 传入 agent 和 sdk 实例
 
     for agent in all_agents:
-        await LocalAgentManager.generate_and_save_agent_interfaces(agent, sdk)
+        await LocalAgentManager.generate_and_save_agent_interfaces(agent, svr)
 
 
     # 用线程启动 server
     def run_server():
-        sdk.start_server()
+        svr.start_server()
     server_thread = threading.Thread(target=run_server, daemon=True)
     server_thread.start()
 
@@ -144,8 +137,8 @@ async def main():
     # 注意：start_server() 是在单独线程中调用的，sdk.stop_server() 只有在 ANPSDK 实现了对应的停止机制时才有效
     if 'sdk' in locals():
         logger.debug("  - Stopping server...")
-        if hasattr(sdk, "stop_server"):
-            sdk.stop_server()
+        if hasattr(svr, "stop_server"):
+            svr.stop_server()
             logger.debug("  - Server stopped.")
         else:
             logger.debug("  - sdk 实例没有 stop_server 方法，无法主动停止服务。")

@@ -3,8 +3,9 @@
 此模块提供配置项的类型提示和协议定义，支持IDE代码提示和类型检查。
 """
 
-from typing import Protocol, List, Dict, Any, Optional
 from pathlib import Path
+from typing import Protocol, List, Dict, Any, Optional
+
 
 class MultiAgentModeConfig(Protocol):
     agents_cfg_path: str

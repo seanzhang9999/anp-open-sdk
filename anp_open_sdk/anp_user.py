@@ -14,24 +14,23 @@
 import asyncio
 import inspect
 import json
-import os
+import logging
 from datetime import datetime
 from typing import Dict, Any, Callable, List
 
 import nest_asyncio
 from fastapi import FastAPI, Request
-import logging
+
 logger = logging.getLogger(__name__)
 from starlette.responses import JSONResponse
 
 
 from anp_open_sdk.config import get_global_config
-from anp_open_sdk.service.publisher.anp_sdk_publisher_mail_backend import EnhancedMailManager
-from anp_open_sdk.auth.did_auth_wba import parse_wba_did_host_port
+from anp_open_sdk.did_tool import parse_wba_did_host_port
 from anp_open_sdk.contact_manager import ContactManager
-from anp_open_sdk.sdk_mode import SdkMode
+from anp_open_sdk_framework.server_mode import ServerMode
 
-class RemoteAgent:
+class RemoteANPUser:
     def __init__(self, id: str, name: str = None, host: str = None, port: int = None, **kwargs):
         self.id = id
         self.name = name
@@ -50,7 +49,7 @@ class RemoteAgent:
             **self.extra
         }
 
-class LocalAgent:
+class ANPUser:
     """本地智能体，代表当前用户的DID身份"""
     api_config: List[Dict[str, Any]]  # 用于多智能体加载时 从agent_mappings.yaml加载api相关扩展描述
 
@@ -59,7 +58,7 @@ class LocalAgent:
         
         Args:
             user_data: 用户数据对象
-            agent_type: 智能体类型，"personal"或"service"
+            agent_type: 智能体类型，"personal"或"anp_service"
         """
         self.user_data = user_data
         user_dir = self.user_data.user_dir
@@ -157,11 +156,11 @@ class LocalAgent:
                     "agent_id": self.id,
                     "agent_name": self.name
                 }
-                from anp_open_sdk.anp_sdk import ANPSDK
-                if hasattr(ANPSDK, 'instance') and ANPSDK.instance:
-                    if self.id not in ANPSDK.instance.api_registry:
-                        ANPSDK.instance.api_registry[self.id] = []
-                    ANPSDK.instance.api_registry[self.id].append(api_info)
+                from anp_open_sdk_framework.anp_server import ANP_Server
+                if hasattr(ANP_Server, 'instance') and ANP_Server.instance:
+                    if self.id not in ANP_Server.instance.api_registry:
+                        ANP_Server.instance.api_registry[self.id] = []
+                    ANP_Server.instance.api_registry[self.id].append(api_info)
                     logger.debug(f"注册 API: {api_info}")
                 return f
             return decorator
@@ -174,11 +173,11 @@ class LocalAgent:
                 "agent_id": self.id,
                 "agent_name": self.name
             }
-            from anp_open_sdk.anp_sdk import ANPSDK
-            if hasattr(ANPSDK, 'instance') and ANPSDK.instance:
-                if self.id not in ANPSDK.instance.api_registry:
-                    ANPSDK.instance.api_registry[self.id] = []
-                ANPSDK.instance.api_registry[self.id].append(api_info)
+            from anp_open_sdk_framework.anp_server import ANP_Server
+            if hasattr(ANP_Server, 'instance') and ANP_Server.instance:
+                if self.id not in ANP_Server.instance.api_registry:
+                    ANP_Server.instance.api_registry[self.id] = []
+                ANP_Server.instance.api_registry[self.id].append(api_info)
                 logger.debug(f"注册 API: {api_info}")
             return func
 
@@ -319,79 +318,8 @@ class LocalAgent:
     def list_contacts(self):
         return self.contact_manager.list_contacts()
 
-    async def check_hosted_did(self):
-        try:
-            import re
-            import json
-            from anp_open_sdk.config import get_global_config
-            config = get_global_config()
-            use_local = config.mail.use_local_backend
-            logger.debug(f"注册邮箱检查前初始化，使用本地文件邮件后端参数设置:{use_local}")
-            mail_manager = EnhancedMailManager(use_local_backend=use_local)
-            responses = mail_manager.get_unread_hosted_responses()
-            if not responses:
-                return "没有找到匹配的托管 DID 激活邮件"
-            count = 0
-            for response in responses:
-                try:
-                    body = response.get('content', '')
-                    message_id = response.get('message_id')
-                    try:
-                        if isinstance(body, str):
-                            did_document = json.loads(body)
-                        else:
-                            did_document = body
-                    except Exception as e:
-                        logger.debug(f"无法解析 did_document: {e}")
-                        continue
-                    did_id = did_document.get('id', '')
-                    m = re.search(r'did:wba:([^:]+)%3A(\d+):', did_id)
-                    if not m:
-                        logger.debug(f"无法从id中提取host:port: {did_id}")
-                        continue
-                    host = m.group(1)
-                    port = m.group(2)
-                    success, hosted_dir_name = self._create_hosted_did_folder(host, port, did_document)
-                    if success:
-                        mail_manager.mark_message_as_read(message_id)
-                        logger.debug(f"已创建托管DID文件夹: {hosted_dir_name}")
-                        count += 1
-                    else:
-                        logger.error(f"创建托管DID文件夹失败: {host}:{port}")
-                except Exception as e:
-                    logger.error(f"处理邮件时出错: {e}")
-            if count > 0:
-                return f"成功处理{count}封托管DID邮件"
-            else:
-                return "未能成功处理任何托管DID邮件"
-        except Exception as e:
-            logger.error(f"检查托管DID时发生错误: {e}")
-            return f"检查托管DID时发生错误: {e}"
 
-    async def register_hosted_did(self, sdk):
-        try:
-            from anp_open_sdk.service.publisher.anp_sdk_publisher_mail_backend import EnhancedMailManager
-            user_data_manager = sdk.user_data_manager
-            user_data = user_data_manager.get_user_data(self.id)
-            did_document = user_data.did_doc
-            if did_document is None:
-                raise ValueError("当前 LocalAgent 未包含 did_document")
-            from anp_open_sdk.config import get_global_config
-            config = get_global_config()
-            use_local = config.mail.use_local_backend
-            logger.debug(f"注册邮箱检查前初始化，使用本地文件邮件后端参数设置:{use_local}")
-            mail_manager = EnhancedMailManager(use_local_backend=use_local)
-            register_email = os.environ.get('REGISTER_MAIL_USER')
-            success = mail_manager.send_hosted_did_request(did_document, register_email)
-            if success:
-                logger.debug("托管DID申请邮件已发送")
-                return True
-            else:
-                logger.error("发送托管DID申请邮件失败")
-                return False
-        except Exception as e:
-            logger.error(f"注册托管DID失败: {e}")
-            return False
+
 
     def _check_if_hosted_did(self) -> bool:
         from pathlib import Path
@@ -426,7 +354,7 @@ class LocalAgent:
                     return {'host': host, 'port': port}
         return None
 
-    def _create_hosted_did_folder(self, host: str, port: str, did_document: dict) -> tuple[bool, str]:
+    def create_hosted_did_folder(self, host: str, port: str, did_document: dict) -> tuple[bool, str]:
         import shutil
         import yaml
         from pathlib import Path
@@ -476,10 +404,10 @@ class LocalAgent:
             logger.error(f"创建托管DID文件夹失败: {e}")
             return False, ''
 
-    def start(self, mode: SdkMode, ws_proxy_url=None, host="0.0.0.0", port=8000):
-        if mode == SdkMode.AGENT_SELF_SERVICE:
+    def start(self, mode: ServerMode, ws_proxy_url=None, host="0.0.0.0", port=8000):
+        if mode == ServerMode.AGENT_SELF_SERVICE:
             self._start_self_service(host, port)
-        elif mode == SdkMode.AGENT_WS_PROXY_CLIENT:
+        elif mode == ServerMode.AGENT_WS_PROXY_CLIENT:
             self._start_self_service(host, port)
             asyncio.create_task(self._start_ws_proxy_client(ws_proxy_url))
         # 其他模式由ANPSDK主导
@@ -530,3 +458,6 @@ class LocalAgent:
                 response = await self.handle_request(self.id, data, DummyRequest(data))
                 await ws.send(json.dumps({"type": "response", "data": response}))
             # 可扩展其他消息类型
+
+
+

@@ -7,12 +7,12 @@
 
 import sys
 import asyncio
-import json
 import tempfile
 import shutil
 from pathlib import Path
-from typing import Dict, Any, Optional
 import logging
+
+import anp_open_sdk.auth.auth_client
 
 # 添加项目路径
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -23,11 +23,12 @@ except ImportError:
     pytest = None
 
 from anp_open_sdk.auth.schemas import DIDCredentials, DIDDocument, DIDKeyPair, AuthenticationContext
-from anp_open_sdk.auth.auth_client import AgentAuthManager, create_authenticator, agent_auth_request
+from anp_open_sdk.auth.auth_client import AgentAuthManager, create_authenticator, send_authenticated_request
 from anp_open_sdk.auth.auth_server import AgentAuthServer, generate_auth_response
-from anp_open_sdk.anp_sdk_user_data import LocalUserDataManager, did_create_user
-from anp_open_sdk.anp_sdk_agent import LocalAgent
-from anp_open_sdk.anp_sdk import ANPSDK
+from anp_open_sdk.anp_sdk_user_data import LocalUserDataManager
+from anp_open_sdk.did_tool import create_did_user
+from anp_open_sdk.anp_user import ANPUser
+from anp_open_sdk_framework.anp_server import ANP_Server
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +73,7 @@ class TestAuthRefactor:
         ]
         
         for config in users_config:
-            did_doc = did_create_user(config)
+            did_doc = create_did_user(config)
             if did_doc:
                 self.test_users.append(did_doc['id'])
                 logger.info(f"创建测试用户: {did_doc['id']}")
@@ -156,7 +157,7 @@ class TestAuthRefactor:
         
         # 测试认证头构建
         authenticator = create_authenticator("wba")
-        auth_headers = authenticator.header_builder.build_auth_header(context, credentials)
+        auth_headers = anp_open_sdk.auth.auth_client._build_wba_auth_header(context, credentials)
         
         assert auth_headers is not None
         assert "Authorization" in auth_headers
@@ -169,11 +170,11 @@ class TestAuthRefactor:
             pytest.skip("需要至少2个测试用户")
             
         # 启动SDK服务器
-        sdk = ANPSDK(host="localhost", port=9527)
+        sdk = ANP_Server(host="localhost", port=9527)
         
         # 创建智能体
-        agent1 = LocalAgent.from_did(self.test_users[0])
-        agent2 = LocalAgent.from_did(self.test_users[1])
+        agent1 = ANPUser.from_did(self.test_users[0])
+        agent2 = ANPUser.from_did(self.test_users[1])
         
         # 注册API处理器
         @agent2.expose_api("/test")
@@ -194,7 +195,7 @@ class TestAuthRefactor:
         
         try:
             # 测试认证请求
-            status, response_data, message, success = await agent_auth_request(
+            status, response_data, message, success = await send_authenticated_request(
                 caller_agent=agent1.id,
                 target_agent=agent2.id,
                 request_url=f"http://localhost:9527/agent/api/{agent2.id}/test",
@@ -217,7 +218,7 @@ class TestAuthRefactor:
         if not self.test_users:
             pytest.skip("没有可用的测试用户")
             
-        agent = LocalAgent.from_did(self.test_users[0])
+        agent = ANPUser.from_did(self.test_users[0])
         remote_did = "did:wba:example.com:agent:test"
         
         # 测试存储令牌
@@ -239,7 +240,7 @@ class TestAuthRefactor:
         if not self.test_users:
             pytest.skip("没有可用的测试用户")
             
-        agent = LocalAgent.from_did(self.test_users[0])
+        agent = ANPUser.from_did(self.test_users[0])
         
         # 测试添加联系人
         contact = {

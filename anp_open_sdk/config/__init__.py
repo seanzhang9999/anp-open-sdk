@@ -21,12 +21,9 @@
 
 """
 
+from . import config_types
 # 导入新的统一配置
 from .unified_config import UnifiedConfig, set_global_config, get_global_config
-from . import config_types
-
-
-
 
 # 使用 __all__ 明确声明包的公共接口，这是一个非常好的实践
 __all__ = [
