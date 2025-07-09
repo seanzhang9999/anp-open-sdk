@@ -917,17 +917,21 @@ class DemoTaskRunner:
 
             # 清理
             logger.debug("\n🧹 清理群聊连接...")
-            member1.stop_listening("sample_group")
-            member2.stop_listening("sample_group")
-            member3.stop_listening("sample_group")
-            member1.stop_listening("moderated_group")
-            member2.stop_listening("moderated_group")
+            await member1.stop_listening("sample_group")
+            await member2.stop_listening("sample_group")
+            await member3.stop_listening("sample_group")
+            await member1.stop_listening("moderated_group")
+            await member2.stop_listening("moderated_group")
 
             await member1.leave_group("sample_group")
             await member2.leave_group("sample_group")
             await member3.leave_group("sample_group")
             await member1.leave_group("moderated_group")
             await member2.leave_group("moderated_group")
+
+            await member1.shutdown_all_listeners()
+            await member2.shutdown_all_listeners()
+            await member3.shutdown_all_listeners()
 
             logger.debug("✅ 增强群聊演示完成")
 

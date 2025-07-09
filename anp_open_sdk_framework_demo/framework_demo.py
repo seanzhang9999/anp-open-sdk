@@ -9,7 +9,7 @@ from anp_open_sdk.anp_sdk_user_data import save_interface_files, LocalUserDataMa
 from anp_open_sdk.sdk_mode import SdkMode
 from anp_open_sdk.service.router.router_agent import wrap_business_handler
 
-from anp_open_sdk.config import UnifiedConfig, set_global_config
+from anp_open_sdk.config import UnifiedConfig, set_global_config, get_global_config
 from anp_open_sdk.utils.log_base import setup_logging
 from anp_open_sdk.anp_sdk import ANPSDK
 
@@ -34,6 +34,7 @@ async def main():
     if os.getcwd() not in sys.path:
         sys.path.append(os.getcwd())
 
+    config = get_global_config()
     # --- 加载和初始化所有Agent模块 ---
 
     agent_files = glob.glob("data_user/localhost_9527/agents_config/*/agent_mappings.yaml")
@@ -76,6 +77,27 @@ async def main():
     server_thread = threading.Thread(target=run_server, daemon=True)
     server_thread.start()
 
+
+    import time
+    import socket
+
+    def wait_for_port(host, port, timeout=10.0):
+        start = time.time()
+        while time.time() - start < timeout:
+            try:
+                with socket.create_connection((host, port), timeout=1):
+                    return True
+            except (OSError, ConnectionRefusedError):
+                time.sleep(0.2)
+        raise RuntimeError(f"Server on {host}:{port} did not start within {timeout} seconds")
+
+    host = config.anp_sdk.host
+    port = config.anp_sdk.port
+    logger.info(f"⏳ 等待服务器启动 {host}:{port} ...")
+    wait_for_port(host, port, timeout=15)
+    logger.info("✅ 服务器就绪，开始执行任务。")
+
+
     logger.info("\n🔥 Server is running. Press Ctrl+C to stop.")
 
 
@@ -107,10 +129,8 @@ async def main():
         result = await discovery_agent.run_ai_root_crawler_demo()
         # agent中的本地api去调用另一个agent的本地api
         result = await discovery_agent.run_agent_002_demo(sdk)
-        print(result)
         # agent中的本地api通过搜索本地api注册表去调用另一个agent的本地api
         result = await discovery_agent.run_agent_002_demo_new()
-        print(result)
 
     else:
         logger.debug("⚠️ No agent with discovery capabilities was found.")

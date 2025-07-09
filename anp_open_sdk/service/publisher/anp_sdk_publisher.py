@@ -4,6 +4,7 @@ import secrets
 from pathlib import Path
 from anp_open_sdk.utils.log_base import  logging as logger
 import socket
+from anp_open_sdk.config import get_global_config
 
 class DIDManager:
     """DID管理器，用于处理DID文档的存储和管理"""
@@ -15,7 +16,8 @@ class DIDManager:
         Args:
             hosted_dir: DID托管目录路径，如果为None则使用默认路径
         """
-        self.hosted_dir = Path(hosted_dir or os.environ.get('ANP_USER_HOSTED_PATH', 'anp_open_sdk/anp_users_hosted'))
+        config = get_global_config()
+        self.hosted_dir = Path(hosted_dir or config.anp_sdk.user_hosted_path)
         self.hosted_dir.mkdir(parents=True, exist_ok=True)
         
         # 获取主机配置

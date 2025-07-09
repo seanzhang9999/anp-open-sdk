@@ -300,7 +300,8 @@ def is_valid_server_nonce(nonce: str) -> bool:
     """
     from datetime import datetime, timezone, timedelta
     try:
-        nonce_expire_minutes = self.config.anp_sdk.nonce_expire_minutes
+        config = get_global_config()
+        nonce_expire_minutes = config.anp_sdk.nonce_expire_minutes
     except Exception:
         nonce_expire_minutes = 5
 

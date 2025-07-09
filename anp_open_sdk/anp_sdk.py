@@ -221,8 +221,8 @@ class ANPSDK:
     def save_openapi_yaml(self):
         import yaml
         import os
-        
-        docs_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'anp_open_sdk', 'anp_users')
+        config = get_global_config()
+        docs_dir = config.anp_sdk.user_did_path
         os.makedirs(docs_dir, exist_ok=True)
         
         for agent_id, agent in self.router.local_agents.items():

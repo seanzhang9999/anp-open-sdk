@@ -113,6 +113,8 @@ local_settings.py
 # 私钥和证书
 *.pem
 *.key
+!**/data_user/**/*.pem
+
 
 # 凭证文件
 credentials.json

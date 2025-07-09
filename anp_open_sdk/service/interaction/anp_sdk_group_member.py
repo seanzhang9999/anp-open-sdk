@@ -7,6 +7,9 @@ import aiohttp
 from typing import Dict, Any, Callable, List
 from anp_open_sdk.service.interaction.anp_sdk_group_runner import Message, MessageType
 
+import logging
+logger = logging.getLogger(__name__)
+
 class GroupMemberSDK:
     """Agent 端的群组 SDK"""
 
@@ -157,11 +160,27 @@ class GroupMemberSDK:
         task = asyncio.create_task(sse_listener())
         self._listeners[group_id] = task
 
-    def stop_listening(self, group_id: str):
+    async def shutdown_all_listeners(self):
+        for group_id, task in self._listeners.items():
+            task.cancel()
+        results = await asyncio.gather(*self._listeners.values(), return_exceptions=True)
+        for result in results:
+            if isinstance(result, Exception) and not isinstance(result, asyncio.CancelledError):
+                logger.warning(f"Listener shutdown error: {result}")
+        self._listeners.clear()
+
+
+    async def stop_listening(self, group_id: str):
         """停止监听群组消息"""
-        if group_id in self._listeners:
-            self._listeners[group_id].cancel()
-            del self._listeners[group_id]
+        task = self._listeners.pop(group_id, None)
+        if task:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                logger.debug(f"Listener for group {group_id} cancelled cleanly.")
+            except Exception as e:
+                logger.warning(f"Listener for group {group_id} raised error during shutdown: {e}")
 
         if self.use_local_optimization and self._local_sdk:
             runner = self._local_sdk.get_group_runner(group_id)
