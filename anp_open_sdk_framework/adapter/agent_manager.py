@@ -8,10 +8,10 @@ import yaml
 import logging
 from typing import Dict, Optional, Tuple, Any
 
+from anp_open_sdk.anp_sdk_user_data import get_user_data_manager
 from anp_open_sdk.anp_user import ANPUser
-from anp_open_sdk.anp_sdk_user_data import LocalUserDataManager, logger
 from anp_open_sdk.config import UnifiedConfig
-from anp_open_sdk_framework.agent_adaptation.anp_service.router.router_agent import wrap_business_handler
+from anp_open_sdk_framework.server.router.router_agent import wrap_business_handler
 
 logger = logging.getLogger(__name__)
 
@@ -124,7 +124,7 @@ class LocalAgentManager:
     async def generate_and_save_agent_interfaces(agent: ANPUser, sdk):
         """为指定的 agent 生成并保存 OpenAPI (YAML) 和 JSON-RPC 接口文件"""
         logger.debug(f"开始为 agent '{agent.name}' ({agent.id}) 生成接口文件...")
-        user_data_manager = LocalUserDataManager()
+        user_data_manager = get_user_data_manager()
         user_data = user_data_manager.get_user_data(agent.id)
         if not user_data:
             logger.error(f"无法找到 agent '{agent.name}' 的用户数据，无法保存接口文件。")

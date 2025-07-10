@@ -98,8 +98,8 @@ class DemoTaskRunner:
 
     async def run_agent_lifecycle_demo(self, agent1,agent2,agent3):
         # 导入必要的模块
-        from anp_open_sdk.did_tool import create_did_user
-        from anp_open_sdk.did_tool import find_user_by_did
+        from anp_open_sdk.anp_user_tool import create_did_user
+        from anp_open_sdk.anp_user_tool import find_user_by_did
         from anp_open_sdk.anp_user import ANPUser
         from anp_open_sdk.config import get_global_config
         import os
@@ -236,13 +236,9 @@ class DemoTaskRunner:
             else:
                 logger.debug(f"✗ {agent1.name} 申请托管 DID 发送失败")
                 return
-            
-            await asyncio.sleep(0.5)
-            
             # 服务器查询托管申请状态
             logger.debug("服务器查询托管 DID 申请状态...")
             server_result = await check_did_host_request()
-            await asyncio.sleep(2)
             logger.debug(f"服务器处理托管情况: {server_result}")
             
             # 智能体查询自己的托管状态
@@ -255,7 +251,6 @@ class DemoTaskRunner:
             
             # 加载用户数据
             user_data_manager = self.sdk.user_data_manager
-            user_data_manager.load_users()
             user_datas = user_data_manager.get_all_users()
             
             # 查找并注册托管智能体
@@ -276,49 +271,74 @@ class DemoTaskRunner:
                     "reply": reply_content,
                 }
                 return reply_message
-
             self.sdk.register_agent(hosted_agent)
 
             # 查找公共托管智能体
-            public_hosted_data = user_data_manager.get_user_data_by_name("托管智能体_did:wba:agent-did.com:test:public")
+            public_hosted_data = user_data_manager.get_user_data_by_name("公共智能体_did:wba:agent-did.com:test:public")
             if public_hosted_data:
                 public_hosted_agent = ANPUser.from_did(public_hosted_data.did)
+
+                @public_hosted_agent.register_message_handler("*")
+                async def handle_hosted_message(msg):
+                    logger.debug(f"[{public_hosted_agent.name}] 收到消息: {msg}")
+                    reply_content = f"这是来自公共智能体 {public_hosted_agent.name} 的自动回复，已收到消息: {msg.get('content')}"
+                    reply_message = {
+                        "reply": reply_content,
+                    }
+                    return reply_message
                 self.sdk.register_agent(public_hosted_agent)
-                logger.debug(f"注册公共托管智能体: {public_hosted_agent.name}")
+                logger.info(f"注册公共托管智能体: {public_hosted_agent.name}")
                 
                 # 托管智能体之间的消息交互
                 self.step_helper.pause("托管智能体消息交互演示")
                 
-                # 公共托管智能体向托管智能体发送消息
+                # 公共智能体向托管智能体发送消息
                 resp = await agent_msg_post(
                     self.sdk, 
                     public_hosted_agent.id, 
                     hosted_agent.id, 
-                    f"你好，我是{public_hosted_agent.name}"
+                    f"你好托管智能体，我是公共智能体{public_hosted_agent.name}"
                 )
-                logger.debug(f"{public_hosted_agent.name} -> {hosted_agent.name}: {resp}")
-                
-                await asyncio.sleep(1)
-                
+                logger.info(f"-- public-host user to host user：{public_hosted_agent.name} -> {hosted_agent.name}: {resp}")
+
+                # 托管智能体向公共智能体发送消息
+                resp = await agent_msg_post(
+                    self.sdk,
+                    hosted_agent.id,
+                    public_hosted_agent.id,
+                    f"你好公共智能体，我是托管智能体{hosted_agent.name}"
+                )
+                logger.info(
+                    f"-- host user to public-host user：{hosted_agent.name} -> {public_hosted_agent.name}: {resp}")
+
+                # 公共智能体向普通智能体发送消息
+                resp = await agent_msg_post(
+                    self.sdk,
+                    public_hosted_agent.id,
+                    agent1.id,
+                    f"你好本地智能体，我是公共智能体{public_hosted_agent.name}"
+                )
+                logger.info(
+                    f"-- public-host user to local user：{public_hosted_agent.name} -> {agent1.name}: {resp}")
+
                 # 托管智能体向普通智能体发送消息
                 resp = await agent_msg_post(
                     self.sdk,
                     hosted_agent.id,
                     agent1.id,
-                    f"你好，我是托管智能体 {hosted_agent.name}"
+                    f"你好本地智能体，我是托管智能体 {hosted_agent.name}"
                 )
-                logger.debug(f"{hosted_agent.name} -> {agent1.name}: {resp}")
+                logger.info(f"-- host user to local user：{hosted_agent.name} -> {agent1.name}: {resp}")
                 
-                await asyncio.sleep(1)
-                
+
                 # 普通智能体向托管智能体发送消息
                 resp = await agent_msg_post(
                     self.sdk,
                     agent1.id,
                     hosted_agent.id,
-                    f"你好托管智能体，我是 {agent1.name}"
+                    f"你好托管智能体，我是本地智能体 {agent1.name}"
                 )
-                logger.debug(f"{agent1.name} -> {hosted_agent.name}: {resp}")
+                logger.info(f"-- local user to host user：{agent1.name} -> {hosted_agent.name}: {resp}")
                 
                 # 显示托管状态总结
                 logger.debug("\n=== 托管 DID 演示总结 ===")
@@ -366,9 +386,8 @@ class DemoTaskRunner:
         
         
         user_data_manager = self.sdk.user_data_manager
-        user_data_manager.load_users()
-   
-        user_data = user_data_manager.get_user_data_by_name("托管智能体_did:wba:agent-did.com:test:public")
+
+        user_data = user_data_manager.get_user_data_by_name("公共智能体_did:wba:agent-did.com:test:public")
         agent_anptool = ANPUser.from_did(user_data.did)
         self.sdk.register_agent(agent_anptool)    
             
@@ -424,7 +443,7 @@ class DemoTaskRunner:
         # 调用通用智能爬虫
         result = await self.anptool_intelligent_crawler(
             anpsdk=self.sdk,  # 添加 anpsdk 参数
-            caller_agent = str(agent_anptool.id) ,  # 添加发起 agent 参数
+            caller_agent = agent_anptool ,  # 添加发起 agent 参数
             target_agent = str(agent2.id)  ,  # 添加目标 agent 参数
             use_two_way_auth = True,  # 是否使用双向认证
             user_input=task["input"],
@@ -472,7 +491,7 @@ class DemoTaskRunner:
         did_document_path : str,
         private_key_path : str,
         anpsdk=None,  # 添加 anpsdk 参数
-        caller_agent: str = None,  # 添加发起 agent 参数
+        caller_agent: ANPUser = None,  # 添加发起 agent 参数
         target_agent: str = None,  # 添加目标 agent 参数
         use_two_way_auth: bool = False,  # 是否使用双向认证
         task_type: str = "general",
@@ -508,8 +527,7 @@ class DemoTaskRunner:
         # 初始化ANPTool
         logger.debug("初始化ANP工具...")
         anp_tool = ANPTool(
-            did_document_path=did_document_path, 
-            private_key_path=private_key_path
+            user_data=caller_agent.user_data
         )
         
         # 获取初始URL内容
@@ -618,11 +636,12 @@ class DemoTaskRunner:
                 logger.info(f"执行 {len(response_message.tool_calls)} 个工具调用")
                 
                 for tool_call in response_message.tool_calls:
+                    logger.info(f"执行 {tool_call.function} 调用")
 
                     if use_two_way_auth:
                         await self.handle_tool_call(
                             tool_call, messages, anp_tool, crawled_documents, visited_urls,
-                            anpsdk = anpsdk,caller_agent =caller_agent,target_agent =target_agent,use_two_way_auth =use_two_way_auth)
+                            anpsdk = anpsdk,caller_agent =caller_agent.id,target_agent =target_agent,use_two_way_auth =use_two_way_auth)
                     else:
                         await self.handle_tool_call(
                             tool_call, messages, anp_tool, crawled_documents, visited_urls
@@ -741,6 +760,7 @@ class DemoTaskRunner:
                     result = await anp_tool.execute(
                         url=url, method=method, headers=headers, params=params, body=body
                     )
+
                 logger.debug(f"ANPTool 响应 [url: {url}]")
 
                 # 记录访问过的 URL 和获取的内容

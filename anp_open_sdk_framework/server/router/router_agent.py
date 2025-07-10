@@ -179,9 +179,11 @@ class AgentRouter:
                 # 将agent实例 挂载到request.state 方便在处理中引用
                 request.state.agent = resp_agent
                 logger.info(
-                        f"成功路由到{resp_agent.id}的处理函数, 请求数据为{request_data}\n"
-                        f"完整请求为 url: {request.url} \n"
+                        f"route_request -- forward to {resp_agent.id}'s handler, forward data:{request_data}\n")
+
+                logger.debug( f"route_request -- url: {request.url} \n"
                         f"body: {await request.body()}")
+
                 return await self.local_agents[resp_did].handle_request(req_did, request_data , request)
             else:
                 self.logger.error(f"{resp_did} 的 `handle_request` 不是一个可调用对象")

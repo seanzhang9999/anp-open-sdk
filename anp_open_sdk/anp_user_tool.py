@@ -15,13 +15,15 @@ from Crypto.PublicKey import RSA
 from agent_connect.authentication import extract_auth_header_parts
 from aiohttp import ClientResponse
 from cryptography.hazmat.primitives import serialization, hashes
-from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives.asymmetric import ec, rsa
 from cryptography.hazmat.primitives.serialization import load_pem_private_key
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
 
 from anp_open_sdk.agent_connect_hotpatch.authentication.did_wba_auth_header_memory import DIDWbaAuthHeaderMemory
 import logging
+
+from anp_open_sdk.anp_sdk_user_data import LocalUserData
 from anp_open_sdk.config import get_global_config, UnifiedConfig
 
 logger = logging.getLogger(__name__)
@@ -102,14 +104,16 @@ class AuthenticationContext(BaseModel):
     json_data: Optional[Dict[str, Any]] = None
     use_two_way_auth: bool = True
     domain: Optional[str] = None  # 新增 domain 字段
-def create_did_auth_header_from_path(did_document_path, private_key_path):
-    did_document = load_did_doc_from_path(did_document_path)
-    private_key = load_private_key(private_key_path)
-    resp_auth_header = DIDWbaAuthHeaderMemory(
-        did_document,
-        private_key
+def create_did_auth_header_from_user_data(user_data: 'LocalUserData') -> DIDWbaAuthHeaderMemory:
+    """
+    [新] 从内存中的 LocalUserData 对象创建 DIDWbaAuthHeaderMemory 实例。
+    """
+    if not user_data.did_document or not user_data.did_private_key:
+        raise ValueError("User data is missing DID document or private key in memory.")
+    return DIDWbaAuthHeaderMemory(
+        user_data.did_document,
+        user_data.did_private_key
     )
-    return resp_auth_header
 def verify_timestamp(timestamp_str: str) -> bool:
     """
     Verify if a timestamp is within the valid period.
@@ -365,7 +369,7 @@ def get_agent_cfg_by_user_dir(user_dir: str) -> dict:
 
 def create_verification_credential(
     did_document: Dict[str, Any],
-    private_key_path: str,
+    private_key: ec.EllipticCurvePrivateKey,
     nonce: str,
     expires_in: int = 3600
 ) -> Optional[Dict[str, Any]]:
@@ -417,8 +421,8 @@ def create_verification_credential(
         }
 
         # 加载私钥
-        private_key = load_private_key(private_key_path)
         if not private_key:
+            logger.error("Provided private key object is invalid.")
             return None
 
         # 准备签名数据
@@ -498,12 +502,13 @@ def verify_verification_credential(
         return False
 
 
-def create_access_token(private_key_path, data: Dict, expires_delta: int = None) -> str:
+
+def create_access_token(private_key: rsa.RSAPrivateKey, data: Dict, expires_delta: int = None) -> str:
     """
     Create a new JWT access token.
 
     Args:
-        private_key_path: 私钥路径
+        private_key: RSA private key object from memory
         data: Data to encode in the token
         expires_delta: Optional expiration time
 
@@ -517,10 +522,8 @@ def create_access_token(private_key_path, data: Dict, expires_delta: int = None)
     expires = datetime.now(timezone.utc) + (timedelta(minutes=expires_delta) if expires_delta else timedelta(seconds=token_expire_time))
     to_encode.update({"exp": expires})
 
-    # Get private key for signing
-    private_key = get_jwt_private_key(private_key_path)
     if not private_key:
-        logger.debug("Failed to load JWT private key")
+        logger.debug("Invalid JWT private key object provided")
         raise HTTPException(status_code=500, detail="Internal server error during token generation")
 
     jwt_algorithm = config.anp_sdk.jwt_algorithm
@@ -531,6 +534,7 @@ def create_access_token(private_key_path, data: Dict, expires_delta: int = None)
         algorithm=jwt_algorithm
     )
     return encoded_jwt
+
 def create_jwt(content: dict, private_key: str) -> str:
     try:
         headers = {

@@ -22,7 +22,7 @@ from urllib.parse import urlencode, quote
 
 from anp_open_sdk.anp_user import RemoteANPUser, ANPUser
 from anp_open_sdk.auth.auth_client import send_authenticated_request
-from anp_open_sdk.did_tool import response_to_dict
+from anp_open_sdk.anp_user_tool import response_to_dict
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 

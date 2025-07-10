@@ -8,7 +8,7 @@ from anp_open_sdk.anp_user import ANPUser, logger
 from anp_open_sdk.config import get_global_config
 from anp_open_sdk.utils.log_base import logging as logger
 from anp_open_sdk_framework.agent_adaptation.anp_service.publisher.anp_sdk_publisher_mail_backend import EnhancedMailManager
-from anp_open_sdk_framework.anp_server import logger
+from anp_open_sdk_framework.server.router.anp_server import logger
 
 
 class DIDManager:
@@ -154,7 +154,7 @@ async def register_hosted_did(agent:ANPUser):
 
 
 
-        did_document = agent.user_data.did_doc
+        did_document = agent.user_data.did_document
         if did_document is None:
             raise ValueError("当前 LocalAgent 未包含 did_document")
         from anp_open_sdk.config import get_global_config
@@ -165,7 +165,7 @@ async def register_hosted_did(agent:ANPUser):
         register_email = os.environ.get('REGISTER_MAIL_USER')
         success = mail_manager.send_hosted_did_request(did_document, register_email)
         if success:
-            logger.debug("托管DID申请邮件已发送")
+            logger.info(f"{agent.id}的托管DID申请邮件已发送")
             return True
         else:
             logger.error("发送托管DID申请邮件失败")
@@ -175,7 +175,7 @@ async def register_hosted_did(agent:ANPUser):
         return False
 
 
-async def check_hosted_did(agent):
+async def check_hosted_did(agent: ANPUser):
     try:
         import re
         import json
@@ -207,10 +207,10 @@ async def check_hosted_did(agent):
                     continue
                 host = m.group(1)
                 port = m.group(2)
-                success, hosted_dir_name = agent.create_hosted_did_folder(host, port, did_document)
+                success, hosted_dir_name = agent.create_hosted_did(host, port, did_document)
                 if success:
                     mail_manager.mark_message_as_read(message_id)
-                    logger.debug(f"已创建托管DID文件夹: {hosted_dir_name}")
+                    logger.info(f"已创建{agent.id}申请的托管DID{did_id}的文件夹: {hosted_dir_name}")
                     count += 1
                 else:
                     logger.error(f"创建托管DID文件夹失败: {host}:{port}")
@@ -228,7 +228,6 @@ async def check_hosted_did(agent):
 async def check_did_host_request():
     from anp_open_sdk_framework.agent_adaptation.anp_service.publisher.anp_sdk_publisher_mail_backend import \
         EnhancedMailManager
-    from anp_open_sdk_framework.agent_adaptation.anp_service.publisher.anp_sdk_publisher import DIDManager
     try:
         config = get_global_config()
         use_local = config.mail.use_local_backend
@@ -274,9 +273,8 @@ async def check_did_host_request():
                     f"处理DID文档时发生错误: {error}"
                 )
                 result += f"{from_address}的DID处理失败: {error}\n"
-
             mail_manager.mark_message_as_read(message_id)
-
+        logger.info(f"DID托管受理检查结果{result}")
         return result
     except Exception as e:
         error_msg = f"处理DID托管请求时发生错误: {e}"

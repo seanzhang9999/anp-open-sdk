@@ -27,7 +27,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
 from anp_open_sdk.anp_user import ANPUser
-from anp_open_sdk.anp_sdk_user_data import LocalUserDataManager
+from anp_open_sdk.anp_sdk_user_data import LocalUserDataManager, get_user_data_manager
 from anp_open_sdk.auth.auth_server import auth_middleware
 from anp_open_sdk.config import get_global_config
 from anp_open_sdk_framework.server_mode import ServerMode
@@ -71,7 +71,7 @@ class ANP_Server:
         self.proxy_mode = False
         self.proxy_task = None
         self.group_manager = GroupManager(self)
-        self.user_data_manager = LocalUserDataManager()
+        self.user_data_manager = get_user_data_manager()
         self.agent = None
         self.initialized = True
         config = get_global_config()

@@ -22,7 +22,7 @@ from urllib.parse import quote
 
 from fastapi.responses import JSONResponse
 
-from anp_open_sdk.did_tool import find_user_by_did, get_agent_cfg_by_user_dir
+from anp_open_sdk.anp_user_tool import find_user_by_did, get_agent_cfg_by_user_dir
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..","..")))
 import os

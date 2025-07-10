@@ -10,8 +10,7 @@ import aiohttp
 import yaml
 
 from anp_open_sdk.anp_user import ANPUser
-from anp_open_sdk.anp_sdk_user_data import LocalUserDataManager
-from anp_open_sdk.did_tool import load_did_doc_from_path, load_private_key
+from anp_open_sdk.anp_sdk_user_data import LocalUserDataManager, get_user_data_manager, load_private_key
 
 logger = logging.getLogger(__name__)
 
@@ -63,8 +62,7 @@ class ANPTool:
 
     def __init__(
         self,
-        did_document_path: Optional[str] = None,
-        private_key_path: Optional[str] = None,
+        user_data: 'LocalUserData',
         **data,
     ):
         """
@@ -76,37 +74,18 @@ class ANPTool:
         """
         super().__init__(**data)
 
-        # 获取当前脚本目录
-        current_dir = Path(__file__).parent
-        # 获取项目根目录
-        base_dir = current_dir.parent
-
-        # 使用提供的路径或默认路径
-        if did_document_path is None:
-            # 首先尝试从环境变量中获取
-            did_document_path = os.environ.get("DID_DOCUMENT_PATH")
-            if did_document_path is None:
-                # 使用默认路径
-                did_document_path = str(base_dir / "use_did_test_public/coder.json")
-
-        if private_key_path is None:
-            # 首先尝试从环境变量中获取
-            private_key_path = os.environ.get("DID_PRIVATE_KEY_PATH")
-            if private_key_path is None:
-                # 使用默认路径
-                private_key_path = str(
-                    base_dir / "use_did_test_public/key-1_private.pem"
-                )
+        if not user_data or not user_data.did_document or not user_data.did_private_key:
+            raise ValueError(
+                "需要提供有效的 user_data 对象，且该对象必须包含已加载到内存的 DID 文档和私钥。"
+            )
 
         logger.debug(
-            f"ANPTool 初始化 - DID 路径: {did_document_path}, 私钥路径: {private_key_path}"
+            f"ANPTool 初始化 - 使用用户 '{user_data.name}' (DID: {user_data.did}) 的内存数据"
         )
 
-        did_document = load_did_doc_from_path(did_document_path)
-        private_key = load_private_key(private_key_path)
         self.auth_client = DIDWbaAuthHeaderMemory(
-            did_document,
-            private_key
+            user_data.did_document,
+            user_data.did_private_key
         )
 
 
@@ -168,7 +147,8 @@ class ANPTool:
 
             try:
                 async with http_method(**request_kwargs) as response:
-                    logger.debug(f"ANP 响应: 状态码 {response.status}")
+                    logger.info(f"ANP 响应: 状态码 {response.status}")
+                    logger.info(f"ANP 响应:  内容 {response.text}")
 
                     # 检查响应状态
                     if (
@@ -256,7 +236,6 @@ class ANPTool:
 
         # 添加 URL 到结果以便跟踪
         result["url"] = str(url)
-
         return result
 
     async def execute_with_two_way_auth(
@@ -441,6 +420,7 @@ class ANPToolCrawler:
             result = await self._intelligent_crawler(
                 anpsdk=None,
                 caller_agent=str(caller_agent.id),
+                caller_agent_obj=caller_agent,
                 target_agent=str(resp_did) if resp_did else str(caller_agent.id),
                 use_two_way_auth=use_two_way_auth,
                 user_input=task_input,
@@ -462,8 +442,7 @@ class ANPToolCrawler:
     async def _get_caller_agent(self, req_did: str = None):
         """获取调用者智能体"""
         if req_did is None:
-            user_data_manager = LocalUserDataManager()
-            user_data_manager.load_users()
+            user_data_manager = get_user_data_manager()
             user_data = user_data_manager.get_user_data_by_name("托管智能体_did:wba:agent-did.com:test:public")
             if user_data:
                 agent = ANPUser.from_did(user_data.did)
@@ -613,8 +592,8 @@ class ANPToolCrawler:
         """
 
     async def _intelligent_crawler(self, user_input: str, initial_url: str,
-                                 prompt_template: str, did_document_path: str,
-                                 private_key_path: str, anpsdk=None,
+                                 prompt_template: str,  caller_agent_obj: 'ANPUser',
+                                   anpsdk=None,
                                  caller_agent: str = None, target_agent: str = None,
                                  use_two_way_auth: bool = True, task_type: str = "general",
                                  max_documents: int = 10, agent_name: str = "智能爬虫"):
@@ -627,9 +606,9 @@ class ANPToolCrawler:
 
         # 初始化ANPTool
         anp_tool = ANPTool(
-            did_document_path=did_document_path,
-            private_key_path=private_key_path
+            user_data=caller_agent_obj.user_data
         )
+
 
         # 获取初始URL内容
         try:
