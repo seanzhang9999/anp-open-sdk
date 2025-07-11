@@ -59,10 +59,10 @@ class DemoTaskRunner:
 
         try:
             #await self.run_anp_tool_crawler_agent_search_ai_ad_jason(agent1, agent2)
-            #await self.run_api_demo(agent1, agent2)
-            #await self.run_message_demo(agent2, agent3, agent1)
-            #await self.run_agent_lifecycle_demo(agent1,agent2,agent3)
-            await self.run_hosted_did_demo(agent1)  # 添加托管 DID 演示
+            await self.run_api_demo(agent1, agent2)
+            await self.run_message_demo(agent2, agent3, agent1)
+            await self.run_agent_lifecycle_demo(agent1,agent2,agent3)
+            #await self.run_hosted_did_demo(agent1)  # 添加托管 DID 演示
             #await self.run_group_chat_demo(agent1, agent2,agent3)
             self.step_helper.pause("所有演示完成")
             
@@ -98,8 +98,8 @@ class DemoTaskRunner:
 
     async def run_agent_lifecycle_demo(self, agent1,agent2,agent3):
         # 导入必要的模块
-        from anp_open_sdk.anp_user_tool import create_did_user
-        from anp_open_sdk.anp_user_tool import find_user_by_did
+        from anp_open_sdk.did.did_tool import create_did_user
+        from anp_open_sdk.did.did_tool import find_user_by_did
         from anp_open_sdk.anp_user import ANPUser
         from anp_open_sdk.config import get_global_config
         import os
@@ -212,7 +212,7 @@ class DemoTaskRunner:
 
                     if os.path.exists(user_full_path):
                         shutil.rmtree(user_full_path)
-                        logger.debug(f"临时用户目录已删除: {user_full_path}")
+                        logger.info(f"临时用户目录已删除: {user_full_path}")
                     else:
                         logger.warning(f"临时用户目录不存在: {user_full_path}")
 
@@ -793,9 +793,9 @@ class DemoTaskRunner:
     
     async def run_group_chat_demo(self, agent1: ANPUser, agent2: ANPUser, agent3: ANPUser):
         """使用新的 GroupRunner SDK 运行群聊演示"""
-        logger.debug("\n" + "=" * 60)
-        logger.debug("🚀 运行增强群聊演示 (使用增强的 GroupMember 与 GroupRunner)")
-        logger.debug("=" * 60)
+        logger.info("\n" + "=" * 60)
+        logger.info("🚀 运行增强群聊演示 (使用增强的 GroupMember 与 GroupRunner)")
+        logger.info("=" * 60)
         try:
             # 注册 GroupRunner
             logger.debug("📋 注册 GroupRunner...")
@@ -843,16 +843,12 @@ class DemoTaskRunner:
             await member2.listen_group("sample_group", member2_handler)
             await member3.listen_group("sample_group", member3_handler)
 
-            await asyncio.sleep(1)  # 等待监听器启动
-
+            await asyncio.sleep(0.1)
             # 发送消息
             logger.debug("\n💬 发送普通群聊消息...")
             await member1.send_message("sample_group", f"Hello from {agent1.name}!")
-            await asyncio.sleep(0.5)
             await member2.send_message("sample_group", f"Hi everyone, this is {agent2.name}")
-            await asyncio.sleep(0.5)
             await member3.send_message("sample_group", f"Greetings from {agent3.name}!")
-            await asyncio.sleep(1)
 
             # 演示2: 审核群聊
             logger.debug("\n🛡️ 演示2: 审核群聊")
@@ -866,21 +862,18 @@ class DemoTaskRunner:
             # 开始监听审核群组
             await member1.listen_group("moderated_group", member1_handler)
             await member2.listen_group("moderated_group", member2_handler)
-            await asyncio.sleep(1)
+            await asyncio.sleep(0.1)
 
             # 发送正常消息
             logger.debug("\n💬 发送正常消息...")
             await member1.send_message("moderated_group", "This is a normal message")
-            await asyncio.sleep(0.5)
 
             # 发送违规消息
             logger.debug("\n🚫 发送违规消息...")
             await member2.send_message("moderated_group", "This message contains spam content")
-            await asyncio.sleep(0.5)
 
             # 发送另一个正常消息
             await member1.send_message("moderated_group", "Back to normal conversation")
-            await asyncio.sleep(2)
 
             # 显示扩展信息
             logger.debug("\n📊 扩展功能信息:")
@@ -929,7 +922,7 @@ class DemoTaskRunner:
                     message_file = UnifiedConfig.resolve_path(f"demo_anp_open_sdk/data_tmp_result/member_messages/{agent_prefix}_group_messages.json")
                     await self._show_received_group_messages(agent.name, message_file)
                 else:
-                    logger.debug(f"\n📨 {agent.name}: 使用的是 {agent_type} 类，不具备存储功能")
+                    logger.info(f"\n📨 {agent.name}: 使用的是 {agent_type} 类，不具备存储功能")
 
             # 清空所有文件
             await self.clean_demo_data()
@@ -956,7 +949,7 @@ class DemoTaskRunner:
             await member2.shutdown_all_listeners()
             await member3.shutdown_all_listeners()
 
-            logger.debug("✅ 增强群聊演示完成")
+            logger.info("✅ 增强群聊演示完成")
 
         except Exception as e:
             logger.debug(f"❌ 增强群聊演示过程中出错: {e}")
@@ -1001,7 +994,7 @@ class DemoTaskRunner:
 
     async def _show_received_messages(self, agent_name: str, message_file: str):
         """显示接收到的消息"""
-        logger.debug(f"\n{agent_name}接收到的群聊消息:")
+        logger.info(f"\n{agent_name}接收到的群聊消息:")
         try:
             messages = []
             async with aiofiles.open(message_file, 'r', encoding='utf-8') as f:
@@ -1010,7 +1003,7 @@ class DemoTaskRunner:
                         messages.append(json.loads(line))
 
             if messages:
-                logger.debug(f"批量收到消息:\n{json.dumps(messages, ensure_ascii=False, indent=2)}")
+                logger.info(f"批量收到消息:\n{json.dumps(messages, ensure_ascii=False, indent=2)}")
             else:
                 logger.debug("未收到任何消息")
         except Exception as e:
@@ -1023,7 +1016,7 @@ class DemoTaskRunner:
             if os.path.exists(message_file):
                 with open(message_file, 'r', encoding='utf-8') as f:
                     messages = json.load(f)
-                logger.debug(f"\n📨 {agent_name} 接收到的消息 ({len(messages)} 条):")
+                logger.info(f"\n📨 {agent_name} 接收到的消息 ({len(messages)} 条):")
                 for msg in messages:
                     msg_type = msg.get('type', 'unknown')
                     sender = msg.get('sender', 'unknown')
@@ -1031,9 +1024,9 @@ class DemoTaskRunner:
                     timestamp = msg.get('timestamp', '')
                     group_id = msg.get('group_id', '')
                     icon = "🔔" if msg_type == "system" else "💬"
-                    logger.debug(f"  {icon} [{timestamp}] [{group_id}] {sender}: {content}")
+                    logger.info(f"  {icon} [{timestamp}] [{group_id}] {sender}: {content}")
             else:
-                logger.debug(f"\n📨 {agent_name}: 没有找到消息文件")
+                logger.info(f"\n📨 {agent_name}: 没有找到消息文件")
         except Exception as e:
             logger.debug(f"❌ 读取 {agent_name} 的消息文件时出错: {e}")
 
@@ -1043,7 +1036,7 @@ class DemoTaskRunner:
             if os.path.exists(log_file):
                 with open(log_file, 'r', encoding='utf-8') as f:
                     logs = json.load(f)
-                logger.debug(f"\n📋 {group_name} 运行日志 ({len(logs)} 条):")
+                logger.info(f"\n📋 {group_name} 运行日志 ({len(logs)} 条):")
                 for log in logs:
                     log_type = log.get('type', 'unknown')
                     timestamp = log.get('timestamp', '')
@@ -1059,7 +1052,7 @@ class DemoTaskRunner:
                         content += f" (原因: {log.get('reason', 'unknown')})"
                     else:
                         icon = "📝"
-                    logger.debug(f"  {icon} [{timestamp}] {content}")
+                    logger.info(f"  {icon} [{timestamp}] {content}")
             else:
                 logger.debug(f"\n📋 {group_name}: 没有找到日志文件")
         except Exception as e:

@@ -6,7 +6,7 @@
  - did及服务地址的模版化问题
  - 支持多域名
  - 重构example
- 
+ - 配置文件按example处理
  
 # framework层
  - did.json ad.json的动态配置处理

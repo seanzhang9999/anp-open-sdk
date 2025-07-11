@@ -4,11 +4,11 @@ from urllib.parse import unquote
 
 from agent_connect.authentication import resolve_did_wba_document
 
-from ..agent_connect_hotpatch.authentication.did_wba import extract_auth_header_parts_two_way, \
+from anp_open_sdk.did.agent_connect_hotpatch.authentication.did_wba import extract_auth_header_parts_two_way, \
     verify_auth_header_signature_two_way
-from ..anp_sdk_user_data import LocalUserDataManager, get_user_data_manager
+from ..anp_sdk_user_data import get_user_data_manager
 
-from ..anp_user_tool import AuthenticationContext, verify_timestamp, \
+from anp_open_sdk.did.did_tool import AuthenticationContext, verify_timestamp, \
      create_did_auth_header_from_user_data
 
 logger = logging.getLogger(__name__)

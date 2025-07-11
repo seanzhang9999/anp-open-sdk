@@ -6,7 +6,7 @@ from fastapi import HTTPException
 from starlette.requests import Request
 from starlette.responses import Response, JSONResponse
 
-from anp_open_sdk.anp_user_tool import extract_did_from_auth_header, AuthenticationContext
+from anp_open_sdk.did.did_tool import extract_did_from_auth_header, AuthenticationContext
 from anp_open_sdk.auth.auth_server import _verify_bearer_token, _verify_wba_header
 
 import logging
@@ -120,7 +120,11 @@ async def _authenticate_request(request: Request) -> Optional[dict]:
         domain = request.url.hostname)
     try:
         success, result = await _verify_wba_header(auth_header, context)
-        return True,"auth passed" , result
+        if success :
+            return True, "auth passed", result
+        else:
+            return False, "auth failed", result
+
 
     except Exception as e:
             logger.debug(f"wba验证失败: {e}")

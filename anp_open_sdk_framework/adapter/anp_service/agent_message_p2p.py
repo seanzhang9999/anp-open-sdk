@@ -20,7 +20,7 @@ from urllib.parse import urlencode, quote
 from anp_open_sdk.anp_user import ANPUser, RemoteANPUser
 from anp_open_sdk.auth.auth_client import send_authenticated_request
 from anp_open_sdk.config import get_global_config
-from anp_open_sdk.anp_user_tool import response_to_dict
+from anp_open_sdk_framework.adapter.anp_service.agent_api_call import response_to_dict
 
 
 async def agent_msg_post(sdk, caller_agent: str, target_agent: str, content: str, message_type: str = "text"):

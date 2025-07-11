@@ -3,18 +3,17 @@ import logging
 import os
 from datetime import datetime
 from json import JSONEncoder
-from pathlib import Path
 from typing import Dict, Any, Optional
 
 import aiohttp
 import yaml
 
 from anp_open_sdk.anp_user import ANPUser
-from anp_open_sdk.anp_sdk_user_data import LocalUserDataManager, get_user_data_manager, load_private_key
+from anp_open_sdk.anp_sdk_user_data import get_user_data_manager
 
 logger = logging.getLogger(__name__)
 
-from anp_open_sdk.agent_connect_hotpatch.authentication.did_wba_auth_header_memory import DIDWbaAuthHeaderMemory
+from anp_open_sdk.did.agent_connect_hotpatch.authentication.did_wba_auth_header_memory import DIDWbaAuthHeaderMemory
 from anp_open_sdk.auth.auth_client import send_authenticated_request
 
 

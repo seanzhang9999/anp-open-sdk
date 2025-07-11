@@ -27,7 +27,7 @@ from starlette.responses import JSONResponse
 
 
 from anp_open_sdk.config import get_global_config
-from anp_open_sdk.anp_user_tool import parse_wba_did_host_port
+from anp_open_sdk.did.did_tool import parse_wba_did_host_port
 from anp_open_sdk.contact_manager import ContactManager
 from anp_open_sdk_framework.server.server_mode import ServerMode
 
@@ -111,8 +111,14 @@ class ANPUser:
         user_data_manager = get_user_data_manager()
         user_data = user_data_manager.get_user_data(did)
         if not user_data:
-            # 如果找不到用户，立即抛出异常，终止后续操作
-            raise ValueError(f"未找到 DID 为 '{did}' 的用户数据。请检查您的用户目录和配置文件。")
+            # 尝试刷新用户数据
+            logger.info(f"用户 {did} 不在内存中，尝试刷新用户数据...")
+            user_data_manager.scan_and_load_new_users()
+            # 再次尝试获取
+            user_data = user_data_manager.get_user_data(did)
+            if not user_data:
+                # 如果还是找不到，抛出异常
+                raise ValueError(f"未找到 DID 为 '{did}' 的用户数据。请检查您的用户目录和配置文件。")
         if name == "未命名":
             name = user_data.name
         if not user_data:
@@ -124,7 +130,16 @@ class ANPUser:
         user_data_manager = get_user_data_manager()
         user_data = user_data_manager.get_user_data_by_name(name)
         if not user_data:
-            logger.error(f"未找到 name 为 {name} 的用户数据")
+            # 尝试刷新用户数据
+            logger.info(f"用户 {name} 不在内存中，尝试刷新用户数据...")
+            user_data_manager.scan_and_load_new_users()
+
+            # 再次尝试获取
+            user_data = user_data_manager.get_user_data_by_name(name)
+            if not user_data:
+                # 如果还是找不到，抛出异常
+                logger.error(f"未找到 name 为 {name} 的用户数据")
+                raise ValueError(f"未找到 name 为 '{name}' 的用户数据。请检查您的用户目录和配置文件。")
             return cls( None, name, agent_type)
         return cls(user_data, name, agent_type)
 

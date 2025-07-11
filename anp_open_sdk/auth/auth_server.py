@@ -25,7 +25,7 @@ from fastapi import HTTPException
 from agent_connect.authentication.did_wba import extract_auth_header_parts
 from anp_open_sdk.config import get_global_config
 from .auth_client import _resolve_did_document_insecurely
-from ..anp_user_tool import AuthenticationContext, \
+from anp_open_sdk.did.did_tool import AuthenticationContext, \
     create_access_token, \
     create_did_auth_header_from_user_data, verify_timestamp
 
@@ -47,7 +47,7 @@ async def _verify_wba_header(auth_header: str, context: AuthenticationContext) -
     logger.debug(f"_verify_wba_header -- url {context.request_url} \n header {auth_header}")
 
     try:
-        from anp_open_sdk.agent_connect_hotpatch.authentication.did_wba import (
+        from anp_open_sdk.did.agent_connect_hotpatch.authentication.did_wba import (
             extract_auth_header_parts_two_way, verify_auth_header_signature_two_way, resolve_did_wba_document
         )
         if context.use_two_way_auth:
@@ -115,7 +115,7 @@ async def _verify_wba_header(auth_header: str, context: AuthenticationContext) -
                     service_domain=context.domain if hasattr(context, 'domain') else None
                 )
             else:
-                from anp_open_sdk.agent_connect_hotpatch.authentication.did_wba import verify_auth_header_signature
+                from anp_open_sdk.did.agent_connect_hotpatch.authentication.did_wba import verify_auth_header_signature
 
                 # from agent_connect.authentication.did_wba import verify_auth_header_signature
                 is_valid, message = verify_auth_header_signature(

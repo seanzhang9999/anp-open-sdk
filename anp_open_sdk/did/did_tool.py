@@ -1,10 +1,7 @@
 import base64
-import json
-import os
 import re
 import secrets
 from datetime import datetime, timezone, timedelta
-from pathlib import Path
 from typing import Dict, Optional, Any, Tuple
 
 import jcs
@@ -12,13 +9,12 @@ import jwt
 import yaml
 from Crypto.PublicKey import RSA
 from agent_connect.authentication import extract_auth_header_parts
-from aiohttp import ClientResponse
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec, rsa
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
 
-from anp_open_sdk.agent_connect_hotpatch.authentication.did_wba_auth_header_memory import DIDWbaAuthHeaderMemory
+from anp_open_sdk.did.agent_connect_hotpatch.authentication.did_wba_auth_header_memory import DIDWbaAuthHeaderMemory
 import logging
 
 from anp_open_sdk.anp_sdk_user_data import LocalUserData, get_user_data_manager
@@ -164,8 +160,25 @@ def create_did_user(user_iput: dict, *, did_hex: bool = True, did_check_unique: 
     logger.debug(f"用户文件已保存到: {userdid_filepath}")
     logger.debug(f"jwt密钥已保存到: {userdid_filepath}")
 
+    try:
+        # 创建成功后，立即加载到内存
+        user_data_manager = get_user_data_manager()
+        new_user_data = user_data_manager.load_single_user(userdid_filepath)
+
+    except Exception as e:
+        logger.error(f"创建用户后加载到用户管理器失败，报错: {e}")
+        return None
+
+    if new_user_data:
+        logger.info(f"新用户已创建并加载到内存: {new_user_data.did}")
+    else:
+        logger.warning(f"用户创建成功但加载到内存失败: {userdid_filepath}")
 
     return did_document
+
+
+
+
 
 
 
@@ -240,7 +253,7 @@ def extract_did_from_auth_header(auth_header: str) -> Tuple[Optional[str], Optio
     """
     try:
         # 优先尝试两路认证
-        from anp_open_sdk.agent_connect_hotpatch.authentication.did_wba import extract_auth_header_parts_two_way
+        from anp_open_sdk.did.agent_connect_hotpatch.authentication.did_wba import extract_auth_header_parts_two_way
         parts = extract_auth_header_parts_two_way(auth_header)
         if parts and len(parts) == 6:
             did, nonce, timestamp, resp_did, keyid, signature = parts
@@ -501,55 +514,6 @@ def verify_jwt(token: str, public_key: str) -> dict:
     except jwt.InvalidTokenError as e:
         logger.error(f"验证 JWT token 失败: {e}")
         return None
-
-
-
-async def response_to_dict(response: Any) -> Dict:
-    if isinstance(response, dict):
-        return response
-    elif isinstance(response, str):
-        # 新增：处理字符串响应
-        try:
-            # 尝试解析为 JSON
-            return json.loads(response)
-        except json.JSONDecodeError:
-            # 不是 JSON，返回包装后的字符串
-            return {
-                "type": "text",
-                "content": response,
-                "format": "string"
-            }
-    elif isinstance(response, ClientResponse):
-        try:
-            if response.status >= 400:
-                error_text = await response.text()
-                logger.error(f"HTTP错误 {response.status}: {error_text}")
-                return {"error": f"HTTP {response.status}", "message": error_text}
-            content_type = response.headers.get('Content-Type', '')
-            if 'application/json' in content_type:
-                return await response.json()
-            else:
-                text = await response.text()
-                logger.warning(f"非JSON响应，Content-Type: {content_type}")
-                return {"content": text, "content_type": content_type}
-        except json.JSONDecodeError as e:
-            logger.error(f"JSON解析失败: {e}")
-            text = await response.text()
-            return {"error": "JSON解析失败", "raw_text": text}
-        except Exception as e:
-            logger.error(f"处理响应时出错: {e}")
-            return {"error": str(e)}
-    else:
-        logger.error(f"未知响应类型: {type(response)}")
-        # 尝试将未知类型转换为字符串
-        try:
-            return {
-                "type": "unknown",
-                "content": str(response),
-                "original_type": str(type(response))
-            }
-        except Exception as e:
-            return {"error": f"无法处理的类型: {type(response)}", "exception": str(e)}
 
 
 

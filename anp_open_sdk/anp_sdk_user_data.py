@@ -87,7 +87,6 @@ class LocalUserData():
         它会根据已有的文件路径，尝试将密钥文件加载为内存对象。
         """
         # 在方法内部导入以避免循环依赖问题
-        from anp_open_sdk import anp_user_tool
 
         try:
             # 加载 DID 私钥
@@ -350,6 +349,136 @@ class LocalUserDataManager():
         """通过用户名称从内存中快速获取用户数据"""
         return self.users_by_name.get(name)
 
+    def reload_all_users(self):
+        """重新加载所有用户数据"""
+        logger.info("重新加载所有用户数据...")
+
+        # 清空现有索引
+        self.users_by_did.clear()
+        self.users_by_name.clear()
+        self.users.clear()
+
+        # 重新加载
+        self.load_all_users()
+
+        logger.info(f"重新加载完成，当前共有 {len(self.users_by_did)} 个用户")
+
+    def add_user_to_memory(self, user_data: LocalUserData):
+        """将新用户添加到内存索引中"""
+        if user_data.did:
+            self.users_by_did[user_data.did] = user_data
+            logger.debug(f"用户 {user_data.did} 已添加到内存索引")
+
+        if user_data.name:
+            self.users_by_name[user_data.name] = user_data
+            logger.debug(f"用户名 {user_data.name} 已添加到内存索引")
+
+    def remove_user_from_memory(self, did: str):
+        """从内存索引中移除用户"""
+        user_data = self.users_by_did.get(did)
+        if user_data:
+            # 从 DID 索引中移除
+            self.users_by_did.pop(did, None)
+
+            # 从名称索引中移除
+            if user_data.name:
+                self.users_by_name.pop(user_data.name, None)
+
+            logger.debug(f"用户 {did} 已从内存索引中移除")
+
+    def load_single_user(self, user_folder_path: str) -> Optional[LocalUserData]:
+        """加载单个用户到内存"""
+        folder_name = os.path.basename(user_folder_path)
+
+        try:
+            # 检查必要文件
+            cfg_path = os.path.join(user_folder_path, 'agent_cfg.yaml')
+            did_doc_path = os.path.join(user_folder_path, 'did_document.json')
+
+            if not (os.path.exists(cfg_path) and os.path.exists(did_doc_path)):
+                logger.warning(f"用户目录不完整: {folder_name}")
+                return None
+
+            # 加载配置文件
+            with open(cfg_path, 'r', encoding='utf-8') as f:
+                agent_cfg = yaml.safe_load(f)
+
+            with open(did_doc_path, 'r', encoding='utf-8') as f:
+                did_doc = json.load(f)
+
+            # 构建密钥路径
+            key_id = self.parse_key_id_from_did_doc(did_doc)
+            if not key_id:
+                key_id = get_global_config().anp_sdk.user_did_key_id
+
+            password_paths = {
+                "did_private_key_file_path": os.path.join(user_folder_path, f"{key_id}_private.pem"),
+                "did_public_key_file_path": os.path.join(user_folder_path, f"{key_id}_public.pem"),
+                "jwt_private_key_file_path": os.path.join(user_folder_path, 'private_key.pem'),
+                "jwt_public_key_file_path": os.path.join(user_folder_path, 'public_key.pem')
+            }
+
+            # 创建用户数据对象
+            user_data = LocalUserData(
+                folder_name, agent_cfg, did_doc, did_doc_path,
+                password_paths, user_folder_path
+            )
+
+            # 添加到内存索引
+            self.add_user_to_memory(user_data)
+
+            logger.info(f"成功加载用户: {user_data.did}")
+            return user_data
+
+        except Exception as e:
+            logger.error(f"加载单个用户失败 ({folder_name}): {e}", exc_info=True)
+            return None
+
+    def refresh_user(self, did: str) -> Optional[LocalUserData]:
+        """刷新指定用户的数据"""
+        user_data = self.users_by_did.get(did)
+        if not user_data:
+            logger.warning(f"用户 {did} 不在内存中，无法刷新")
+            return None
+
+        # 重新加载用户数据
+        return self.load_single_user(user_data.user_dir)
+
+    def scan_and_load_new_users(self):
+        """扫描用户目录，加载新用户"""
+        if not os.path.isdir(self._user_dir):
+            return
+
+        current_dids = set(self.users_by_did.keys())
+        found_dids = set()
+
+        for entry in os.scandir(self._user_dir):
+            if not entry.is_dir() or not (entry.name.startswith('user_') or entry.name.startswith('user_hosted_')):
+                continue
+
+            try:
+                did_doc_path = os.path.join(entry.path, 'did_document.json')
+                if os.path.exists(did_doc_path):
+                    with open(did_doc_path, 'r', encoding='utf-8') as f:
+                        did_doc = json.load(f)
+
+                    did = did_doc.get('id')
+                    if did:
+                        found_dids.add(did)
+
+                        # 如果是新用户，加载到内存
+                        if did not in current_dids:
+                            logger.info(f"发现新用户: {did}")
+                            self.load_single_user(entry.path)
+
+            except Exception as e:
+                logger.error(f"扫描用户目录时出错 ({entry.name}): {e}")
+
+        # 检查是否有用户被删除
+        deleted_dids = current_dids - found_dids
+        for did in deleted_dids:
+            logger.info(f"用户已被删除: {did}")
+            self.remove_user_from_memory(did)
     @property
     def user_dir(self):
         return self._user_dir
@@ -377,3 +506,18 @@ def load_private_key(private_key_path: str, password: Optional[bytes] = None):
     except Exception as e:
         logger.error(f"加载私钥时出错: {str(e)}")
         return None
+def refresh_user_data_manager():
+    """刷新用户数据管理器 - 便捷函数"""
+    manager = get_user_data_manager()
+    manager.scan_and_load_new_users()
+
+def reload_user_data_manager():
+    """重新加载用户数据管理器 - 便捷函数"""
+    manager = get_user_data_manager()
+    manager.reload_all_users()
+
+def force_reload_user_data_manager():
+    """强制重新创建用户数据管理器实例"""
+    global _user_data_manager_instance
+    _user_data_manager_instance = None
+    return get_user_data_manager()

@@ -138,7 +138,7 @@ class DIDWbaAuthHeaderMemory:
         """Generate DID authentication header"""
         try:
             did_document = self.did_document
-            from anp_open_sdk.agent_connect_hotpatch.authentication.did_wba import generate_auth_header
+            from anp_open_sdk.did.agent_connect_hotpatch.authentication.did_wba import generate_auth_header
             auth_header = generate_auth_header(
                 did_document,
                 domain,
