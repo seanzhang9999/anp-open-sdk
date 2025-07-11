@@ -15,20 +15,21 @@ import asyncio
 import inspect
 import json
 import logging
-from datetime import datetime
-from typing import Dict, Any, Callable, List
+from typing import Dict, Any, Callable, List, Tuple
 
 import nest_asyncio
 from fastapi import FastAPI, Request
+
+from anp_open_sdk.anp_sdk_user_data import get_user_data_manager
 
 logger = logging.getLogger(__name__)
 from starlette.responses import JSONResponse
 
 
 from anp_open_sdk.config import get_global_config
-from anp_open_sdk.did_tool import parse_wba_did_host_port
+from anp_open_sdk.anp_user_tool import parse_wba_did_host_port
 from anp_open_sdk.contact_manager import ContactManager
-from anp_open_sdk_framework.server_mode import ServerMode
+from anp_open_sdk_framework.server.server_mode import ServerMode
 
 class RemoteANPUser:
     def __init__(self, id: str, name: str = None, host: str = None, port: int = None, **kwargs):
@@ -84,9 +85,9 @@ class ANPUser:
         self._ws_connections = {}
         self._sse_clients = set()
         # 托管DID标识
-        self.is_hosted_did = self._check_if_hosted_did()
-        self.parent_did = self._get_parent_did() if self.is_hosted_did else None
-        self.hosted_info = self._get_hosted_info() if self.is_hosted_did else None
+        self.is_hosted_did = self.user_data.is_hosted_did
+        self.parent_did = self.user_data.parent_did
+        self.hosted_info = self.user_data.hosted_info
         import requests
         self.requests = requests
         # 新增: API与消息handler注册表
@@ -107,10 +108,11 @@ class ANPUser:
 
     @classmethod
     def from_did(cls, did: str, name: str = "未命名", agent_type: str = "personal"):
-        from anp_open_sdk.anp_sdk_user_data import LocalUserDataManager
-        user_data_manager = LocalUserDataManager()
-        user_data_manager.load_users()
+        user_data_manager = get_user_data_manager()
         user_data = user_data_manager.get_user_data(did)
+        if not user_data:
+            # 如果找不到用户，立即抛出异常，终止后续操作
+            raise ValueError(f"未找到 DID 为 '{did}' 的用户数据。请检查您的用户目录和配置文件。")
         if name == "未命名":
             name = user_data.name
         if not user_data:
@@ -119,9 +121,7 @@ class ANPUser:
 
     @classmethod
     def from_name(cls, name: str, agent_type: str = "personal"):
-        from anp_open_sdk.anp_sdk_user_data import LocalUserDataManager
-        user_data_manager = LocalUserDataManager()
-        user_data_manager.load_users()
+        user_data_manager = get_user_data_manager()
         user_data = user_data_manager.get_user_data_by_name(name)
         if not user_data:
             logger.error(f"未找到 name 为 {name} 的用户数据")
@@ -156,7 +156,7 @@ class ANPUser:
                     "agent_id": self.id,
                     "agent_name": self.name
                 }
-                from anp_open_sdk_framework.anp_server import ANP_Server
+                from anp_open_sdk_framework.server.anp_server import ANP_Server
                 if hasattr(ANP_Server, 'instance') and ANP_Server.instance:
                     if self.id not in ANP_Server.instance.api_registry:
                         ANP_Server.instance.api_registry[self.id] = []
@@ -173,7 +173,7 @@ class ANPUser:
                 "agent_id": self.id,
                 "agent_name": self.name
             }
-            from anp_open_sdk_framework.anp_server import ANP_Server
+            from anp_open_sdk_framework.server.anp_server import ANP_Server
             if hasattr(ANP_Server, 'instance') and ANP_Server.instance:
                 if self.id not in ANP_Server.instance.api_registry:
                     ANP_Server.instance.api_registry[self.id] = []
@@ -318,91 +318,22 @@ class ANPUser:
     def list_contacts(self):
         return self.contact_manager.list_contacts()
 
+    def create_hosted_did(self, host: str, port: str, did_document: dict) -> Tuple[bool, Any]:
+        """
+        [新] 创建一个托管DID。此方法将调用数据管理器来处理持久化和内存加载。
+        """
+        manager = get_user_data_manager()
+        success, new_user_data = manager.create_hosted_user(
+            parent_user_data=self.user_data,
+            host=host,
+            port=port,
+            did_document=did_document
+        )
+        if success:
+            # 返回新创建的 ANPUser 实例
+            return True, ANPUser(user_data=new_user_data)
+        return False, None
 
-
-
-    def _check_if_hosted_did(self) -> bool:
-        from pathlib import Path
-        user_dir_name = Path(self.user_dir).name
-        return user_dir_name.startswith('user_hosted_')
-
-    def _get_parent_did(self) -> str:
-        import yaml
-        from pathlib import Path
-        config_path = Path(self.user_dir) / 'agent_cfg.yaml'
-        if config_path.exists():
-            try:
-                with open(config_path, 'r', encoding='utf-8') as f:
-                    config = yaml.safe_load(f)
-                    hosted_config = config.get('hosted_config', {})
-                    return hosted_config.get('parent_did')
-            except Exception as e:
-                logger.warning(f"读取托管配置失败: {e}")
-        return None
-
-    def _get_hosted_info(self) -> dict:
-        from pathlib import Path
-        user_dir_name = Path(self.user_dir).name
-        if user_dir_name.startswith('user_hosted_'):
-            parts = user_dir_name[12:].rsplit('_', 2)
-            if len(parts) >= 2:
-                if len(parts) == 3:
-                    host, port, did_suffix = parts
-                    return {'host': host, 'port': port, 'did_suffix': did_suffix}
-                else:
-                    host, port = parts
-                    return {'host': host, 'port': port}
-        return None
-
-    def create_hosted_did_folder(self, host: str, port: str, did_document: dict) -> tuple[bool, str]:
-        import shutil
-        import yaml
-        from pathlib import Path
-        try:
-            did_id = did_document.get('id', '')
-            import re
-            pattern = r"did:wba:[^:]+:[^:]+:[^:]+:([a-zA-Z0-9]{16})"
-            match = re.search(pattern, did_id)
-            if match:
-                did_suffix = match.group(1)
-            else:
-                did_suffix = "无法匹配随机数"
-            original_user_dir = Path(self.user_dir)
-            parent_dir = original_user_dir.parent
-            hosted_dir_name = f"user_hosted_{host}_{port}_{did_suffix}"
-            hosted_dir = parent_dir / hosted_dir_name
-            hosted_dir.mkdir(parents=True, exist_ok=True)
-            key_files = ['key-1_private.pem', 'key-1_public.pem', 'private_key.pem', 'public_key.pem']
-            for key_file in key_files:
-                src_path = original_user_dir / key_file
-                dst_path = hosted_dir / key_file
-                if src_path.exists():
-                    shutil.copy2(src_path, dst_path)
-                    logger.debug(f"已复制密钥文件: {key_file}")
-                else:
-                    logger.warning(f"源密钥文件不存在: {src_path}")
-            did_doc_path = hosted_dir / 'did_document.json'
-            with open(did_doc_path, 'w', encoding='utf-8') as f:
-                json.dump(did_document, f, ensure_ascii=False, indent=2)
-            hosted_config = {
-                'did': did_document.get('id', ''),
-                'unique_id': did_suffix,
-                'hosted_config': {
-                    'parent_did': self.id,
-                    'host': host,
-                    'port': int(port),
-                    'created_at': datetime.now().isoformat(),
-                    'purpose': f"对外托管服务 - {host}:{port}"
-                }
-            }
-            config_path = hosted_dir / 'agent_cfg.yaml'
-            with open(config_path, 'w', encoding='utf-8') as f:
-                yaml.dump(hosted_config, f, default_flow_style=False, allow_unicode=True)
-            logger.debug(f"托管DID文件夹创建成功: {hosted_dir}")
-            return True, hosted_dir_name
-        except Exception as e:
-            logger.error(f"创建托管DID文件夹失败: {e}")
-            return False, ''
 
     def start(self, mode: ServerMode, ws_proxy_url=None, host="0.0.0.0", port=8000):
         if mode == ServerMode.AGENT_SELF_SERVICE:
@@ -458,6 +389,7 @@ class ANPUser:
                 response = await self.handle_request(self.id, data, DummyRequest(data))
                 await ws.send(json.dumps({"type": "response", "data": response}))
             # 可扩展其他消息类型
+
 
 
 

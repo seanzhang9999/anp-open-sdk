@@ -1,7 +1,7 @@
 import threading
 import time
 from anp_open_sdk.utils.log_base import  logging as logger
-from anp_open_sdk_framework.anp_server import ANP_Server
+from anp_open_sdk_framework.server.anp_server import ANP_Server
 
 
 class DemoSDKManager:

@@ -3,15 +3,15 @@
 import httpx  # 需要安装 httpx: pip install httpx
 import json
 
-from anp_open_sdk_framework.agent_adaptation.anp_service.interaction.agent_api_call import agent_api_call_get
-from anp_open_sdk_framework.agent_adaptation.anp_service.interaction.anp_tool import ANPToolCrawler
+from anp_open_sdk_framework.adapter.anp_service.agent_api_call import agent_api_call_get
+from anp_open_sdk_framework.adapter.anp_service.anp_tool import ANPToolCrawler
 import logging
 logger = logging.getLogger(__name__)
-from anp_open_sdk_framework.anp_server import ANP_Server
+from anp_open_sdk_framework.server.anp_server import ANP_Server
 from anp_open_sdk.anp_user import ANPUser
 from anp_open_sdk.auth.auth_client import send_authenticated_request
-from anp_open_sdk_framework.agent_adaptation.local_service.local_methods_caller import LocalMethodsCaller
-from anp_open_sdk_framework.agent_adaptation.local_service.local_methods_doc import LocalMethodsDocGenerator
+from anp_open_sdk_framework.adapter.local_service.local_methods_caller import LocalMethodsCaller
+from anp_open_sdk_framework.adapter.local_service.local_methods_doc import LocalMethodsDocGenerator
 
 # 在初始化时创建调用器
 caller = None

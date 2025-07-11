@@ -24,12 +24,12 @@ logger.debug(f"Python版本: {sys.version}")
 logger.debug(f"工作目录: {sys.path[0]}")
 try:
     logger.debug("导入模块...")
-    from anp_open_sdk_demo.demo_modules.step_helper import DemoStepHelper
-    from anp_open_sdk_demo.demo_modules.agent_loader import DemoAgentLoader
-    from anp_open_sdk_demo.demo_modules.agent_batch_registry import DemoAgentRegistry
-    from anp_open_sdk_demo.demo_modules.demo_tasks import DemoTaskRunner
-    from anp_open_sdk_demo.services.dns_service import DemoDNSService
-    from anp_open_sdk_demo.services.sdk_manager import DemoSDKManager
+    from demo_anp_open_sdk.demo_modules.step_helper import DemoStepHelper
+    from demo_anp_open_sdk.demo_modules.agent_loader import DemoAgentLoader
+    from demo_anp_open_sdk.demo_modules.agent_batch_registry import DemoAgentRegistry
+    from demo_anp_open_sdk.demo_modules.demo_tasks import DemoTaskRunner
+    from demo_anp_open_sdk.services.dns_service import DemoDNSService
+    from demo_anp_open_sdk.services.sdk_manager import DemoSDKManager
 
     logger.debug("✓ 所有模块导入成功")
 except ImportError as e:

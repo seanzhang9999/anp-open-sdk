@@ -151,7 +151,7 @@ class AgentUserBindingManager:
         """为 agent 创建新的用户 DID"""
         try:
             # 导入必要的模块（延迟导入避免配置依赖）
-            from anp_open_sdk.did_tool import create_did_user
+            from anp_open_sdk.anp_user_tool import create_did_user
             import uuid
             
             # 生成用户ID

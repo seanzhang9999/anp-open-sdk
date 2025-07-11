@@ -14,7 +14,7 @@
 import inspect
 import logging
 
-from anp_open_sdk_framework.agent_adaptation.anp_service.router.router_did import url_did_format
+from anp_open_sdk_framework.server.router.router_did import url_did_format
 
 logger = logging.getLogger(__name__)
 

@@ -85,7 +85,7 @@ def setup_logging():
 
     # --- 配置控制台 Handler ---
     console_formatter = ColoredFormatter(
-        "%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s"
+        "%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - \n ------------------------------ %(message)s"
     )
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setFormatter(console_formatter)

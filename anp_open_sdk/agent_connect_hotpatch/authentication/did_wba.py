@@ -275,7 +275,7 @@ def generate_auth_header(
     Raises:
         ValueError: If the DID document format is invalid.
     """
-    logging.info("Starting to generate DID authentication header.")
+    logging.debug("Starting to generate DID authentication header.")
 
     # Validate DID document
     did = did_document.get('id')
@@ -295,7 +295,7 @@ def generate_auth_header(
     data_to_sign = {
         "nonce": nonce,
         "timestamp": timestamp,
-        "anp_service": service_domain,
+        "service": service_domain,
         "did": did
     }
 
@@ -320,7 +320,7 @@ def generate_auth_header(
         f'signature="{signature}"'
     )
 
-    logging.info("Successfully generated DID authentication header.")
+    logging.debug("Successfully generated DID authentication header.")
     logging.debug(f"Generated Authorization header: {auth_header}")
 
     return auth_header
@@ -715,7 +715,6 @@ def verify_auth_header_signature_two_way(
             - Message describing the verification result or error
     """
     #logger.debug("Starting DID authentication header verification")
-    
     try:
         # Extract auth header parts
         client_did, nonce, timestamp_str, resp_id, verification_method, signature = extract_auth_header_parts_two_way(auth_header)
@@ -828,6 +827,113 @@ def generate_auth_json(
     
     logger.debug("Successfully generated DID authentication JSON")
     return json.dumps(auth_json)
+
+
+def extract_auth_header_parts(auth_header: str) -> Tuple[str, str, str, str, str]:
+    """
+    Extract authentication information from the authorization header.
+
+    Args:
+        auth_header: Authorization header value without "Authorization:" prefix.
+
+    Returns:
+        Tuple[str, str, str, str, str]: A tuple containing:
+            - did: DID string
+            - nonce: Nonce value
+            - timestamp: Timestamp string
+            - verification_method: Verification method fragment
+            - signature: Signature value
+
+    Raises:
+        ValueError: If any required field is missing in the auth header
+    """
+    logging.debug(f"Extracting auth header parts from: {auth_header}")
+
+    required_fields = {
+        'did': r'(?i)did="([^"]+)"',
+        'nonce': r'(?i)nonce="([^"]+)"',
+        'timestamp': r'(?i)timestamp="([^"]+)"',
+        'verification_method': r'(?i)verification_method="([^"]+)"',
+        'signature': r'(?i)signature="([^"]+)"'
+    }
+
+    # Verify the header starts with DIDWba
+    if not auth_header.strip().startswith('DIDWba'):
+        raise ValueError("Authorization header must start with 'DIDWba'")
+
+    parts = {}
+    for field, pattern in required_fields.items():
+        match = re.search(pattern, auth_header)
+        if not match:
+            raise ValueError(f"Missing required field in auth header: {field}")
+        parts[field] = match.group(1)
+
+    logging.debug(f"Extracted auth header parts: {parts}")
+    return (parts['did'], parts['nonce'], parts['timestamp'],
+            parts['verification_method'], parts['signature'])
+
+
+def verify_auth_header_signature(
+        auth_header: str,
+        did_document: Dict,
+        service_domain: str
+) -> Tuple[bool, str]:
+    """
+    Verify the DID authentication header signature.
+
+    Args:
+        auth_header: Authorization header value without "Authorization:" prefix.
+        did_document: DID document dictionary.
+        service_domain: Server domain that should match the one used to generate the signature.
+
+    Returns:
+        Tuple[bool, str]: A tuple containing:
+            - Boolean indicating if verification was successful
+            - Message describing the verification result or error
+    """
+    logging.debug("Starting DID authentication header verification")
+
+    try:
+        # Extract auth header parts
+        client_did, nonce, timestamp_str, verification_method, signature = extract_auth_header_parts(auth_header)
+
+        # Verify DID (case-sensitive)
+        if did_document.get('id').lower() != client_did.lower():
+            return False, "DID mismatch"
+
+        # Construct data to verify
+        data_to_verify = {
+            "nonce": nonce,
+            "timestamp": timestamp_str,
+            "service": service_domain,
+            "did": client_did
+        }
+
+        canonical_json = jcs.canonicalize(data_to_verify)
+        content_hash = hashlib.sha256(canonical_json).digest()
+
+        verification_method_id = f"{client_did}#{verification_method}"
+        method_dict = _find_verification_method(did_document, verification_method_id)
+        if not method_dict:
+            return False, "Verification method not found"
+
+        try:
+            verifier = create_verification_method(method_dict)
+            if verifier.verify_signature(content_hash, signature):
+                return True, "Verification successful"
+            return False, "Signature verification failed"
+        except ValueError as e:
+            return False, f"Invalid or unsupported verification method: {str(e)}"
+        except Exception as e:
+            return False, f"Verification error: {str(e)}"
+
+    except ValueError as e:
+        logging.error(f"Error extracting auth header parts: {str(e)}")
+        return False, str(e)
+    except Exception as e:
+        logging.error(f"Error during verification process: {str(e)}")
+        return False, f"Verification process error: {str(e)}"
+
 
 def verify_auth_json_signature(
     auth_json: Union[str, Dict],

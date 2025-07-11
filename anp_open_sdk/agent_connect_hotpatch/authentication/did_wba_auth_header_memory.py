@@ -30,7 +30,7 @@ from cryptography.hazmat.primitives.asymmetric import ec
 logger = logging.getLogger(__name__)
 # Import agent_connect for DID authentication
 from .did_wba import (
-    generate_auth_header_two_way, generate_auth_header
+    generate_auth_header_two_way
 )
 
 class DIDWbaAuthHeaderMemory:
@@ -124,28 +124,28 @@ class DIDWbaAuthHeaderMemory:
         # If there is a token and not forcing a new authentication header, return the token
         if domain in self.tokens and not force_new:
             token = self.tokens[domain]
-            logging.info(f"Using existing token for domain {domain}")
+            logging.debug(f"Using existing token for domain {domain}")
             return {"Authorization": f"Bearer {token}"}
 
         # Otherwise, generate or use existing DID authentication header
         if domain not in self.auth_headers or force_new:
             self.auth_headers[domain] = self._generate_auth_header(domain)
 
-        logging.info(f"Using DID authentication header for domain {domain}")
+        logging.debug(f"Using DID authentication header for domain {domain}")
         return {"Authorization": self.auth_headers[domain]}
 
     def _generate_auth_header(self, domain: str) -> str:
         """Generate DID authentication header"""
         try:
             did_document = self.did_document
-
+            from anp_open_sdk.agent_connect_hotpatch.authentication.did_wba import generate_auth_header
             auth_header = generate_auth_header(
                 did_document,
                 domain,
                 self._sign_callback
             )
 
-            logging.info(f"Generated authentication header for domain {domain}: {auth_header[:30]}...")
+            logging.debug(f"Generated authentication header for domain {domain}: {auth_header[:30]}...")
             return auth_header
         except Exception as e:
             logging.error(f"Error generating authentication header: {e}")
@@ -234,6 +234,8 @@ class DIDWbaAuthHeaderMemory:
         """Clear all tokens for all domains"""
         self.tokens.clear()
         # logger.debug("Cleared all tokens for all domains")
+
+
 
 # # Example usage
 # async def example_usage():

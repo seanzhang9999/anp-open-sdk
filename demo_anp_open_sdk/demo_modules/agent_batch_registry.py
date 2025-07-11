@@ -8,7 +8,7 @@ from fastapi import Request
 import aiofiles
 
 
-from anp_open_sdk_framework.anp_server import ANPUser
+from anp_open_sdk_framework.server.anp_server import ANPUser
 
 
 class DemoAgentRegistry:

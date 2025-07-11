@@ -4,7 +4,7 @@ import logging
 from anp_open_sdk.anp_user import ANPUser
 
 logger = logging.getLogger(__name__)
-from anp_open_sdk_framework.anp_server import ANP_Server
+from anp_open_sdk_framework.server.anp_server import ANP_Server
 from anp_open_sdk.anp_sdk_user_data import LocalUserDataManager
 from anp_open_sdk.config import get_global_config
 

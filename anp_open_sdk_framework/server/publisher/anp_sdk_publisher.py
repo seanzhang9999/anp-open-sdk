@@ -7,8 +7,8 @@ from pathlib import Path
 from anp_open_sdk.anp_user import ANPUser, logger
 from anp_open_sdk.config import get_global_config
 from anp_open_sdk.utils.log_base import logging as logger
-from anp_open_sdk_framework.agent_adaptation.anp_service.publisher.anp_sdk_publisher_mail_backend import EnhancedMailManager
-from anp_open_sdk_framework.server.router.anp_server import logger
+from anp_open_sdk_framework.server.publisher.anp_sdk_publisher_mail_backend import EnhancedMailManager
+from anp_open_sdk_framework.server.anp_server import logger
 
 
 class DIDManager:
@@ -150,7 +150,7 @@ class DIDManager:
 
 async def register_hosted_did(agent:ANPUser):
     try:
-        from anp_open_sdk_framework.agent_adaptation.anp_service.publisher.anp_sdk_publisher_mail_backend import EnhancedMailManager
+        from anp_open_sdk_framework.server.publisher.anp_sdk_publisher_mail_backend import EnhancedMailManager
 
 
 
@@ -226,7 +226,7 @@ async def check_hosted_did(agent: ANPUser):
 
 
 async def check_did_host_request():
-    from anp_open_sdk_framework.agent_adaptation.anp_service.publisher.anp_sdk_publisher_mail_backend import \
+    from anp_open_sdk_framework.server.publisher.anp_sdk_publisher_mail_backend import \
         EnhancedMailManager
     try:
         config = get_global_config()

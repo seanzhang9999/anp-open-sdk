@@ -5,8 +5,8 @@ from typing import Dict, Any, Callable, List
 from datetime import datetime
 
 from anp_open_sdk.config import UnifiedConfig
-from anp_open_sdk_framework.agent_adaptation.anp_service.interaction.anp_sdk_group_member import GroupMemberSDK
-from anp_open_sdk_framework.agent_adaptation.anp_service.interaction.anp_sdk_group_runner import Message, MessageType
+from anp_open_sdk_framework.adapter.anp_service.anp_sdk_group_member import GroupMemberSDK
+from anp_open_sdk_framework.adapter.anp_service.anp_sdk_group_runner import Message, MessageType
 from anp_open_sdk.utils.log_base import logging as logger
 
 class GroupMemberWithStorage(GroupMemberSDK):
@@ -15,7 +15,7 @@ class GroupMemberWithStorage(GroupMemberSDK):
     def __init__(self, agent_id: str, port: int, base_url: str = "http://localhost",
                  use_local_optimization: bool = True,
                  enable_storage: bool = True,
-                 storage_dir: str = "anp_open_sdk_demo/data_tmp_result/member_messages"):
+                 storage_dir: str = "demo_anp_open_sdk/data_tmp_result/member_messages"):
         super().__init__(agent_id, port, base_url, use_local_optimization)
 
         self.enable_storage = enable_storage
@@ -295,7 +295,7 @@ class GroupMemberComplete(GroupMemberWithStorage):
     def __init__(self, agent_id: str, port: int, base_url: str = "http://localhost",
                  use_local_optimization: bool = True,
                  enable_storage: bool = True,
-                 storage_dir: str = "anp_open_sdk_demo/data_tmp_result/member_messages"):
+                 storage_dir: str = "demo_anp_open_sdk/data_tmp_result/member_messages"):
         super().__init__(agent_id, port, base_url, use_local_optimization, enable_storage, storage_dir)
 
         # 添加统计功能

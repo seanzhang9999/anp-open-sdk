@@ -3,7 +3,6 @@ import json
 import os
 import re
 import secrets
-import urllib.parse
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Dict, Optional, Any, Tuple
@@ -14,203 +13,21 @@ import yaml
 from Crypto.PublicKey import RSA
 from agent_connect.authentication import extract_auth_header_parts
 from aiohttp import ClientResponse
-from cryptography.hazmat.primitives import serialization, hashes
+from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec, rsa
-from cryptography.hazmat.primitives.serialization import load_pem_private_key
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
 
 from anp_open_sdk.agent_connect_hotpatch.authentication.did_wba_auth_header_memory import DIDWbaAuthHeaderMemory
 import logging
 
-from anp_open_sdk.anp_sdk_user_data import LocalUserData
+from anp_open_sdk.anp_sdk_user_data import LocalUserData, get_user_data_manager
 from anp_open_sdk.config import get_global_config, UnifiedConfig
 
 logger = logging.getLogger(__name__)
 
 
 
-
-
-def load_did_doc_from_path(did_document_path):
-    with open(did_document_path, 'r') as f:
-        did_document = json.load(f)
-    return did_document
-def load_private_key(private_key_path: str, password: Optional[bytes] = None):
-    """加载私钥"""
-    try:
-        with open(private_key_path, "rb") as f:
-            private_key_data = f.read()
-        return load_pem_private_key(private_key_data, password=password)
-    except Exception as e:
-        logger.error(f"加载私钥时出错: {str(e)}")
-        return None
-def get_jwt_private_key(key_path: str = None ) -> Optional[str]:
-    """
-    Get the JWT private key from a PEM file.
-    Args:
-        key_path: Path to the private key PEM file (default: from config)
-
-    Returns:
-        Optional[str]: The private key content as a string, or None if the file cannot be read
-    """
-
-    if not os.path.exists(key_path):
-        logger.debug(f"Private key file not found: {key_path}")
-        return None
-
-    try:
-        with open(key_path, "r") as f:
-            private_key = f.read()
-        logger.debug(f"读取到Token签名密钥文件{key_path}，准备签发Token")
-        return private_key
-    except Exception as e:
-        logger.debug(f"Error reading private key file: {e}")
-        return None
-def get_jwt_public_key(key_path: str = None) -> Optional[str]:
-    """
-    Get the JWT public key from a PEM file.
-
-    Args:
-        key_path: Path to the public key PEM file (default: from config)
-
-    Returns:
-        Optional[str]: The public key content as a string, or None if the file cannot be read
-    """
-    if not os.path.exists(key_path):
-        logger.debug(f"Public key file not found: {key_path}")
-        return None
-
-    try:
-        with open(key_path, "r") as f:
-            public_key = f.read()
-        logger.debug(f"Successfully read public key from {key_path}")
-        return public_key
-    except Exception as e:
-        logger.debug(f"Error reading public key file: {e}")
-        return None
-
-
-
-class AuthenticationContext(BaseModel):
-    """认证上下文"""
-    caller_did: str
-    target_did: str
-    request_url: str
-    method: str = "GET"
-    timestamp: Optional[datetime] = None
-    nonce: Optional[str] = None
-    custom_headers: Dict[str, str] = Field(default_factory=dict)
-    json_data: Optional[Dict[str, Any]] = None
-    use_two_way_auth: bool = True
-    domain: Optional[str] = None  # 新增 domain 字段
-def create_did_auth_header_from_user_data(user_data: 'LocalUserData') -> DIDWbaAuthHeaderMemory:
-    """
-    [新] 从内存中的 LocalUserData 对象创建 DIDWbaAuthHeaderMemory 实例。
-    """
-    if not user_data.did_document or not user_data.did_private_key:
-        raise ValueError("User data is missing DID document or private key in memory.")
-    return DIDWbaAuthHeaderMemory(
-        user_data.did_document,
-        user_data.did_private_key
-    )
-def verify_timestamp(timestamp_str: str) -> bool:
-    """
-    Verify if a timestamp is within the valid period.
-
-    Args:
-        timestamp_str: ISO format timestamp string
-
-    Returns:
-        bool: Whether the timestamp is valid
-    """
-    try:
-        # Parse the timestamp string
-        request_time = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
-
-        # Get current time
-        current_time = datetime.now(timezone.utc)
-
-        # Calculate time difference
-        time_diff = abs((current_time - request_time).total_seconds() / 60)
-        config = get_global_config()
-        nonce_expire_minutes = config.anp_sdk.nonce_expire_minutes
-        # Verify timestamp is within valid period
-        if time_diff > nonce_expire_minutes:
-            logger.debug(f"Timestamp expired. Current time: {current_time}, Request time: {request_time}, Difference: {time_diff} minutes")
-            return False
-
-        return True
-
-    except ValueError as e:
-        logger.debug(f"Invalid timestamp format: {e}")
-        return False
-    except Exception as e:
-        logger.debug(f"Error verifying timestamp: {e}")
-        return False
-def extract_did_from_auth_header(auth_header: str) -> Tuple[Optional[str], Optional[str]]:
-    """
-    支持两路和标准认证头的 DID 提取
-    """
-    try:
-        # 优先尝试两路认证
-        from anp_open_sdk.agent_connect_hotpatch.authentication.did_wba import extract_auth_header_parts_two_way
-        parts = extract_auth_header_parts_two_way(auth_header)
-        if parts and len(parts) == 6:
-            did, nonce, timestamp, resp_did, keyid, signature = parts
-            return did, resp_did
-    except Exception:
-        pass
-
-    try:
-        # 回退到标准认证
-        parts = extract_auth_header_parts(auth_header)
-        if parts and len(parts) >= 4:
-            did, nonce, timestamp, keyid, signature = parts
-            return did, None
-    except Exception:
-        pass
-
-    return None, None
-
-
-
-
-
-
-def parse_wba_did_host_port(did: str) -> Tuple[Optional[str], Optional[int]]:
-    """
-    从 did:wba:host%3Aport:xxxx / did:wba:host:port:xxxx / did:wba:host:xxxx
-    解析 host 和 port
-    """
-    m = re.match(r"did:wba:([^%:]+)%3A(\d+):", did)
-    if m:
-        return m.group(1), int(m.group(2))
-    m = re.match(r"did:wba:([^:]+):(\d+):", did)
-    if m:
-        return m.group(1), int(m.group(2))
-    m = re.match(r"did:wba:([^:]+):", did)
-    if m:
-        return m.group(1), 80
-    return None, None
-def find_user_by_did(did):
-    config=get_global_config()
-
-    user_dirs = config.anp_sdk.user_did_path
-    for user_dir in os.listdir(user_dirs):
-        did_path = os.path.join(user_dirs, user_dir, "did_document.json")
-        if os.path.exists(did_path):
-            try:
-                with open(did_path, 'r', encoding='utf-8') as f:
-                    did_dict = json.load(f)
-                    if did_dict.get('id') == did:
-                        logger.debug(f"已加载用户 {user_dir} 的 DID 文档")
-                        return True, did_dict, user_dir
-            except Exception as e:
-                logger.error(f"读取DID文档 {did_path} 出错: {e}")
-                continue
-    logger.error(f"未找到DID为 {did} 的用户文档")
-    return False, None, None
 def create_did_user(user_iput: dict, *, did_hex: bool = True, did_check_unique: bool = True):
     from agent_connect.authentication.did_wba import create_did_wba_document
     import json
@@ -349,21 +166,143 @@ def create_did_user(user_iput: dict, *, did_hex: bool = True, did_check_unique: 
 
 
     return did_document
+
+
+
+
+
+
+class AuthenticationContext(BaseModel):
+    """认证上下文"""
+    caller_did: str
+    target_did: str
+    request_url: str
+    method: str = "GET"
+    timestamp: Optional[datetime] = None
+    nonce: Optional[str] = None
+    custom_headers: Dict[str, str] = Field(default_factory=dict)
+    json_data: Optional[Dict[str, Any]] = None
+    use_two_way_auth: bool = True
+    domain: Optional[str] = None  # 新增 domain 字段
+def create_did_auth_header_from_user_data(user_data: 'LocalUserData') -> DIDWbaAuthHeaderMemory:
+    """
+    [新] 从内存中的 LocalUserData 对象创建 DIDWbaAuthHeaderMemory 实例。
+    """
+    if not user_data.did_document or not user_data.did_private_key:
+        raise ValueError("User data is missing DID document or private key in memory.")
+    return DIDWbaAuthHeaderMemory(
+        user_data.did_document,
+        user_data.did_private_key
+    )
+
+
+def verify_timestamp(timestamp_str: str) -> tuple[bool, str]:
+    """
+    Verify if a timestamp is within the valid period.
+
+    Args:
+        timestamp_str: ISO format timestamp string
+
+    Returns:
+        tuple[bool, str]: (is_valid, error_message)
+    """
+    try:
+        # Parse the timestamp string
+        request_time = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+        # Get current time
+        current_time = datetime.now(timezone.utc)
+        # Calculate time difference
+        time_diff = abs((current_time - request_time).total_seconds() / 60)
+
+        config = get_global_config()
+        nonce_expire_minutes = config.anp_sdk.nonce_expire_minutes
+
+        # Verify timestamp is within valid period
+        if time_diff > nonce_expire_minutes:
+            error_msg = f"Timestamp expired. Current time: {current_time}, Request time: {request_time}, Difference: {time_diff} minutes"
+            logger.debug(error_msg)
+            return False, error_msg
+
+        logger.debug(f"_verify_wba_header -- Timestamp passed: {time_diff} less {nonce_expire_minutes}")
+        return True, ""
+
+    except ValueError as e:
+        error_msg = f"Invalid timestamp format: {e}"
+        logger.debug(error_msg)
+        return False, error_msg
+    except Exception as e:
+        error_msg = f"Error verifying timestamp: {e}"
+        logger.debug(error_msg)
+        return False, error_msg
+def extract_did_from_auth_header(auth_header: str) -> Tuple[Optional[str], Optional[str]]:
+    """
+    支持两路和标准认证头的 DID 提取
+    """
+    try:
+        # 优先尝试两路认证
+        from anp_open_sdk.agent_connect_hotpatch.authentication.did_wba import extract_auth_header_parts_two_way
+        parts = extract_auth_header_parts_two_way(auth_header)
+        if parts and len(parts) == 6:
+            did, nonce, timestamp, resp_did, keyid, signature = parts
+            return did, resp_did
+    except Exception:
+        pass
+
+    try:
+        # 回退到标准认证
+        parts = extract_auth_header_parts(auth_header)
+        if parts and len(parts) >= 4:
+            did, nonce, timestamp, keyid, signature = parts
+            return did, None
+    except Exception:
+        pass
+
+    return None, None
+
+
+
+
+
+
+def parse_wba_did_host_port(did: str) -> Tuple[Optional[str], Optional[int]]:
+    """
+    从 did:wba:host%3Aport:xxxx / did:wba:host:port:xxxx / did:wba:host:xxxx
+    解析 host 和 port
+    """
+    m = re.match(r"did:wba:([^%:]+)%3A(\d+):", did)
+    if m:
+        return m.group(1), int(m.group(2))
+    m = re.match(r"did:wba:([^:]+):(\d+):", did)
+    if m:
+        return m.group(1), int(m.group(2))
+    m = re.match(r"did:wba:([^:]+):", did)
+    if m:
+        return m.group(1), 80
+    return None, None
+def find_user_by_did(did):
+    manager = get_user_data_manager()
+    user_data = manager.get_user_data(did)
+
+    if user_data:
+        logger.debug(f"从内存中找到用户 {user_data.name} 的数据 (DID: {did})")
+        return True, user_data.did_document, user_data.folder_name
+    else:
+        logger.error(f"未在内存中找到DID为 {did} 的用户数据")
+        return False, None, None
 def get_agent_cfg_by_user_dir(user_dir: str) -> dict:
-    import os
-    import yaml
-    config=get_global_config()
+    manager = get_user_data_manager()
+    all_users = manager.get_all_users()
 
-    did_path = Path(config.anp_sdk.user_did_path)
-    did_path = did_path.joinpath(user_dir, "agent_cfg.yaml")
-    cfg_path = Path(UnifiedConfig.resolve_path(did_path.as_posix()))
-    if not os.path.isfile(cfg_path):
-        raise FileNotFoundError(f"agent_cfg.yaml not found in {user_dir}")
-    with open(cfg_path, "r", encoding="utf-8") as f:
-        cfg = yaml.safe_load(f)
-    return cfg
+    for user_data in all_users:
+        if user_data.folder_name == user_dir:
+            if user_data.agent_cfg:
+                return user_data.agent_cfg
+            else:
+                # 这种情况理论上不应发生，因为加载时总会有 cfg
+                raise ValueError(f"User {user_dir} found in memory but has no agent_cfg.")
 
-
+    # 保持与原函数相同的错误类型，以确保兼容性
+    raise FileNotFoundError(f"agent_cfg.yaml not found for user_dir {user_dir} in memory cache")
 
 
 
@@ -568,6 +507,18 @@ def verify_jwt(token: str, public_key: str) -> dict:
 async def response_to_dict(response: Any) -> Dict:
     if isinstance(response, dict):
         return response
+    elif isinstance(response, str):
+        # 新增：处理字符串响应
+        try:
+            # 尝试解析为 JSON
+            return json.loads(response)
+        except json.JSONDecodeError:
+            # 不是 JSON，返回包装后的字符串
+            return {
+                "type": "text",
+                "content": response,
+                "format": "string"
+            }
     elif isinstance(response, ClientResponse):
         try:
             if response.status >= 400:
@@ -590,5 +541,15 @@ async def response_to_dict(response: Any) -> Dict:
             return {"error": str(e)}
     else:
         logger.error(f"未知响应类型: {type(response)}")
-        return {"error": f"未知类型: {type(response)}"}
+        # 尝试将未知类型转换为字符串
+        try:
+            return {
+                "type": "unknown",
+                "content": str(response),
+                "original_type": str(type(response))
+            }
+        except Exception as e:
+            return {"error": f"无法处理的类型: {type(response)}", "exception": str(e)}
+
+
 

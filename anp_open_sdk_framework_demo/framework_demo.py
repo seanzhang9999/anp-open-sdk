@@ -4,17 +4,17 @@ import sys
 import asyncio
 import threading
 
-from anp_open_sdk_framework.server_mode import ServerMode
+from anp_open_sdk_framework.server.server_mode import ServerMode
 
 from anp_open_sdk.config import UnifiedConfig, set_global_config, get_global_config
 from anp_open_sdk.utils.log_base import setup_logging
-from anp_open_sdk_framework.anp_server import ANP_Server
+from anp_open_sdk_framework.server.anp_server import ANP_Server
 
 import logging
 
-from anp_open_sdk_framework.agent_adaptation.agent_manager import LocalAgentManager
+from anp_open_sdk_framework.adapter.agent_manager import LocalAgentManager
 
-from anp_open_sdk_framework.agent_adaptation.local_service.local_methods_doc import LocalMethodsDocGenerator
+from anp_open_sdk_framework.adapter.local_service.local_methods_doc import LocalMethodsDocGenerator
 
 app_config = UnifiedConfig(config_file='anp_open_sdk_framework_demo_agent_unified_config.yaml')
 set_global_config(app_config)

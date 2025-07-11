@@ -7,7 +7,7 @@ from typing import Dict, Any, Callable, List
 
 import aiohttp
 
-from anp_open_sdk_framework.agent_adaptation.anp_service.interaction.anp_sdk_group_runner import Message, MessageType
+from anp_open_sdk_framework.adapter.anp_service.anp_sdk_group_runner import Message, MessageType
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +35,7 @@ class GroupMemberSDK:
             # 本地优化路径
             runner = self._local_sdk.get_group_runner(group_id)
             if runner:
-                from anp_open_sdk_framework.agent_adaptation.anp_service.interaction.anp_sdk_group_runner import Agent
+                from anp_open_sdk_framework.adapter.anp_service.anp_sdk_group_runner import Agent
                 agent = Agent(
                     id=self.agent_id,
                     name=name or self.agent_id,

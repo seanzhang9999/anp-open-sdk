@@ -27,13 +27,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
 from anp_open_sdk.anp_user import ANPUser
-from anp_open_sdk.anp_sdk_user_data import LocalUserDataManager, get_user_data_manager
-from anp_open_sdk.auth.auth_server import auth_middleware
+from anp_open_sdk.anp_sdk_user_data import get_user_data_manager
+from anp_open_sdk_framework.server.anp_server_auth_middleware import auth_middleware
 from anp_open_sdk.config import get_global_config
-from anp_open_sdk_framework.server_mode import ServerMode
-from anp_open_sdk_framework.agent_adaptation.anp_service.interaction.anp_sdk_group_runner import GroupManager, GroupRunner, Message, MessageType, Agent
-from anp_open_sdk_framework.agent_adaptation.anp_service.router import router_did
-from anp_open_sdk_framework.agent_adaptation.anp_service.router import router_auth, router_publisher
+from anp_open_sdk_framework.server.server_mode import ServerMode
+from anp_open_sdk_framework.adapter.anp_service.anp_sdk_group_runner import GroupManager, GroupRunner, Message, MessageType, Agent
+from anp_open_sdk_framework.server.router import router_did
+from anp_open_sdk_framework.server.router import router_auth, router_publisher
 
 logger = logging.getLogger(__name__)
 
@@ -109,7 +109,7 @@ class ANP_Server:
         async def auth_middleware_wrapper(request, call_next):
             return await auth_middleware(request, call_next)
 
-        from anp_open_sdk_framework.agent_adaptation.anp_service.router.router_agent import AgentRouter
+        from anp_open_sdk_framework.server.router.router_agent import AgentRouter
         self.router = AgentRouter()
         if mode == ServerMode.MULTI_AGENT_ROUTER:
             for agent in self.agents:

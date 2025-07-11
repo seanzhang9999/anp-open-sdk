@@ -3,7 +3,7 @@ import os
 import json
 from dotenv import load_dotenv
 
-from anp_open_sdk_framework.agent_adaptation.anp_service.publisher.anp_sdk_publisher import register_hosted_did, \
+from anp_open_sdk_framework.server.publisher.anp_sdk_publisher import register_hosted_did, \
     check_hosted_did, check_did_host_request
 from anp_open_sdk.config import UnifiedConfig
 
@@ -16,20 +16,20 @@ import requests
 import aiofiles
 from anp_open_sdk.utils.log_base import  logging as logger
 
-from anp_open_sdk_framework.anp_server import ANP_Server, ANPUser
-from anp_open_sdk_framework.agent_adaptation.anp_service.interaction.agent_api_call import agent_api_call_post, agent_api_call_get
-from anp_open_sdk_framework.agent_adaptation.anp_service.interaction.agent_message_p2p import agent_msg_post
-from anp_open_sdk_framework.agent_adaptation.anp_service.interaction.anp_tool import ANPTool
+from anp_open_sdk_framework.server.anp_server import ANP_Server, ANPUser
+from anp_open_sdk_framework.adapter.anp_service.agent_api_call import agent_api_call_post, agent_api_call_get
+from anp_open_sdk_framework.adapter.anp_service.agent_message_p2p import agent_msg_post
+from anp_open_sdk_framework.adapter.anp_service.anp_tool import ANPTool
 from .step_helper import DemoStepHelper
 
 
 
-from anp_open_sdk_demo.demo_modules.customized_group_member import (
+from demo_anp_open_sdk.demo_modules.customized_group_member import (
     GroupMemberWithStorage,
     GroupMemberWithStats,
     GroupMemberComplete
 )
-from anp_open_sdk_demo.demo_modules.customized_group_runner import (
+from demo_anp_open_sdk.demo_modules.customized_group_runner import (
     ChatRoomRunnerWithLogging,
     ModeratedChatRunnerWithLogging
 )
@@ -518,7 +518,7 @@ class DemoTaskRunner:
         self.step_helper.pause(f"启动{agent_name}智能爬取: {initial_url}")
         
         # 引入必要的依赖
-        from anp_open_sdk_framework.agent_adaptation.anp_service.interaction.anp_tool import ANPTool
+        from anp_open_sdk_framework.adapter.anp_service.anp_tool import ANPTool
         
         # 初始化变量
         visited_urls = set()
@@ -902,8 +902,8 @@ class DemoTaskRunner:
             logger.debug("\n📋 显示群组运行日志:")
             logger.debug("-" * 40)
             group_log_files = [
-                UnifiedConfig.resolve_path("anp_open_sdk_demo/data_tmp_result/group_logs/sample_group_messages.json"),
-                UnifiedConfig.resolve_path("anp_open_sdk_demo/data_tmp_result/group_logs/moderated_group_messages.json")
+                UnifiedConfig.resolve_path("demo_anp_open_sdk/data_tmp_result/group_logs/sample_group_messages.json"),
+                UnifiedConfig.resolve_path("demo_anp_open_sdk/data_tmp_result/group_logs/moderated_group_messages.json")
             ]
             for group_name, log_file in zip(["普通群聊", "审核群聊"], group_log_files):
                 await self._show_group_logs(group_name, log_file)
@@ -926,7 +926,7 @@ class DemoTaskRunner:
 
             for agent, agent_prefix, agent_type in storage_agents:
                 if agent_type in ["GroupMemberWithStorage", "GroupMemberComplete"]:
-                    message_file = UnifiedConfig.resolve_path(f"anp_open_sdk_demo/data_tmp_result/member_messages/{agent_prefix}_group_messages.json")
+                    message_file = UnifiedConfig.resolve_path(f"demo_anp_open_sdk/data_tmp_result/member_messages/{agent_prefix}_group_messages.json")
                     await self._show_received_group_messages(agent.name, message_file)
                 else:
                     logger.debug(f"\n📨 {agent.name}: 使用的是 {agent_type} 类，不具备存储功能")
@@ -969,7 +969,7 @@ class DemoTaskRunner:
         
         try:
             # 获取demo_data目录路径
-            demo_data_path = UnifiedConfig.resolve_path("anp_open_sdk_demo/data_tmp_result")
+            demo_data_path = UnifiedConfig.resolve_path("demo_anp_open_sdk/data_tmp_result")
             if not os.path.exists(demo_data_path):
                 logger.warning(f"demo_data目录不存在: {demo_data_path}")
                 return

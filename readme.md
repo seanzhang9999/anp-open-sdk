@@ -63,7 +63,7 @@ pip install agent-connect
 
 ```bash
 python test/test_anpsdk_all.py
-python anp_open_sdk_demo/anp_demo_main.py
+python demo_anp_open_sdk/anp_demo_main.py
 ```
 
 ### 4. 体验完整的智能体网络

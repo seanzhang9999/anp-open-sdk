@@ -6,10 +6,10 @@ from typing import Dict, Optional, Tuple
 from ..core.config import USERS_CREDENTIALS_FILE, get_anp_user_base_path
 from ..models.schemas import UserCreate
 from anp_open_sdk.anp_sdk_user_data import (
-    LocalUserDataManager)
-from anp_open_sdk.did_tool import find_user_by_did, create_did_user
+    LocalUserDataManager, get_user_data_manager)
+from anp_open_sdk.anp_user_tool import find_user_by_did, create_did_user
 
-USER_DATA_MANAGER = LocalUserDataManager(user_dir=str(get_anp_user_base_path()))
+USER_DATA_MANAGER = get_user_data_manager()
 
 def load_user_credentials() -> Dict:
     if not USERS_CREDENTIALS_FILE.exists():
@@ -55,7 +55,6 @@ def create_user_with_anp(user_data: UserCreate) -> Tuple[Optional[str], Optional
         }
         save_user_credentials(credentials)
 
-        USER_DATA_MANAGER.load_users()
 
         user_data_obj = USER_DATA_MANAGER.get_user_data(user_did)
         if not user_data_obj:

@@ -6,10 +6,10 @@ from agent_connect.authentication import resolve_did_wba_document
 
 from ..agent_connect_hotpatch.authentication.did_wba import extract_auth_header_parts_two_way, \
     verify_auth_header_signature_two_way
-from ..anp_sdk_user_data import LocalUserDataManager
+from ..anp_sdk_user_data import LocalUserDataManager, get_user_data_manager
 
-from ..did_tool import AuthenticationContext,  verify_timestamp, \
-    create_did_auth_header_from_path
+from ..anp_user_tool import AuthenticationContext, verify_timestamp, \
+     create_did_auth_header_from_user_data
 
 logger = logging.getLogger(__name__)
 
@@ -53,12 +53,16 @@ async def send_authenticated_request(
             else:
                 return status, response_data, "token认证请求", status == 200
     """
-    return await _execute_wba_auth_flow(
+    status, response, info, is_auth_pass = await _execute_wba_auth_flow(
         caller_agent,target_agent,request_url,
         method,json_data,
         custom_headers,
         use_two_way_auth
     )
+    logger.info(f"request:{request_url} \n status: {status}, info: {info},auth_status {is_auth_pass},\n{response},")
+
+    return  status, response, info, is_auth_pass
+
 
 
 
@@ -86,56 +90,69 @@ async def _execute_wba_auth_flow(
             status_code, response_auth_header, response_data = await _send_wba_http_request(
                 context
             )
-            if status_code != 401 and status_code != 403:
+            if status_code == 200:
                 auth_value, token = _parse_token_from_response(response_auth_header)
                 if token:
-                    if auth_value != "单向认证":
-                        response_auth_header = json.loads(response_auth_header.get("Authorization"))
-                        response_auth_header = response_auth_header[0].get("resp_did_auth_header")
-                        response_auth_header = response_auth_header.get("Authorization")
-                        if not await _verify_response_auth_header(response_auth_header):
-                            message = f"接收方DID认证头验证失败! 状态: {status_code}\n响应: {response_data}"
-                            return status_code, response_data, message, False
-                        caller_agent.contact_manager.store_token_from_remote(context.target_did, token)
-                        message = f"DID双向认证成功! 已保存 {context.target_did} 颁发的token:{token}"
-                        return status_code, response_data, message, True
-                    else:
+                    if auth_value == "单向认证":
                         caller_agent.contact_manager.store_token_from_remote(context.target_did, token)
                         message = f"单向认证成功! 已保存 {context.target_did} 颁发的token:{token}"
                         return status_code, response_data, message, True
+                    else:
+                        message = f"返回200，但是token单向认证失败，可能是其他认证token，认证失败"
+                        return status_code, response_data, message, False
                 else:
-                    message = "无token，可能是无认证页面或第一代协议"
+                    message = "返回200，没有token，可能是无认证页面"
                     return status_code, response_data, message, True
+            elif status_code == 401 or status_code == 403:
+                message = "双向和单向认证均返回401/403，认证失败"
+                return status_code, response_data , message, False
             else:
-                message = "401错误，认证失败"
-                return 401, '', message, False
+                auth_value, token = _parse_token_from_response(response_auth_header)
+                if token:
+                    if auth_value == "单向认证":
+                        caller_agent.contact_manager.store_token_from_remote(context.target_did, token)
+                        message = f"未返回200，但是单向认证成功!可能有逻辑层错误，已保存 {context.target_did} 颁发的token:{token}"
+                        return status_code, response_data, message, True
+                    else:
+                        message = f"未返回200，未返回401/403，token单向认证失败，可能是其他认证token，认证失败"
+                        return status_code, response_data, message, False
+                else:
+                    message = " 未返回200，未返回401/403，没有token，可能是其他错误"
+                    return status_code, response_data, message, True
         else:
-            if status_code != 401 and status_code != 403:
+            if status_code == 200:
                 auth_value, token = _parse_token_from_response(response_auth_header)
                 if token:
-                    if auth_value != "单向认证":
-                        response_auth_header = json.loads(response_auth_header.get("Authorization"))
-                        response_auth_header = response_auth_header[0].get("resp_did_auth_header")
-                        response_auth_header = response_auth_header.get("Authorization")
-                        if not await _verify_response_auth_header(response_auth_header):
-                            message = f"接收方DID认证头验证失败! 状态: {status_code}\n响应: {response_data}"
-                            return status_code, response_data, message, False
+                    response_auth_header = json.loads(response_auth_header.get("Authorization"))
+                    response_auth_header = response_auth_header[0].get("resp_did_auth_header")
+                    response_auth_header = response_auth_header.get("Authorization")
+                    if await _verify_response_auth_header(response_auth_header):
                         caller_agent.contact_manager.store_token_from_remote(context.target_did, token)
-                        message = f"DID双向认证成功! 已保存 {context.target_did} 颁发的token:{token}"
+                        message = f"DID双向认证成功! 已保存 {context.target_did} 颁发的token"
                         return status_code, response_data, message, True
                     else:
-                        caller_agent.contact_manager.store_token_from_remote(context.target_did, token)
-                        message = f"单向认证成功! 已保存 {context.target_did} 颁发的token:{token}"
-                        return status_code, response_data, message, True
+                        message = f"返回200，返回token，但是resp_did返回认证验证失败! 状态: {status_code}\n响应: {response_data}"
+                        return status_code, response_data, message, False
                 else:
-                    message = "无token，可能是无认证页面或第一代协议"
+                    message = f"返回200，无token，可能是无认证页面 状态: {status_code}\n响应: {response_data}"
                     return status_code, response_data, message, True
             else:
-                message = "401错误，认证失败"
-                return 401, '', message, False
+                auth_value, token = _parse_token_from_response(response_auth_header)
+                if token:
+                    if await _verify_response_auth_header(response_auth_header):
+                        caller_agent.contact_manager.store_token_from_remote(context.target_did, token)
+                        message = f"未返回200，未返回401/403，但是DID双向认证成功! 应该是逻辑层有错误，已保存 {context.target_did} 颁发的token:{token}"
+                        return status_code, response_data, message, True
+                    else:
+                        message = f"未返回200，未返回401/403，resp_did返回认证验证失败! 状态: {status_code}\n响应: {response_data}"
+                        return status_code, response_data, message, False
+                else:
+                    message = f"未返回200，未返回401/403，未返回token，应有其他错误！ 状态: {status_code}\n响应: {response_data}"
+                    return status_code, response_data, message, False
+
     except Exception as e:
         logger.error(f"认证过程中发生错误: {e}")
-        return 500, '', f"认证错误: {str(e)}", False
+        return 500, '', f"请求中发生错误: {str(e)}", False
 
 
 async def _send_request_with_token(target_url: str, token: str, sender_did: str, targeter_did: string, method: str = "GET",
@@ -187,11 +204,29 @@ def _parse_token_from_response(response_header: Dict) -> Tuple[Optional[str], Op
     """
     if "Authorization" in response_header:
         auth_value = response_header["Authorization"]
-        if isinstance(auth_value, str) and auth_value.startswith('Bearer '):
-                token = auth_value[7:]  # Extract token after 'Bearer '
+        import re
+        if isinstance(auth_value, str):
+            match = re.match(r'^bearer\s+(.+)$', auth_value, re.IGNORECASE)
+            if match:
+                token = match.group(1)
                 logger.debug("获得单向认证令牌，兼容无双向认证的服务")
                 return "单向认证", token
-        # If Authorization is a dict, execute existing logic
+            else :
+                try:
+                    auth_value = response_header.get("Authorization")
+                    auth_value = json.loads(auth_value)
+                    token = auth_value[0].get("access_token")
+                    did_auth_header = auth_value[0].get("resp_did_auth_header", {}).get("Authorization")
+                    if did_auth_header and token:
+                        logger.debug("令牌包含双向认证信息，进行双向校验")
+                        return "双向认证", token
+                    else:
+                        logger.error(f"[错误] 解析失败，缺少必要字段{auth_value}")
+                        return "AuthDict无法识别", None
+                except Exception as e:
+                    logger.error(f"[错误] 处理 Authorization 字典时出错:{e} ")
+                    return "不是AuthDict", None
+                return "不识别的AuthToken", None
         else:
             try:
                 auth_value =  response_header.get("Authorization")
@@ -203,13 +238,13 @@ def _parse_token_from_response(response_header: Dict) -> Tuple[Optional[str], Op
                     return "双向认证", token
                 else:
                     logger.error("[错误] 解析失败，缺少必要字段" + str(auth_value))
-                    return None, None
+                    return "AuthDict无法识别", None
             except Exception as e:
                 logger.error("[错误] 处理 Authorization 字典时出错: " + str(e))
-                return None, None
+                return "不是AuthDict", None
     else:
         logger.debug("response_header不包含'Authorization',无需处理令牌")
-        return None, None
+        return "没有Auth头", None
 
 
 async def _verify_response_auth_header(auth_value: str) -> bool:
@@ -235,9 +270,10 @@ async def _verify_response_auth_header(auth_value: str) -> bool:
     did, nonce, timestamp, resp_did, keyid, signature = header_parts
     logger.debug(f"用 {did}的{keyid}检验")
 
-    if not verify_timestamp(timestamp):
-        logger.error("Timestamp expired or invalid")
+    is_valid, error_msg = verify_timestamp(timestamp)
+    if not is_valid:
         return False
+
 
     # 尝试使用自定义解析器解析DID文档
     did_document = await _resolve_did_document_insecurely(did)
@@ -257,13 +293,14 @@ async def _verify_response_auth_header(auth_value: str) -> bool:
     try:
         # 重新构造完整的授权头
         full_auth_header = auth_value
-        target_url = "virtual.WBAback" # 迁就现在的url parse代码
+        # 用固定值测试返回认证，本地没有做http过滤逻辑，直接写即可
+        service_domain =  "virtual.WBAback"
 
         # 调用验证函数
         is_valid, message = verify_auth_header_signature_two_way(
             auth_header=full_auth_header,
             did_document=did_document,
-            service_domain=target_url
+            service_domain=service_domain
         )
 
         logger.debug(f"签名验证结果: {is_valid}, 消息: {message}")
@@ -362,7 +399,6 @@ async def _resolve_did_document_insecurely(did: str) -> Optional[Dict]:
 
         http_url = f"http://{hostname}/wba/{user_dir}/{user_id}/did.json"
 
-
         # 这里使用异步HTTP请求
         async with aiohttp.ClientSession() as session:
             async with session.get(http_url, ssl=False) as response:
@@ -373,28 +409,28 @@ async def _resolve_did_document_insecurely(did: str) -> Optional[Dict]:
                 else:
                     logger.debug(f"did本地解析器地址{http_url}获取失败，状态码: {response.status}")
                     return None
-
     except Exception as e:
         logger.debug(f"解析DID文档时出错: {e}")
         return None
 
 
 def _build_wba_auth_header(context):
-    user_data_manager = LocalUserDataManager()
+    user_data_manager = get_user_data_manager()
     user_data = user_data_manager.get_user_data(context.caller_did)
-    did_document_path = user_data.did_doc_path
-    private_key_path =user_data.did_private_key_file_path
+    if not user_data:
+        raise ValueError(f"Could not find user data for DID: {context.caller_did}")
 
-    auth_header = create_did_auth_header_from_path(did_document_path, private_key_path)
+    # 临时回退到文件路径方式进行调试
+    auth_header_builder = create_did_auth_header_from_user_data(user_data)
 
     if context.use_two_way_auth:
         # 双向认证
-        auth_headers = auth_header.get_auth_header_two_way(
+        auth_headers = auth_header_builder.get_auth_header_two_way(
             context.request_url, context.target_did
         )
     else:
         # 单向/降级认证
-        auth_headers = auth_header.get_auth_header(
+        auth_headers = auth_header_builder.get_auth_header(
             context.request_url
         )
     return auth_headers

@@ -2,7 +2,7 @@
 """
 ANP SDK Demo 自动化集成测试
 
-本脚本自动化测试 anp_open_sdk_demo 的主要演示功能，确保各主要流程可正常跑通。
+本脚本自动化测试 demo_anp_open_sdk 的主要演示功能，确保各主要流程可正常跑通。
 """
 
 import sys
@@ -23,12 +23,12 @@ logger = logging.getLogger(__name__)
 # 添加项目路径
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from anp_open_sdk_demo.demo_modules.step_helper import DemoStepHelper
-from anp_open_sdk_demo.demo_modules.agent_loader import DemoAgentLoader
-from anp_open_sdk_demo.demo_modules.agent_batch_registry import DemoAgentRegistry
-from anp_open_sdk_demo.demo_modules.demo_tasks import DemoTaskRunner
-from anp_open_sdk_demo.services.dns_service import DemoDNSService
-from anp_open_sdk_demo.services.sdk_manager import DemoSDKManager
+from demo_anp_open_sdk.demo_modules.step_helper import DemoStepHelper
+from demo_anp_open_sdk.demo_modules.agent_loader import DemoAgentLoader
+from demo_anp_open_sdk.demo_modules.agent_batch_registry import DemoAgentRegistry
+from demo_anp_open_sdk.demo_modules.demo_tasks import DemoTaskRunner
+from demo_anp_open_sdk.services.dns_service import DemoDNSService
+from demo_anp_open_sdk.services.sdk_manager import DemoSDKManager
 
 def setup_demo_env():
     """初始化演示环境，返回 DemoTaskRunner 和 agent 列表"""

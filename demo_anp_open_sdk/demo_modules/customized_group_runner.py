@@ -5,7 +5,7 @@ from typing import Dict, Any
 from datetime import datetime
 
 from anp_open_sdk.config import UnifiedConfig
-from anp_open_sdk_framework.agent_adaptation.anp_service.interaction.anp_sdk_group_runner import GroupRunner, Message, MessageType, Agent
+from anp_open_sdk_framework.adapter.anp_service.anp_sdk_group_runner import GroupRunner, Message, MessageType, Agent
 from anp_open_sdk.utils.log_base import logging  as logger
 
 
@@ -14,7 +14,7 @@ class FileLoggingGroupRunner(GroupRunner):
 
     def __init__(self, group_id: str):
         super().__init__(group_id)
-        self.log_dir = UnifiedConfig.resolve_path("anp_open_sdk_demo/data_tmp_result/group_logs")
+        self.log_dir = UnifiedConfig.resolve_path("demo_anp_open_sdk/data_tmp_result/group_logs")
         os.makedirs(self.log_dir, exist_ok=True)
         logger.debug(f"🗂️ 群组日志目录已创建: {self.log_dir}")  # 添加调试信息
 
