@@ -13,11 +13,11 @@
 # limitations under the License.
 
 """
-DID格式管理模块
+域名管理模块
 
-提供DID格式化、解析和验证功能
+提供多域名支持和路由功能
 """
 
-from .did_format_manager import DidFormatManager, get_did_format_manager
+from .domain_manager import DomainManager, get_domain_manager
 
-__all__ = ['DidFormatManager', 'get_did_format_manager']
+__all__ = ['DomainManager', 'get_domain_manager']

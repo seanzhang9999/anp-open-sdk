@@ -152,6 +152,46 @@ class SecretsConfig(Protocol):
     database_url: Optional[str]
 
 
+class DidUserTypeConfig(Protocol):
+    """DID 用户类型配置"""
+    user: str
+    hostuser: str
+    test: str
+
+class DidUrlEncodingConfig(Protocol):
+    """DID URL 编码配置"""
+    use_percent_encoding: bool
+    support_legacy_encoding: bool
+
+class DidPathTemplateConfig(Protocol):
+    """DID 路径模板配置"""
+    user_did_path: str
+    user_hosted_path: str
+    agents_cfg_path: str
+
+class DidParsingConfig(Protocol):
+    """DID 解析配置"""
+    strict_validation: bool
+    allow_insecure: bool
+    default_host: str
+    default_port: int
+
+class DidConfig(Protocol):
+    """DID 配置协议"""
+    method: str
+    format_template: str
+    router_prefix: str
+    user_path_template: str
+    hostuser_path_template: str
+    testuser_path_template: str
+    user_types: DidUserTypeConfig
+    creatable_user_types: List[str]
+    hosts: Dict[str, int]
+    path_templates: DidPathTemplateConfig
+    url_encoding: DidUrlEncodingConfig
+    insecure_patterns: List[str]
+    parsing: DidParsingConfig
+
 class BaseUnifiedConfigProtocol(Protocol):
     """统一配置协议"""
     # 主要配置节点
@@ -164,9 +204,15 @@ class BaseUnifiedConfigProtocol(Protocol):
     web_api: WebApiConfig
     acceleration: AccelerationConfig
     
+    # DID 配置
+    did_config: DidConfig
+    
     # 环境变量和敏感信息
     env: EnvConfig
     secrets: SecretsConfig
+    
+    # 应用根目录
+    app_root: str
     
     # 方法
     def resolve_path(self, path: str) -> Path: ...
