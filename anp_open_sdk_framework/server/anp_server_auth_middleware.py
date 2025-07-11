@@ -1,6 +1,6 @@
 import fnmatch
 import json
-from typing import Callable, Optional
+from typing import Callable, Optional, Tuple, Union
 
 from fastapi import HTTPException
 from starlette.requests import Request
@@ -8,6 +8,7 @@ from starlette.responses import Response, JSONResponse
 
 from anp_open_sdk.did.did_tool import extract_did_from_auth_header, AuthenticationContext
 from anp_open_sdk.auth.auth_server import _verify_bearer_token, _verify_wba_header
+from anp_open_sdk.did.url_analyzer import get_url_analyzer
 
 import logging
 logger = logging.getLogger(__name__)
@@ -65,7 +66,7 @@ def is_exempt(path):
     return any(fnmatch.fnmatch(path, pattern) for pattern in EXEMPT_PATHS)
 
 
-async def _authenticate_request(request: Request) -> Optional[dict]:
+async def _authenticate_request(request: Request) -> Tuple[Union[bool, str], str, dict]:
     for exempt_path in EXEMPT_PATHS:
         if exempt_path == "/" and request.url.path == "/":
             return True, "exempt url", {}
@@ -100,14 +101,32 @@ async def _authenticate_request(request: Request) -> Optional[dict]:
         # 除了query_params，还可以由服务器开发者根据上下文指定resp_did
         target_did = request.query_params.get("resp_did","")
 
+    # 如果仍然没有target_did，尝试使用URL分析器推断
     if target_did == "":
-        msg = "error: Cannot accept request that do not mention resp_did"
+        try:
+            url_analyzer = get_url_analyzer()
+            inferred_did = url_analyzer.infer_resp_did_from_url(request)
+            if inferred_did:
+                target_did = inferred_did
+                logger.debug(f"URL分析器推断出目标DID: {target_did}")
+            else:
+                logger.debug(f"URL分析器无法从路径推断DID: {request.url.path}")
+        except Exception as e:
+            logger.debug(f"URL分析器推断DID时出错: {e}")
+
+    if target_did == "":
+        msg = "error: Cannot accept request that do not mention resp_did and cannot infer from URL"
         return "NotSupport", msg, {}
 
     if ":hostuser:" in target_did:
         # 托管DID，未来要做转发，没有转发时候直接拒绝
         msg = "error: Cannot accept request to hosted DID"
         return "NotSupport", msg, {}
+
+    # 确保req_did不为None
+    if req_did is None:
+        msg = "error: Cannot extract caller DID from authorization header"
+        return False, msg, {}
 
     context = AuthenticationContext(
         caller_did=req_did,
@@ -120,11 +139,19 @@ async def _authenticate_request(request: Request) -> Optional[dict]:
         domain = request.url.hostname)
     try:
         success, result = await _verify_wba_header(auth_header, context)
-        if success :
-            return True, "auth passed", result
+        if success:
+            # 确保result是字典类型
+            if isinstance(result, str):
+                # 如果result是字符串，将其包装在字典中
+                return True, "auth passed", {"result": result}
+            else:
+                return True, "auth passed", result if isinstance(result, dict) else {}
         else:
-            return False, "auth failed", result
-
+            # 确保result是字典类型
+            if isinstance(result, str):
+                return False, "auth failed", {"error": result}
+            else:
+                return False, "auth failed", result if isinstance(result, dict) else {}
 
     except Exception as e:
             logger.debug(f"wba验证失败: {e}")
