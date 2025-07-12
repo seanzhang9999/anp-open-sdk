@@ -124,7 +124,7 @@ async def _execute_wba_auth_flow(
                 auth_value, token = _parse_token_from_response(response_auth_header)
                 if token:
                     response_auth_header = json.loads(response_auth_header.get("Authorization"))
-                    response_auth_header = response_auth_header[0].get("resp_did_auth_header")
+                    response_auth_header = response_auth_header.get("resp_did_auth_header")
                     response_auth_header = response_auth_header.get("Authorization")
                     if await _verify_response_auth_header(response_auth_header):
                         caller_agent.contact_manager.store_token_from_remote(context.target_did, token)
@@ -202,49 +202,48 @@ def _parse_token_from_response(response_header: Dict) -> Tuple[Optional[str], Op
     Returns:
         Tuple[str, str]: (did_auth_header, token) 双向认证头和访问令牌
     """
-    if "Authorization" in response_header:
-        auth_value = response_header["Authorization"]
+    if "Authorization" not in response_header:
+        return "没有Auth头", None
+
+
+    auth_value = response_header["Authorization"]
+    if isinstance(auth_value, str):
         import re
-        if isinstance(auth_value, str):
-            match = re.match(r'^bearer\s+(.+)$', auth_value, re.IGNORECASE)
-            if match:
-                token = match.group(1)
-                logger.debug("获得单向认证令牌，兼容无双向认证的服务")
-                return "单向认证", token
-            else :
-                try:
-                    auth_value = response_header.get("Authorization")
-                    auth_value = json.loads(auth_value)
-                    token = auth_value[0].get("access_token")
-                    did_auth_header = auth_value[0].get("resp_did_auth_header", {}).get("Authorization")
-                    if did_auth_header and token:
-                        logger.debug("令牌包含双向认证信息，进行双向校验")
-                        return "双向认证", token
-                    else:
-                        logger.error(f"[错误] 解析失败，缺少必要字段{auth_value}")
-                        return "AuthDict无法识别", None
-                except Exception as e:
-                    logger.error(f"[错误] 处理 Authorization 字典时出错:{e} ")
-                    return "不是AuthDict", None
-                return "不识别的AuthToken", None
-        else:
-            try:
-                auth_value =  response_header.get("Authorization")
-                auth_value= json.loads(auth_value)
-                token = auth_value[0].get("access_token")
-                did_auth_header =auth_value[0].get("resp_did_auth_header", {}).get("Authorization")
+        match = re.match(r'^bearer\s+(.+)$', auth_value, re.IGNORECASE)
+        if match:
+            token = match.group(1)
+            logger.debug("获得单向认证令牌，兼容无双向认证的服务")
+            return "单向认证", token
+            # 如果不是Bearer格式，尝试解析为JSON
+        try:
+            auth_data = json.loads(auth_value)
+            # 解析后应该是字典格式
+            if isinstance(auth_data, dict):
+                token = auth_data.get("access_token")
+                did_auth_header = auth_data.get("resp_did_auth_header", {}).get("Authorization")
                 if did_auth_header and token:
-                    logger.debug("令牌包含双向认证信息，进行双向校验")
                     return "双向认证", token
                 else:
-                    logger.error("[错误] 解析失败，缺少必要字段" + str(auth_value))
                     return "AuthDict无法识别", None
-            except Exception as e:
-                logger.error("[错误] 处理 Authorization 字典时出错: " + str(e))
-                return "不是AuthDict", None
+            else:
+                return "JSON解析后格式错误", None
+        except json.JSONDecodeError:
+            return ("JSON解析AuthToken失败"), None
     else:
-        logger.debug("response_header不包含'Authorization',无需处理令牌")
-        return "没有Auth头", None
+        try:
+            auth_value= json.loads(auth_value)
+            token = auth_value.get("access_token")
+            did_auth_header =auth_value.get("resp_did_auth_header", {}).get("Authorization")
+            if did_auth_header and token:
+                logger.debug("令牌包含双向认证信息，进行双向校验")
+                return "双向认证", token
+            else:
+                logger.error("[错误] 解析失败，缺少必要字段" + str(auth_value))
+                return "AuthDict无法识别", None
+        except Exception as e:
+            logger.error("[错误] 处理 Authorization 字典时出错: " + str(e))
+            return "JSON解析AuthDict失败", None
+
 
 
 async def _verify_response_auth_header(auth_value: str) -> bool:

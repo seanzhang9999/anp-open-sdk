@@ -706,6 +706,490 @@ class AgentRoutingMonitor:
         return self.metrics.copy()
 ```
 
+## 多域名路由增强
+
+### 1. 多域名支持问题分析
+
+#### 当前 `AgentRouter` 的问题
+```python
+# 当前的问题代码
+class AgentRouter:
+    def __init__(self):
+        self.local_agents = {}  # 问题：全局共享，没有域名隔离
+    
+    def register_agent(self, agent):
+        self.local_agents[str(agent.id)] = agent  # 问题：可能覆盖不同域名的同名agent
+    
+    async def route_request(self, req_did: str, resp_did: str, request_data: Dict, request: Request):
+        resp_did = url_did_format(resp_did, request)
+        if resp_did in self.local_agents:  # 问题：没有验证域名权限
+            return await self.local_agents[resp_did].handle_request(...)
+```
+
+#### 具体风险场景
+1. **域名A**: `user.localhost:9527` 注册了 `agent_001`
+2. **域名B**: `service.localhost:9527` 也注册了 `agent_001`
+3. **结果**: 后注册的会覆盖先注册的，导致路由错误
+
+#### 安全风险
+- 跨域名的智能体访问
+- 域名权限绕过
+- 数据泄露风险
+
+### 2. 增强的 AgentRouter 设计
+
+#### 新的数据结构
+```python
+class EnhancedAgentRouter(AgentRouter):
+    def __init__(self):
+        # 多级索引结构：domain -> port -> agent_id -> agent
+        self.domain_agents = {}  # {domain: {port: {agent_id: agent}}}
+        self.global_agents = {}  # 向后兼容的全局索引
+        self.domain_manager = get_domain_manager()
+        self.logger = logger
+        
+        # 统计信息
+        self.stats = {
+            'total_agents': 0,
+            'domains_count': 0,
+            'registration_conflicts': 0,
+            'routing_errors': 0
+        }
+```
+
+#### 增强的注册方法
+```python
+def register_agent_with_domain(self, agent, domain: str = None, port: int = None, request: Request = None):
+    """
+    注册智能体到指定域名
+    
+    Args:
+        agent: 智能体实例
+        domain: 域名（可选，从request中提取）
+        port: 端口（可选，从request中提取）
+        request: HTTP请求对象（用于自动提取域名信息）
+    """
+    # 1. 确定域名和端口
+    if request:
+        domain, port = self.domain_manager.get_host_port_from_request(request)
+    elif not domain or not port:
+        domain, port = self.domain_manager._get_default_host_port()
+    
+    # 2. 验证域名权限
+    is_valid, error_msg = self.domain_manager.validate_domain_access(domain, port)
+    if not is_valid:
+        raise ValueError(f"域名注册被拒绝: {error_msg}")
+    
+    # 3. 确保域名目录存在
+    self.domain_manager.ensure_domain_directories(domain, port)
+    
+    # 4. 初始化域名结构
+    if domain not in self.domain_agents:
+        self.domain_agents[domain] = {}
+        self.stats['domains_count'] += 1
+    
+    if port not in self.domain_agents[domain]:
+        self.domain_agents[domain][port] = {}
+    
+    # 5. 检查冲突
+    agent_id = str(agent.id)
+    if agent_id in self.domain_agents[domain][port]:
+        self.stats['registration_conflicts'] += 1
+        self.logger.warning(f"智能体注册冲突: {domain}:{port} 已存在 {agent_id}")
+        if not getattr(agent, 'allow_override', False):
+            raise ValueError(f"智能体 {agent_id} 已在 {domain}:{port} 注册")
+    
+    # 6. 注册智能体
+    self.domain_agents[domain][port][agent_id] = agent
+    
+    # 7. 更新全局索引（向后兼容）
+    global_key = f"{domain}:{port}:{agent_id}"
+    self.global_agents[global_key] = agent
+    self.global_agents[agent_id] = agent  # 保持原有行为
+    
+    # 8. 更新统计
+    self.stats['total_agents'] += 1
+    
+    self.logger.info(f"✅ 智能体注册成功: {agent_id} @ {domain}:{port}")
+    return agent
+
+# 向后兼容的注册方法
+def register_agent(self, agent):
+    """向后兼容的注册方法"""
+    return self.register_agent_with_domain(agent)
+```
+
+#### 增强的路由方法
+```python
+async def route_request_with_domain_validation(self, req_did: str, resp_did: str, 
+                                             request_data: Dict, request: Request) -> Any:
+    """带域名验证的路由请求"""
+    
+    # 1. 提取请求域名信息
+    domain, port = self.domain_manager.get_host_port_from_request(request)
+    
+    # 2. 验证域名访问权限
+    is_valid, error_msg = self.domain_manager.validate_domain_access(domain, port)
+    if not is_valid:
+        self.stats['routing_errors'] += 1
+        raise HTTPException(status_code=403, detail=f"域名访问被拒绝: {error_msg}")
+    
+    # 3. 格式化目标DID
+    resp_did = url_did_format(resp_did, request)
+    
+    # 4. 多级查找智能体
+    agent = self._find_agent_with_domain_priority(resp_did, domain, port)
+    
+    if not agent:
+        self.stats['routing_errors'] += 1
+        available_agents = self._get_available_agents_for_domain(domain, port)
+        raise ValueError(
+            f"未找到智能体: {resp_did} @ {domain}:{port}\n"
+            f"可用智能体: {available_agents}"
+        )
+    
+    # 5. 验证跨域访问权限
+    if not self._validate_cross_domain_access(req_did, resp_did, domain, port):
+        self.stats['routing_errors'] += 1
+        raise HTTPException(status_code=403, detail="跨域访问被拒绝")
+    
+    # 6. 设置请求上下文
+    request.state.agent = agent
+    request.state.domain = domain
+    request.state.port = port
+    
+    # 7. 执行路由
+    try:
+        self.logger.info(f"🚀 路由请求: {req_did} -> {resp_did} @ {domain}:{port}")
+        result = await agent.handle_request(req_did, request_data, request)
+        return result
+    except Exception as e:
+        self.stats['routing_errors'] += 1
+        self.logger.error(f"❌ 路由执行失败: {e}")
+        raise
+
+def _find_agent_with_domain_priority(self, agent_id: str, domain: str, port: int):
+    """
+    按优先级查找智能体：
+    1. 当前域名:端口下的智能体
+    2. 当前域名下其他端口的智能体
+    3. 全局智能体（向后兼容）
+    """
+    # 优先级1: 精确匹配域名和端口
+    if (domain in self.domain_agents and 
+        port in self.domain_agents[domain] and 
+        agent_id in self.domain_agents[domain][port]):
+        return self.domain_agents[domain][port][agent_id]
+    
+    # 优先级2: 同域名不同端口
+    if domain in self.domain_agents:
+        for other_port, agents in self.domain_agents[domain].items():
+            if agent_id in agents:
+                self.logger.warning(f"跨端口访问: {agent_id} @ {domain}:{other_port} -> {domain}:{port}")
+                return agents[agent_id]
+    
+    # 优先级3: 全局查找（向后兼容）
+    if agent_id in self.global_agents:
+        self.logger.warning(f"全局智能体访问: {agent_id}")
+        return self.global_agents[agent_id]
+    
+    return None
+
+def _validate_cross_domain_access(self, req_did: str, resp_did: str, domain: str, port: int) -> bool:
+    """验证跨域访问权限"""
+    try:
+        # 检查是否允许跨域访问
+        cross_domain_config = self.domain_manager.config.did_config.cross_domain
+        if not cross_domain_config.get('enabled', False):
+            return True  # 默认允许
+        
+        # 检查白名单
+        whitelist = cross_domain_config.get('whitelist', [])
+        if req_did in whitelist:
+            return True
+        
+        # 检查黑名单
+        blacklist = cross_domain_config.get('blacklist', [])
+        if req_did in blacklist:
+            return False
+        
+        # 检查域名规则
+        domain_rules = cross_domain_config.get('domain_rules', {})
+        current_domain_key = f"{domain}:{port}"
+        if current_domain_key in domain_rules:
+            allowed_patterns = domain_rules[current_domain_key]
+            for pattern in allowed_patterns:
+                if self.domain_manager._match_pattern(req_did, pattern):
+                    return True
+            return False
+        
+        return True  # 默认允许
+        
+    except Exception as e:
+        self.logger.error(f"跨域访问验证失败: {e}")
+        return True  # 出错时默认允许
+```
+
+### 3. 域名管理增强
+
+#### 智能体查询方法
+```python
+def get_agents_by_domain(self, domain: str, port: int = None) -> Dict:
+    """获取指定域名下的所有智能体"""
+    if domain not in self.domain_agents:
+        return {}
+    
+    if port:
+        return self.domain_agents[domain].get(port, {})
+    else:
+        # 返回该域名下所有端口的智能体
+        all_agents = {}
+        for p, agents in self.domain_agents[domain].items():
+            for agent_id, agent in agents.items():
+                all_agents[f"{p}:{agent_id}"] = agent
+        return all_agents
+
+def get_domain_statistics(self) -> Dict:
+    """获取域名统计信息"""
+    stats = self.stats.copy()
+    
+    # 详细统计
+    domain_details = {}
+    for domain, ports in self.domain_agents.items():
+        domain_details[domain] = {
+            'ports': list(ports.keys()),
+            'total_agents': sum(len(agents) for agents in ports.values()),
+            'agents_by_port': {
+                str(port): list(agents.keys()) 
+                for port, agents in ports.items()
+            }
+        }
+    
+    stats['domain_details'] = domain_details
+    return stats
+
+def cleanup_domain(self, domain: str, port: int = None):
+    """清理指定域名的智能体"""
+    if domain not in self.domain_agents:
+        return
+    
+    if port:
+        # 清理指定端口
+        if port in self.domain_agents[domain]:
+            agents = self.domain_agents[domain][port]
+            for agent_id in list(agents.keys()):
+                self._unregister_agent(domain, port, agent_id)
+            del self.domain_agents[domain][port]
+    else:
+        # 清理整个域名
+        for port in list(self.domain_agents[domain].keys()):
+            self.cleanup_domain(domain, port)
+        del self.domain_agents[domain]
+        self.stats['domains_count'] -= 1
+
+def _unregister_agent(self, domain: str, port: int, agent_id: str):
+    """注销智能体"""
+    # 从域名索引中移除
+    if (domain in self.domain_agents and 
+        port in self.domain_agents[domain] and 
+        agent_id in self.domain_agents[domain][port]):
+        del self.domain_agents[domain][port][agent_id]
+        self.stats['total_agents'] -= 1
+    
+    # 从全局索引中移除
+    global_key = f"{domain}:{port}:{agent_id}"
+    if global_key in self.global_agents:
+        del self.global_agents[global_key]
+    
+    # 如果没有其他域名使用，也从简单索引中移除
+    if agent_id in self.global_agents:
+        # 检查是否还有其他域名在使用
+        still_in_use = False
+        for d, ports in self.domain_agents.items():
+            for p, agents in ports.items():
+                if agent_id in agents:
+                    still_in_use = True
+                    break
+            if still_in_use:
+                break
+        
+        if not still_in_use:
+            del self.global_agents[agent_id]
+```
+
+### 4. 配置文件增强
+
+#### 域名配置示例
+```yaml
+# unified_config.yaml
+did_config:
+  hosts:
+    localhost: 9527
+    user.localhost: 9527
+    service.localhost: 9527
+    api.localhost: 8080
+  
+  parsing:
+    default_host: "localhost"
+    default_port: 9527
+    allow_insecure: true
+  
+  cross_domain:
+    enabled: true
+    whitelist:
+      - "did:wba:localhost:9527:wba:admin:*"
+    blacklist:
+      - "did:wba:malicious.com:*"
+    domain_rules:
+      "user.localhost:9527":
+        - "did:wba:localhost:9527:wba:user:*"
+        - "did:wba:service.localhost:9527:wba:service:*"
+      "service.localhost:9527":
+        - "did:wba:*:wba:user:*"
+  
+  insecure_patterns:
+    - "*.test.com:*"
+    - "localhost:*"
+```
+
+### 5. 监控和调试工具
+
+#### 域名路由监控
+```python
+class DomainRoutingMonitor:
+    def __init__(self, router: EnhancedAgentRouter):
+        self.router = router
+        self.request_log = []
+        self.error_log = []
+    
+    def log_request(self, req_did: str, resp_did: str, domain: str, port: int, 
+                   success: bool, error_msg: str = None):
+        """记录路由请求"""
+        log_entry = {
+            'timestamp': datetime.now().isoformat(),
+            'req_did': req_did,
+            'resp_did': resp_did,
+            'domain': domain,
+            'port': port,
+            'success': success,
+            'error_msg': error_msg
+        }
+        
+        self.request_log.append(log_entry)
+        if not success:
+            self.error_log.append(log_entry)
+        
+        # 保持日志大小
+        if len(self.request_log) > 1000:
+            self.request_log = self.request_log[-500:]
+        if len(self.error_log) > 100:
+            self.error_log = self.error_log[-50:]
+    
+    def get_domain_health(self) -> Dict:
+        """获取域名健康状态"""
+        stats = self.router.get_domain_statistics()
+        
+        # 计算成功率
+        recent_requests = self.request_log[-100:]  # 最近100个请求
+        if recent_requests:
+            success_count = sum(1 for req in recent_requests if req['success'])
+            success_rate = success_count / len(recent_requests)
+        else:
+            success_rate = 1.0
+        
+        return {
+            'total_domains': stats['domains_count'],
+            'total_agents': stats['total_agents'],
+            'success_rate': success_rate,
+            'recent_errors': len([e for e in self.error_log if 
+                                datetime.fromisoformat(e['timestamp']) > 
+                                datetime.now() - timedelta(hours=1)]),
+            'domain_details': stats['domain_details']
+        }
+```
+
+### 6. 实施计划
+
+#### 第一阶段：基础架构升级
+1. **实现 EnhancedAgentRouter**
+   - 替换现有的 AgentRouter
+   - 保持向后兼容性
+   - 添加域名隔离功能
+
+2. **集成域名管理器**
+   - 在路由中集成 DomainManager
+   - 添加域名验证逻辑
+   - 实现跨域访问控制
+
+#### 第二阶段：监控和工具
+1. **部署监控系统**
+   - 实现 DomainRoutingMonitor
+   - 添加健康检查端点
+   - 配置告警机制
+
+2. **开发调试工具**
+   - 域名统计查询接口
+   - 智能体注册状态查看
+   - 路由冲突检测工具
+
+#### 第三阶段：配置和优化
+1. **配置文件标准化**
+   - 更新域名配置格式
+   - 添加跨域访问规则
+   - 配置安全策略
+
+2. **性能优化**
+   - 优化路由查找算法
+   - 添加缓存机制
+   - 减少内存占用
+
+### 7. 测试和验证
+
+#### 单元测试
+```python
+class TestEnhancedAgentRouter:
+    def test_domain_isolation(self):
+        """测试域名隔离功能"""
+        router = EnhancedAgentRouter()
+        
+        # 在不同域名注册同名智能体
+        agent1 = MockAgent("agent_001")
+        agent2 = MockAgent("agent_001")
+        
+        router.register_agent_with_domain(agent1, "user.localhost", 9527)
+        router.register_agent_with_domain(agent2, "service.localhost", 9527)
+        
+        # 验证隔离效果
+        assert router.get_agents_by_domain("user.localhost", 9527)["agent_001"] == agent1
+        assert router.get_agents_by_domain("service.localhost", 9527)["agent_001"] == agent2
+    
+    def test_cross_domain_access_control(self):
+        """测试跨域访问控制"""
+        # 配置跨域规则
+        # 测试白名单、黑名单、域名规则
+        pass
+    
+    def test_routing_priority(self):
+        """测试路由优先级"""
+        # 测试域名优先级查找逻辑
+        pass
+```
+
+#### 集成测试
+```python
+class TestDomainRoutingIntegration:
+    def test_multi_domain_deployment(self):
+        """测试多域名部署场景"""
+        # 模拟多域名环境
+        # 测试路由正确性
+        pass
+    
+    def test_backward_compatibility(self):
+        """测试向后兼容性"""
+        # 验证旧版本客户端仍能正常工作
+        pass
+```
+
 ## 总结
 
 本方案通过以下核心改进实现了ANP SDK的架构优化：
@@ -716,6 +1200,7 @@ class AgentRoutingMonitor:
 3. **配置标准化**: 统一的配置文件格式和关系
 4. **自动化工具**: 完整的检查、修复和监控工具
 5. **向后兼容**: 平滑迁移，不影响现有功能
+6. **多域名支持**: 完整的域名隔离和跨域访问控制
 
 ### 🎯 技术特点
 - 基于路径的智能路由
@@ -723,5 +1208,13 @@ class AgentRoutingMonitor:
 - 完整的配置验证机制
 - 灵活的Agent管理架构
 - 详细的监控和日志系统
+- 多级域名隔离机制
+- 智能的路由优先级算法
 
-这个设计既解决了当前的架构问题，又为未来的扩展提供了良好的基础。
+### 🔒 安全增强
+- 域名级别的访问控制
+- 跨域访问权限验证
+- 智能体注册冲突检测
+- 详细的审计日志
+
+这个设计既解决了当前的架构问题，又为未来的扩展提供了良好的基础，特别是在多域名环境下的安全性和可管理性方面有了显著提升。

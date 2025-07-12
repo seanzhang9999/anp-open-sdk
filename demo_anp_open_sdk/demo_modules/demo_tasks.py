@@ -3,7 +3,7 @@ import os
 import json
 from dotenv import load_dotenv
 
-from anp_open_sdk_framework.server.publisher.anp_sdk_publisher import register_hosted_did, \
+from anp_open_sdk_framework.server.anp_server_hoster import register_hosted_did, \
     check_hosted_did, check_did_host_request
 from anp_open_sdk.config import UnifiedConfig
 
@@ -59,10 +59,10 @@ class DemoTaskRunner:
 
         try:
             #await self.run_anp_tool_crawler_agent_search_ai_ad_jason(agent1, agent2)
-            await self.run_api_demo(agent1, agent2)
-            await self.run_message_demo(agent2, agent3, agent1)
-            await self.run_agent_lifecycle_demo(agent1,agent2,agent3)
-            #await self.run_hosted_did_demo(agent1)  # 添加托管 DID 演示
+            #await self.run_api_demo(agent1, agent2)
+            #await self.run_message_demo(agent2, agent3, agent1)
+            #await self.run_agent_lifecycle_demo(agent1,agent2,agent3)
+            await self.run_hosted_did_demo(agent1)  # 添加托管 DID 演示
             #await self.run_group_chat_demo(agent1, agent2,agent3)
             self.step_helper.pause("所有演示完成")
             
@@ -278,48 +278,13 @@ class DemoTaskRunner:
             if public_hosted_data:
                 public_hosted_agent = ANPUser.from_did(public_hosted_data.did)
 
-                @public_hosted_agent.register_message_handler("*")
-                async def handle_hosted_message(msg):
-                    logger.debug(f"[{public_hosted_agent.name}] 收到消息: {msg}")
-                    reply_content = f"这是来自公共智能体 {public_hosted_agent.name} 的自动回复，已收到消息: {msg.get('content')}"
-                    reply_message = {
-                        "reply": reply_content,
-                    }
-                    return reply_message
                 self.sdk.register_agent(public_hosted_agent)
                 logger.info(f"注册公共托管智能体: {public_hosted_agent.name}")
                 
                 # 托管智能体之间的消息交互
                 self.step_helper.pause("托管智能体消息交互演示")
-                
-                # 公共智能体向托管智能体发送消息
-                resp = await agent_msg_post(
-                    self.sdk, 
-                    public_hosted_agent.id, 
-                    hosted_agent.id, 
-                    f"你好托管智能体，我是公共智能体{public_hosted_agent.name}"
-                )
-                logger.info(f"-- public-host user to host user：{public_hosted_agent.name} -> {hosted_agent.name}: {resp}")
-
-                # 托管智能体向公共智能体发送消息
-                resp = await agent_msg_post(
-                    self.sdk,
-                    hosted_agent.id,
-                    public_hosted_agent.id,
-                    f"你好公共智能体，我是托管智能体{hosted_agent.name}"
-                )
-                logger.info(
-                    f"-- host user to public-host user：{hosted_agent.name} -> {public_hosted_agent.name}: {resp}")
-
-                # 公共智能体向普通智能体发送消息
-                resp = await agent_msg_post(
-                    self.sdk,
-                    public_hosted_agent.id,
-                    agent1.id,
-                    f"你好本地智能体，我是公共智能体{public_hosted_agent.name}"
-                )
-                logger.info(
-                    f"-- public-host user to local user：{public_hosted_agent.name} -> {agent1.name}: {resp}")
+                #暂时屏蔽 因为不稳定
+                #await self.public_hosted_agent_demo(agent1, hosted_agent, public_hosted_agent)
 
                 # 托管智能体向普通智能体发送消息
                 resp = await agent_msg_post(
@@ -361,8 +326,35 @@ class DemoTaskRunner:
             logger.error(f"详细错误信息: {traceback.format_exc()}")
             
         self.step_helper.pause("托管 DID 演示完成")
-        
-        
+
+    async def public_hosted_agent_demo(self, agent1, hosted_agent, public_hosted_agent):
+        # 公共智能体向托管智能体发送消息
+        resp = await agent_msg_post(
+            self.sdk,
+            public_hosted_agent.id,
+            hosted_agent.id,
+            f"你好托管智能体，我是公共智能体{public_hosted_agent.name}"
+        )
+        logger.info(f"-- public-host user to host user：{public_hosted_agent.name} -> {hosted_agent.name}: {resp}")
+        # 托管智能体向公共智能体发送消息
+        resp = await agent_msg_post(
+            self.sdk,
+            hosted_agent.id,
+            public_hosted_agent.id,
+            f"你好公共智能体，我是托管智能体{hosted_agent.name}"
+        )
+        logger.info(
+            f"-- host user to public-host user：{hosted_agent.name} -> {public_hosted_agent.name}: {resp}")
+        # 公共智能体向普通智能体发送消息
+        resp = await agent_msg_post(
+            self.sdk,
+            public_hosted_agent.id,
+            agent1.id,
+            f"你好本地智能体，我是公共智能体{public_hosted_agent.name}"
+        )
+        logger.info(
+            f"-- public-host user to local user：{public_hosted_agent.name} -> {agent1.name}: {resp}")
+
     async def run_message_demo(self, agent2: ANPUser, agent3: ANPUser, agent1: ANPUser):
         """消息发送演示"""
         self.step_helper.pause("步骤2: 演示消息发送")

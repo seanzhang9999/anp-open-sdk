@@ -1,14 +1,12 @@
 import fnmatch
 import json
-from typing import Callable, Optional, Tuple, Union
+from typing import Callable
 
 from fastapi import HTTPException
 from starlette.requests import Request
 from starlette.responses import Response, JSONResponse
 
-from anp_open_sdk.did.did_tool import extract_did_from_auth_header, AuthenticationContext
-from anp_open_sdk.auth.auth_server import _verify_bearer_token, _verify_wba_header
-from anp_open_sdk.did.url_analyzer import get_url_analyzer
+from anp_open_sdk.auth.auth_server import _authenticate_request
 
 import logging
 logger = logging.getLogger(__name__)
@@ -16,14 +14,34 @@ logger = logging.getLogger(__name__)
 EXEMPT_PATHS = [
     "/docs", "/anp-nlp/", "/ws/", "/publisher/agents", "/agent/group/*",
     "/redoc", "/openapi.json", "/wba/hostuser/*", "/wba/user/*", "/", "/favicon.ico",
-    "/agents/example/ad.json","/wba/auth"
+    "/agents/example/ad.json","/wba/auth", "/wba/hosted-did/*"
 ]
+
+
+async def _check_permissions(self, request: Request, auth_info: dict) :
+    """
+    权限检查扩展点
+    可以根据请求路径、方法、认证信息等进行权限判断
+    """
+    # 这里可以插入具体的权限检查逻辑
+    # 比如基于角色的访问控制(RBAC)、基于属性的访问控制(ABAC)等
+    return True,"success"
+
 
 
 async def auth_middleware(request: Request, call_next: Callable, auth_method: str = "wba" ) -> Response:
     try:
         logger.debug(f"auth_middleware -- get: {request.url}")
 
+        # Check exempt paths first
+        for exempt_path in EXEMPT_PATHS:
+            if exempt_path == "/" and request.url.path == "/":
+                return await call_next(request)
+            elif request.url.path == exempt_path or (exempt_path != '/' and exempt_path.endswith('/') and request.url.path.startswith(exempt_path)):
+                return await call_next(request)
+            elif is_exempt(request.url.path):
+                return await call_next(request)
+        # Only authenticate if not exempt
         auth_passed,msg,response_auth = await _authenticate_request(request)
 
         headers = dict(request.headers)
@@ -31,20 +49,37 @@ async def auth_middleware(request: Request, call_next: Callable, auth_method: st
 
         if auth_passed == True:
             if response_auth is not None:
+                # 权限控制扩展点
+                permission_result, error_message = await _check_permissions(request, response_auth)
+                if not permission_result.allowed:
+                    return JSONResponse(
+                        status_code=403,
+                        content={"error": "Permission denied", "message": error_message}
+                    )
                 response = await call_next(request)
                 response.headers['authorization'] = json.dumps(response_auth) if response_auth else ""
+
+                # 可以在这里添加权限相关的响应头
+                if permission_result.additional_headers:
+                    for key, value in permission_result.additional_headers.items():
+                        response.headers[key] = value
+
                 return response
             else:
-                return await call_next(request)
+                msg = "auth passed but there is no authz response,something is wrong"
+                return JSONResponse(
+                    status_code=500,
+                    content={"detail": f"{msg}"}
+                )
         elif auth_passed == "NotSupport":
             return JSONResponse(
                 status_code=202,
-                content={"detail": f"{msg}"}
+                content={"detail": f"{msg}:{response_auth}"}
             )
         else:
             return JSONResponse(
                 status_code=401,
-                content={"detail": f"{msg}"}
+                content={"detail": f"{msg}:{response_auth}"}
             )
 
 
@@ -62,97 +97,7 @@ async def auth_middleware(request: Request, call_next: Callable, auth_method: st
         )
 
 
+
+
 def is_exempt(path):
     return any(fnmatch.fnmatch(path, pattern) for pattern in EXEMPT_PATHS)
-
-
-async def _authenticate_request(request: Request) -> Tuple[Union[bool, str], str, dict]:
-    for exempt_path in EXEMPT_PATHS:
-        if exempt_path == "/" and request.url.path == "/":
-            return True, "exempt url", {}
-        elif request.url.path == exempt_path or (exempt_path != '/' and exempt_path.endswith('/') and request.url.path.startswith(exempt_path)):
-            return True, "exempt url", {}
-        elif is_exempt(request.url.path):
-            return True, "exempt url", {}
-    logger.debug(f"安全中间件拦截检查url:\n{request.url}")
-
-    # 提取所有需要的信息
-    auth_header = request.headers.get("Authorization")
-    if not auth_header:
-        raise HTTPException(status_code=401, detail="Missing Authorization header")
-
-    if auth_header and auth_header.startswith("Bearer "):
-        req_did =  request.headers.get("req_did")
-        target_did =request.headers.get("resp_did")
-        token = auth_header[len("Bearer "):]
-        try:
-            result = await _verify_bearer_token(token, req_did, target_did)
-            return True, "Bearer token verified", result
-        except Exception as e:
-            logger.debug(f"Bearer认证失败: {e}")
-            return False, f"exception {e}", {}
-
-
-    req_did, target_did = extract_did_from_auth_header(auth_header)
-    use_two_way_auth = True
-    if target_did is None:
-        use_two_way_auth = False
-        # 现在的token生成需要依赖resp_did的jwt私钥，因此必须获取
-        # 除了query_params，还可以由服务器开发者根据上下文指定resp_did
-        target_did = request.query_params.get("resp_did","")
-
-    # 如果仍然没有target_did，尝试使用URL分析器推断
-    if target_did == "":
-        try:
-            url_analyzer = get_url_analyzer()
-            inferred_did = url_analyzer.infer_resp_did_from_url(request)
-            if inferred_did:
-                target_did = inferred_did
-                logger.debug(f"URL分析器推断出目标DID: {target_did}")
-            else:
-                logger.debug(f"URL分析器无法从路径推断DID: {request.url.path}")
-        except Exception as e:
-            logger.debug(f"URL分析器推断DID时出错: {e}")
-
-    if target_did == "":
-        msg = "error: Cannot accept request that do not mention resp_did and cannot infer from URL"
-        return "NotSupport", msg, {}
-
-    if ":hostuser:" in target_did:
-        # 托管DID，未来要做转发，没有转发时候直接拒绝
-        msg = "error: Cannot accept request to hosted DID"
-        return "NotSupport", msg, {}
-
-    # 确保req_did不为None
-    if req_did is None:
-        msg = "error: Cannot extract caller DID from authorization header"
-        return False, msg, {}
-
-    context = AuthenticationContext(
-        caller_did=req_did,
-        target_did=target_did,
-        request_url=str(request.url),
-        method=request.method,
-        custom_headers=dict(request.headers),
-        json_data=None,
-        use_two_way_auth=use_two_way_auth,
-        domain = request.url.hostname)
-    try:
-        success, result = await _verify_wba_header(auth_header, context)
-        if success:
-            # 确保result是字典类型
-            if isinstance(result, str):
-                # 如果result是字符串，将其包装在字典中
-                return True, "auth passed", {"result": result}
-            else:
-                return True, "auth passed", result if isinstance(result, dict) else {}
-        else:
-            # 确保result是字典类型
-            if isinstance(result, str):
-                return False, "auth failed", {"error": result}
-            else:
-                return False, "auth failed", result if isinstance(result, dict) else {}
-
-    except Exception as e:
-            logger.debug(f"wba验证失败: {e}")
-            return False, str(e), {}

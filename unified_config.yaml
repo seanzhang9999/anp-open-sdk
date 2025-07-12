@@ -34,6 +34,7 @@ did_config:
     localhost: 9527
     user.localhost: 9527
     service.localhost: 9527
+    open.localhost: 9527
     127.0.0.1: 9527
   path_templates:
     user_did_path: '{APP_ROOT}/data_user/{host}_{port}/anp_users'

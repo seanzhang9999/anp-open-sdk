@@ -14,7 +14,7 @@
  - 统一调用器+搜索器
  - 调用器的mcp封装
  - 基于调用器接口的llm自动编码通过装饰器再发布
- - 托管增加sse/ws——对接到auth_server预留接口
+ - 托管增加sse/ws——对接到auth_server预留接口 实现托管远端did
  - auth_midddleware 只是身份认证，授权应该放到agent的路由点，
    - 一方面知道自己有什么api，
    - 一方面知道自己是谁对方是谁

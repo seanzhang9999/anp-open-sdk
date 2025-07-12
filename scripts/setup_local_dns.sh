@@ -20,6 +20,7 @@ DOMAINS=(
     "test.localhost"
     "api.localhost"
     "admin.localhost"
+    "open.localhost"
 )
 
 # 检测操作系统

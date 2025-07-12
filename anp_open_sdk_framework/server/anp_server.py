@@ -32,7 +32,7 @@ from anp_open_sdk_framework.server.anp_server_auth_middleware import auth_middle
 from anp_open_sdk.config import get_global_config
 from anp_open_sdk_framework.server.server_mode import ServerMode
 from anp_open_sdk_framework.adapter.anp_service.anp_sdk_group_runner import GroupManager, GroupRunner, Message, MessageType, Agent
-from anp_open_sdk_framework.server.router import router_did
+from anp_open_sdk_framework.server.router import router_did,router_host
 from anp_open_sdk_framework.server.router import router_auth, router_publisher
 
 logger = logging.getLogger(__name__)
@@ -120,6 +120,10 @@ class ANP_Server:
         elif mode == ServerMode.SDK_WS_PROXY_SERVER:
             self._register_default_routes()
             self._register_ws_proxy_server(ws_host, ws_port)
+        elif mode == ServerMode.AGENT_SELF_SERVICE:
+            for agent in self.agents:
+                self.register_agent(agent)
+            self._register_default_routes()
         # 其他模式由LocalAgent主导
 
         @self.app.on_event("startup")
@@ -332,6 +336,7 @@ class ANP_Server:
         self.app.include_router(router_auth.router)
         self.app.include_router(router_did.router)
         self.app.include_router(router_publisher.router)
+        self.app.include_router(router_host.router)
         @self.app.get("/", tags=["status"])
         async def root():
             return {
@@ -809,4 +814,3 @@ class ANP_Server:
         except Exception as e:
             self.logger.error(f"Failed to unregister agent {agent_id}: {e}")
             return False
-

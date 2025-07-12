@@ -133,3 +133,7 @@ yarn-error.log*
 # 前端构建产物 
 /public/build
 /dist
+
+
+**/*/hosted_did_queue/*
+**/*/hosted_did_results/*

@@ -5,6 +5,45 @@ multi_agent_mode:
   agents_cfg_path: '{APP_ROOT}/data_user/localhost_9527/agents_config'
 
 
+
+did_config:
+  method: wba
+  format_template: did:{method}:{host}%3A{port}:{method}:{user_type}:{user_id}
+  router_prefix: /wba
+  user_path_template: /{method}/user/{user_id}/did.json
+  hostuser_path_template: /{method}/hostuser/{user_id}/did.json
+  testuser_path_template: /{method}/test/{user_name}/did.json
+  user_types:
+    user: user
+    hostuser: hostuser
+    test: test
+  creatable_user_types:
+    - user
+  hosts:
+    localhost: 9527
+    user.localhost: 9527
+    service.localhost: 9527
+    127.0.0.1: 9527
+  path_templates:
+    user_did_path: '{APP_ROOT}/data_user/{host}_{port}/anp_users'
+    user_hosted_path: '{APP_ROOT}/data_user/{host}_{port}/anp_users_hosted'
+    agents_cfg_path: '{APP_ROOT}/data_user/{host}_{port}/agents_config'
+  url_encoding:
+    use_percent_encoding: false
+    support_legacy_encoding: true
+  insecure_patterns:
+    - did:wba:localhost:*
+    - did:wba:127.0.0.1:*
+    - did:wba:*:test:*
+  parsing:
+    strict_validation: true
+    allow_insecure: true
+    default_host: localhost
+    default_port: 9527
+
+
+
+
 log_settings:
   log_level: INFO
   detail:
@@ -32,6 +71,7 @@ anp_sdk:
     demo_agent1: 本田
     demo_agent2: 雅马哈
     demo_agent3: 铃木
+
 llm:
   api_url: https://api.302ai.cn/v1
   default_model: deepseek/deepseek-chat-v3-0324:free
@@ -54,6 +94,8 @@ anp_user_service:
   model_name: gpt-4.1-nano
   temperature: 0.3
   api_base: https://api.302ai.cn/v1
+
+
 env_mapping:
   '# 应用配置': null
   debug_mode: ANP_DEBUG
@@ -74,6 +116,7 @@ env_mapping:
   '# 数据库和服务': null
   database_url: DATABASE_URL
   redis_url: REDIS_URL
+
 secrets:
 - openai_api_key
 - anthropic_api_key

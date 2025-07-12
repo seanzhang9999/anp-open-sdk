@@ -1,0 +1,20 @@
+{
+  "id": "did:wba:test1.local%3A8001:wba:user:hosted123",
+  "verificationMethod": [
+    {
+      "id": "did:wba:test1.local%3A8001:wba:user:hosted123#key-1",
+      "type": "EcdsaSecp256k1VerificationKey2019",
+      "controller": "did:wba:test1.local%3A8001:wba:user:hosted123",
+      "publicKeyJwk": {
+        "kty": "EC",
+        "crv": "secp256k1",
+        "x": "test_x_value",
+        "y": "test_y_value"
+      }
+    }
+  ],
+  "authentication": [
+    "did:wba:test1.local%3A8001:wba:user:hosted123#key-1"
+  ],
+  "service": []
+}

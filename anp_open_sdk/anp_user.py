@@ -17,6 +17,8 @@ import json
 import logging
 from typing import Dict, Any, Callable, List, Tuple
 
+import aiohttp
+import httpx
 import nest_asyncio
 from fastapi import FastAPI, Request
 
@@ -333,6 +335,208 @@ class ANPUser:
     def list_contacts(self):
         return self.contact_manager.list_contacts()
 
+    async def request_hosted_did_async(self, target_host: str, target_port: int = 9527) -> Tuple[bool, str, str]:
+        """
+        异步申请托管DID（第一步：提交申请）
+        
+        Args:
+            target_host: 目标托管服务主机
+            target_port: 目标托管服务端口
+            
+        Returns:
+            tuple: (是否成功, 申请ID, 错误信息)
+        """
+        try:
+            if not self.user_data.did_document:
+                return False, "", "当前用户没有DID文档"
+            
+            # 构建申请请求
+            request_data = {
+                "did_document": self.user_data.did_document,
+                "requester_did": self.user_data.did_document.get('id'),
+                "callback_info": {
+                    "client_host": getattr(self, 'host', 'localhost'),
+                    "client_port": getattr(self, 'port', 9527)
+                }
+            }
+            
+            # 发送申请请求
+            target_url = f"http://{target_host}:{target_port}/wba/hosted-did/request"
+            
+
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    target_url,
+                    json=request_data,
+                    timeout=30.0
+                )
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    if result.get('success'):
+                        request_id = result.get('request_id')
+                        logger.info(f"托管DID申请已提交: {request_id}")
+                        return True, request_id, ""
+                    else:
+                        error_msg = result.get('message', '申请失败')
+                        return False, "", error_msg
+                else:
+                    error_msg = f"申请请求失败: HTTP {response.status_code}"
+                    logger.error(error_msg)
+                    return False, "", error_msg
+                    
+        except Exception as e:
+            error_msg = f"申请托管DID失败: {e}"
+            logger.error(error_msg)
+            return False, "", error_msg
+
+    async def check_hosted_did_results(self) -> Tuple[bool, List[Dict[str, Any]], str]:
+        """
+        检查托管DID处理结果（第二步：检查结果）
+        
+        Returns:
+            tuple: (是否成功, 结果列表, 错误信息)
+        """
+        try:
+            if not self.user_data.did_document:
+                return False, [], "当前用户没有DID文档"
+            
+            # 从自己的DID中提取ID
+            did_parts = self.user_data.did_document.get('id', '').split(':')
+            requester_id = did_parts[-1] if did_parts else ""
+            
+            if not requester_id:
+                return False, [], "无法从DID中提取用户ID"
+            
+            # 检查结果（可以检查多个托管服务）
+            all_results = []
+            
+            # 这里可以配置多个托管服务地址
+            target_services = [
+                ("localhost", 9527),
+                ("open.localhost", 9527),
+                # 可以添加更多托管服务
+            ]
+            
+            import httpx
+            for target_host, target_port in target_services:
+                try:
+                    check_url = f"http://{target_host}:{target_port}/wba/hosted-did/check/{requester_id}"
+                    
+                    async with httpx.AsyncClient() as client:
+                        response = await client.get(check_url, timeout=10.0)
+                        
+                        if response.status_code == 200:
+                            result = response.json()
+                            if result.get('success') and result.get('results'):
+                                for res in result['results']:
+                                    res['source_host'] = target_host
+                                    res['source_port'] = target_port
+                                all_results.extend(result['results'])
+                        
+                except Exception as e:
+                    logger.warning(f"检查托管服务 {target_host}:{target_port} 失败: {e}")
+            
+            return True, all_results, ""
+            
+        except Exception as e:
+            error_msg = f"检查托管DID结果失败: {e}"
+            logger.error(error_msg)
+            return False, [], error_msg
+
+    async def process_hosted_did_results(self, results: List[Dict[str, Any]]) -> int:
+        """
+        处理托管DID结果
+        
+        使用现有的create_hosted_did方法保存到本地
+        在anp_users/下创建user_hosted_{host}_{port}_{id}/目录
+        """
+        processed_count = 0
+        
+        for result in results:
+            try:
+                if result.get('success') and result.get('hosted_did_document'):
+                    hosted_did_doc = result['hosted_did_document']
+                    source_host = result.get('source_host', 'unknown')
+                    source_port = result.get('source_port', 9527)
+                    
+                    # 使用现有的create_hosted_did方法
+                    # 这会在anp_users/下创建user_hosted_{host}_{port}_{id}/目录
+                    success, hosted_result = self.create_hosted_did(
+                        source_host, str(source_port), hosted_did_doc
+                    )
+                    
+                    if success:
+                        # 确认收到结果
+                        await self._acknowledge_hosted_did_result(
+                            result.get('result_id', ''), source_host, source_port
+                        )
+                        
+                        logger.info(f"托管DID已保存: {hosted_result}")
+                        logger.info(f"托管DID ID: {hosted_did_doc.get('id')}")
+                        processed_count += 1
+                    else:
+                        logger.error(f"保存托管DID失败: {hosted_result}")
+                else:
+                    logger.warning(f"托管DID申请失败: {result.get('error_message', '未知错误')}")
+                    
+            except Exception as e:
+                logger.error(f"处理托管DID结果失败: {e}")
+        
+        return processed_count
+
+    async def _acknowledge_hosted_did_result(self, result_id: str, source_host: str, source_port: int):
+        """确认收到托管DID结果"""
+        try:
+            if not result_id:
+                return
+                
+            ack_url = f"http://{source_host}:{source_port}/wba/hosted-did/acknowledge/{result_id}"
+            
+            import httpx
+            async with httpx.AsyncClient() as client:
+                response = await client.post(ack_url, timeout=10.0)
+                if response.status_code == 200:
+                    logger.debug(f"已确认托管DID结果: {result_id}")
+                else:
+                    logger.warning(f"确认托管DID结果失败: {response.status_code}")
+                    
+        except Exception as e:
+            logger.warning(f"确认托管DID结果时出错: {e}")
+
+    async def poll_hosted_did_results(self, interval: int = 30, max_polls: int = 20) -> int:
+        """
+        轮询托管DID结果
+        
+        Args:
+            interval: 轮询间隔（秒）
+            max_polls: 最大轮询次数
+            
+        Returns:
+            int: 总共处理的结果数量
+        """
+        total_processed = 0
+        
+        for i in range(max_polls):
+            try:
+                success, results, error = await self.check_hosted_did_results()
+                
+                if success and results:
+                    processed = await self.process_hosted_did_results(results)
+                    total_processed += processed
+                    
+                    if processed > 0:
+                        logger.info(f"轮询第{i+1}次: 处理了{processed}个托管DID结果")
+                
+                if i < max_polls - 1:  # 不是最后一次
+                    await asyncio.sleep(interval)
+                    
+            except Exception as e:
+                logger.error(f"轮询托管DID结果失败: {e}")
+                await asyncio.sleep(interval)
+        
+        return total_processed
+
     def create_hosted_did(self, host: str, port: str, did_document: dict) -> Tuple[bool, Any]:
         """
         [新] 创建一个托管DID。此方法将调用数据管理器来处理持久化和内存加载。
@@ -404,7 +608,3 @@ class ANPUser:
                 response = await self.handle_request(self.id, data, DummyRequest(data))
                 await ws.send(json.dumps({"type": "response", "data": response}))
             # 可扩展其他消息类型
-
-
-
-

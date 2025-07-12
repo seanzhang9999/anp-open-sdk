@@ -18,16 +18,19 @@ Authentication middleware module.
 import fnmatch
 import logging
 from datetime import timezone
-from typing import Tuple
+from typing import Tuple, Union
 
 import jwt
 from fastapi import HTTPException
 from agent_connect.authentication.did_wba import extract_auth_header_parts
+from starlette.requests import Request
+
 from anp_open_sdk.config import get_global_config
 from .auth_client import _resolve_did_document_insecurely
 from anp_open_sdk.did.did_tool import AuthenticationContext, \
     create_access_token, \
-    create_did_auth_header_from_user_data, verify_timestamp
+    create_did_auth_header_from_user_data, verify_timestamp, extract_did_from_auth_header
+from ..did.url_analyzer import get_url_analyzer
 
 logger = logging.getLogger(__name__)
 
@@ -286,9 +289,6 @@ async def _generate_wba_auth_response	(did, is_two_way_auth, resp_did):
         data={"req_did": did, "resp_did": resp_did, "comments": "open for req_did"},
         expires_delta=expiration_time
     )
-
-
-
     #废弃 access_token = create_access_token_from_path(
     #废弃     resp_did_agent.jwt_private_key_path,
     #废弃     data={"req_did": did, "resp_did": resp_did, "comments": "open for req_did"},
@@ -332,3 +332,99 @@ async def _generate_wba_auth_response	(did, is_two_way_auth, resp_did):
 def is_insecurely(did: str) -> bool:
     """Check if a DID should be resolved insecurely based on patterns."""
     return any(fnmatch.fnmatch(did, pattern) for pattern in INSECURELY_DID_FORMAT)
+
+
+async def _authenticate_request(request: Request) -> Tuple[Union[bool, str], str, dict]:
+
+    # 提取所有需要的信息
+    auth_header = request.headers.get("Authorization")
+    if not auth_header:
+        raise HTTPException(status_code=401, detail="Missing Authorization header")
+
+    if auth_header and auth_header.startswith("Bearer "):
+        req_did =  request.headers.get("req_did")
+        target_did =request.headers.get("resp_did")
+        token = auth_header[len("Bearer "):]
+        try:
+            result = await _verify_bearer_token(token, req_did, target_did)
+            return True, "Bearer token verified", result
+        except Exception as e:
+            logger.debug(f"Bearer认证失败: {e}")
+            return False, f"exception {e}", {}
+
+
+    req_did, target_did = extract_did_from_auth_header(auth_header)
+    use_two_way_auth = True
+    if target_did is None:
+        use_two_way_auth = False
+        # 现在的token生成需要依赖resp_did的jwt私钥，因此必须获取
+        # 除了query_params，还可以由服务器开发者根据上下文指定resp_did
+        target_did = request.query_params.get("resp_did","")
+
+    # 如果仍然没有target_did，尝试使用URL分析器推断
+    if target_did == "":
+        try:
+            url_analyzer = get_url_analyzer()
+            inferred_did = url_analyzer.infer_resp_did_from_url(request)
+            if inferred_did:
+                target_did = inferred_did
+                logger.debug(f"URL分析器推断出目标DID: {target_did}")
+            else:
+                logger.debug(f"URL分析器无法从路径推断DID: {request.url.path}")
+        except Exception as e:
+            logger.debug(f"URL分析器推断DID时出错: {e}")
+
+    if target_did == "":
+        msg = "error: Cannot accept request that do not mention resp_did and cannot infer from URL"
+        return "NotSupport", msg, {}
+
+    if ":hostuser:" in target_did:
+        # 托管DID，未来要做转发，没有转发时候直接拒绝
+        msg = "error: Cannot accept request to hosted DID"
+        return "NotSupport", msg, {}
+
+    # 确保req_did不为None
+    if req_did is None:
+        msg = "error: Cannot extract caller DID from authorization header"
+        return False, msg, {}
+
+    context = AuthenticationContext(
+        caller_did=req_did,
+        target_did=target_did,
+        request_url=str(request.url),
+        method=request.method,
+        custom_headers=dict(request.headers),
+        json_data=None,
+        use_two_way_auth=use_two_way_auth,
+        domain = request.url.hostname)
+    try:
+        success, result = await _verify_wba_header(auth_header, context)
+        if success:
+            if result is None:
+                return False, "auth passed but result is None", {}
+            else:
+                # 确保result是字典类型，如果是列表则取第一个元素（如果是字典）或包装成字典
+                if isinstance(result, list):
+                    if len(result) > 0 and isinstance(result[0], dict):
+                        return True, "auth passed", result[0]
+                    else:
+                        return True, "auth passed", {"result": result}
+                elif isinstance(result, str):
+                    # 如果result是字符串，将其包装在字典中
+                    return True, "auth passed", {"result": result}
+                elif isinstance(result, dict):
+                    return True, "auth passed", result
+                else:
+                    return False, f"auth passed but unexpected result type {type(result)}", {"error": f"unexpected result type: {type(result)}result:{result}"}
+        else:
+            # 认证失败的情况
+            if isinstance(result, str):
+                return False, "auth failed", {"error": result}
+            elif isinstance(result, dict):
+                return False, "auth failed", result
+            else:
+                return False, "auth failed", {"error": str(result) if result is not None else "unknown error"}
+
+    except Exception as e:
+            logger.debug(f"wba验证失败: {e}")
+            return False, str(e), {}

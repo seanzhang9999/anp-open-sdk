@@ -3,6 +3,7 @@ import os
 import secrets
 import socket
 from pathlib import Path
+from typing import Optional
 
 from anp_open_sdk.anp_user import ANPUser, logger
 from anp_open_sdk.config import get_global_config
@@ -11,25 +12,43 @@ from anp_open_sdk_framework.server.publisher.anp_sdk_publisher_mail_backend impo
 from anp_open_sdk_framework.server.anp_server import logger
 
 
-class DIDManager:
+class DIDHostManager:
     """DID管理器，用于处理DID文档的存储和管理"""
     
-    def __init__(self, hosted_dir: str = None):
+    def __init__(self, hosted_dir: Optional[str] = None, host: Optional[str] = None, port: Optional[int] = None):
         """
         初始化DID管理器
         
         Args:
             hosted_dir: DID托管目录路径，如果为None则使用默认路径
+            host: 指定主机名（用于多域名环境）
+            port: 指定端口（用于多域名环境）
         """
-        config = get_global_config()
-        self.hosted_dir = Path(hosted_dir or config.anp_sdk.user_hosted_path)
+        if host is not None and port is not None:
+            # 多域名模式：使用指定的主机和端口
+            from anp_open_sdk.domain import get_domain_manager
+            domain_manager = get_domain_manager()
+            paths = domain_manager.get_all_data_paths(host, port)
+            self.hosted_dir = paths['user_hosted_path']
+            self.hostdomain = host
+            self.hostport = str(port)
+        else:
+            # 兼容模式：使用现有逻辑
+            config = get_global_config()
+            self.hosted_dir = Path(hosted_dir or config.anp_sdk.user_hosted_path)
+            self.hostdomain = os.environ.get('HOST_DID_DOMAIN', 'localhost')
+            self.hostport = os.environ.get('HOST_DID_PORT', '9527')
+            
         self.hosted_dir.mkdir(parents=True, exist_ok=True)
         
-        # 获取主机配置
+        # 保持现有的其他初始化逻辑
         self.hostname = socket.gethostname()
         self.hostip = socket.gethostbyname(self.hostname)
-        self.hostport = os.environ.get('HOST_DID_PORT', '9527')
-        self.hostdomain = os.environ.get('HOST_DID_DOMAIN', 'localhost')
+    
+    @classmethod
+    def create_for_domain(cls, host: str, port: int) -> 'DIDHostManager':
+        """为指定域名创建DID托管管理器"""
+        return cls(hosted_dir=None, host=host, port=port)
     
     def is_duplicate_did(self, did_document: dict) -> bool:
         """
@@ -66,7 +85,7 @@ class DIDManager:
                 logger.error(f"读取DID文档失败: {e}")
         return False
     
-    def store_did_document(self, did_document: dict) -> tuple[bool, str, str]:
+    def store_did_document(self, did_document: dict) -> tuple[bool, dict, str]:
         """
         存储DID文档
         
@@ -74,7 +93,7 @@ class DIDManager:
             did_document: DID文档
             
         Returns:
-            tuple: (是否成功, 新的DID ID, 错误信息)
+            tuple: (是否成功, 新的DID文档, 错误信息)
         """
         try:
             # 生成新的sid
@@ -100,7 +119,7 @@ class DIDManager:
         except Exception as e:
             error_msg = f"存储DID文档失败: {e}"
             logger.error(error_msg)
-            return False, "", error_msg
+            return False, {}, error_msg
     
     def _modify_did_document(self, did_document: dict, sid: str) -> dict:
         """
@@ -163,6 +182,8 @@ async def register_hosted_did(agent:ANPUser):
         logger.debug(f"注册邮箱检查前初始化，使用本地文件邮件后端参数设置:{use_local}")
         mail_manager = EnhancedMailManager(use_local_backend=use_local)
         register_email = os.environ.get('REGISTER_MAIL_USER')
+        if not register_email:
+            raise ValueError("REGISTER_MAIL_USER 环境变量未设置")
         success = mail_manager.send_hosted_did_request(did_document, register_email)
         if success:
             logger.info(f"{agent.id}的托管DID申请邮件已发送")
@@ -192,6 +213,9 @@ async def check_hosted_did(agent: ANPUser):
             try:
                 body = response.get('content', '')
                 message_id = response.get('message_id')
+                if not message_id:
+                    logger.warning("邮件缺少message_id，跳过处理")
+                    continue
                 try:
                     if isinstance(body, str):
                         did_document = json.loads(body)
@@ -233,7 +257,7 @@ async def check_did_host_request():
         use_local = config.mail.use_local_backend
         logger.debug(f"管理邮箱检查前初始化，使用本地文件邮件后端参数设置:{use_local}")
         mail_manager = EnhancedMailManager(use_local_backend=use_local)
-        did_manager = DIDManager()
+        did_manager = DIDHostManager()
 
         did_requests = mail_manager.get_unread_did_requests()
         if not did_requests:
@@ -263,7 +287,7 @@ async def check_did_host_request():
                 mail_manager.send_reply_email(
                     from_address,
                     "ANP HOSTED DID RESPONSED",
-                    new_did_doc)
+                    json.dumps(new_did_doc, ensure_ascii=False, indent=2))
 
                 result += f"{from_address}的DID {new_did_doc['id']} 已保存\n"
             else:

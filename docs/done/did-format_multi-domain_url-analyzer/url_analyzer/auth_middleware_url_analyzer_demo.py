@@ -23,7 +23,7 @@ app_root = str(Path(__file__).parent.parent)
 config = UnifiedConfig(app_root=app_root)
 set_global_config(config)
 
-from anp_open_sdk_framework.server.anp_server_auth_middleware import _authenticate_request
+from anp_open_sdk.auth.auth_server import _authenticate_request
 from anp_open_sdk.did.url_analyzer import get_url_analyzer
 
 # 设置日志

@@ -281,7 +281,8 @@ class LocalUserDataManager():
 
             original_user_dir = Path(parent_user_data.user_dir)
             parent_dir = original_user_dir.parent
-            hosted_dir_name = f"user_hosted_{host}_{port}_{did_suffix}"
+            clean_host = host.replace(".", "_").replace(":", "_")
+            hosted_dir_name = f"user_hosted_{clean_host}_{port}_{did_suffix}"
             hosted_dir_path = parent_dir / hosted_dir_name
 
             # --- 文件系统操作 ---
