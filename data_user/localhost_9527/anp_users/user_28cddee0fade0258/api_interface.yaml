@@ -1,9 +1,97 @@
 info:
-  title: Large Language Model AgentAgent API
+  title: Calculator AgentAgent API
   version: 1.0.0
 openapi: 3.0.0
 paths:
+  /add:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties: {}
+              type: object
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+          description: 返回结果
+      summary: 计算两个数的和
+  /calculator/add:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties: {}
+              type: object
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+          description: 返回结果
+      summary: 计算两个数的和
+  /calculator/chat:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties: {}
+              type: object
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+          description: 返回结果
+      summary: "\n    API处理函数，现在直接使用模块内的 my_llm_client。\n    它不再需要从request中获取agent实例。\n\
+        \    "
+  /calculator/llm/chat:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties: {}
+              type: object
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+          description: 返回结果
+      summary: "\n    API处理函数，现在直接使用模块内的 my_llm_client。\n    它不再需要从request中获取agent实例。\n\
+        \    "
   /chat:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties: {}
+              type: object
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+          description: 返回结果
+      summary: "\n    API处理函数，现在直接使用模块内的 my_llm_client。\n    它不再需要从request中获取agent实例。\n\
+        \    "
+  /llm/chat:
     post:
       requestBody:
         content:

@@ -5,10 +5,15 @@
 
 """ANP SDK 综合演示程序"""
 import sys
+import os
 import argparse
 import asyncio
 import traceback
 import logging
+
+# 添加路径以便导入
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from anp_sdk.utils.log_base import setup_logging
 from anp_sdk.config import UnifiedConfig,set_global_config
 

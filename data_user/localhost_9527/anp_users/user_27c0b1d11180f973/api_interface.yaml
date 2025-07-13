@@ -2,4 +2,38 @@ info:
   title: 用户智能体安鹏Agent API
   version: 1.0.0
 openapi: 3.0.0
-paths: {}
+paths:
+  /add:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties: {}
+              type: object
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+          description: 返回结果
+      summary: 加法计算API
+  /multiply:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties: {}
+              type: object
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+          description: 返回结果
+      summary: 乘法计算API

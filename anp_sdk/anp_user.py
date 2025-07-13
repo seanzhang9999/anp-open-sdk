@@ -54,6 +54,9 @@ class RemoteANPUser:
 class ANPUser:
     """本地智能体，代表当前用户的DID身份"""
     api_config: List[Dict[str, Any]]  # 用于多智能体加载时 从agent_mappings.yaml加载api相关扩展描述
+    
+    # 类级别的实例缓存，确保同一个DID只有一个ANPUser实例
+    _instances = {}
 
     def __init__(self, user_data, name: str = "未命名", agent_type: str = "personal"):
         """初始化本地智能体
@@ -74,6 +77,13 @@ class ANPUser:
         self.name = name
         self.user_dir = user_dir
         self.agent_type = agent_type
+        
+        # 将实例添加到缓存中（如果还没有的话）
+        if self.id not in self._instances:
+            self._instances[self.id] = self
+            logger.info(f"🆕 缓存ANPUser实例 (直接构造): {self.id}")
+        else:
+            logger.info(f"🔄 ANPUser实例已存在于缓存中: {self.id}")
         config = get_global_config()
         self.key_id = config.anp_sdk.user_did_key_id
 
@@ -109,6 +119,11 @@ class ANPUser:
 
     @classmethod
     def from_did(cls, did: str, name: str = "未命名", agent_type: str = "personal"):
+        # 检查实例缓存
+        if did in cls._instances:
+            logger.info(f"🔄 复用ANPUser实例: {did}")
+            return cls._instances[did]
+        
         user_data_manager = get_user_data_manager()
         user_data = user_data_manager.get_user_data(did)
         if not user_data:
@@ -124,7 +139,12 @@ class ANPUser:
             name = user_data.name
         if not user_data:
             raise ValueError(f"未找到 DID 为 {did} 的用户数据")
-        return cls(user_data, name, agent_type)
+        
+        # 创建新实例并缓存
+        instance = cls(user_data, name, agent_type)
+        cls._instances[did] = instance
+        logger.info(f"🆕 创建并缓存ANPUser实例: {did}")
+        return instance
 
     @classmethod
     def from_name(cls, name: str, agent_type: str = "personal"):
@@ -141,8 +161,18 @@ class ANPUser:
                 # 如果还是找不到，抛出异常
                 logger.error(f"未找到 name 为 {name} 的用户数据")
                 raise ValueError(f"未找到 name 为 '{name}' 的用户数据。请检查您的用户目录和配置文件。")
-            return cls( None, name, agent_type)
-        return cls(user_data, name, agent_type)
+        
+        # 获取到user_data后，使用DID进行缓存检查
+        did = user_data.did
+        if did in cls._instances:
+            logger.info(f"🔄 复用ANPUser实例 (通过name查找): {name} -> {did}")
+            return cls._instances[did]
+        
+        # 创建新实例并缓存
+        instance = cls(user_data, name, agent_type)
+        cls._instances[did] = instance
+        logger.info(f"🆕 创建并缓存ANPUser实例 (通过name查找): {name} -> {did}")
+        return instance
 
     def __del__(self):
         """确保在对象销毁时释放资源"""
@@ -277,6 +307,13 @@ class ANPUser:
                 return {"anp_result": {"status": "error", "message": f"No handler for group type: {req_type}"}}
         if req_type == "api_call":
             api_path = request_data.get("path")
+            
+            # 调试信息：显示当前ANPUser的所有API路由
+            self.logger.info(f"🔍 ANPUser {self.id} 查找API路径: {api_path}")
+            self.logger.info(f"🔍 ANPUser {self.id} 当前所有API路由:")
+            for route_path, route_handler in self.api_routes.items():
+                self.logger.info(f"   - {route_path}: {getattr(route_handler, '__name__', 'unknown')}")
+            
             handler = self.api_routes.get(api_path)
             if handler:
                 try:
@@ -563,8 +600,17 @@ class ANPUser:
             did_document=did_document
         )
         if success:
-            # 返回新创建的 ANPUser 实例
-            return True, ANPUser(user_data=new_user_data)
+            # 使用缓存机制创建ANPUser实例
+            hosted_did = new_user_data.did
+            if hosted_did in self._instances:
+                logger.info(f"🔄 复用ANPUser实例 (托管DID): {hosted_did}")
+                return True, self._instances[hosted_did]
+            
+            # 创建新实例并缓存
+            instance = ANPUser(user_data=new_user_data)
+            self._instances[hosted_did] = instance
+            logger.info(f"🆕 创建并缓存ANPUser实例 (托管DID): {hosted_did}")
+            return True, instance
         return False, None
 
 

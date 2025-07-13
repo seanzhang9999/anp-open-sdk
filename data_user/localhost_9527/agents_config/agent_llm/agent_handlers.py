@@ -61,15 +61,37 @@ async def chat_completion(request_data, request):
     """
     global my_llm_client
     
-    # 从request_data中提取消息内容
+    print(f"  -> LLM Agent API调用，接收到的request_data: {request_data}")
+    
+    # 从request_data中提取消息内容 - 支持多种格式
     message = None
-    if 'params' in request_data and isinstance(request_data['params'], dict):
-        message = request_data['params'].get('message')
-    elif 'message' in request_data:
-        message = request_data['message']
+    
+    # 尝试多种可能的参数格式
+    if isinstance(request_data, dict):
+        # 格式1: {"params": {"message": "..."}}
+        if 'params' in request_data and isinstance(request_data['params'], dict):
+            message = request_data['params'].get('message')
+        # 格式2: {"message": "..."}
+        elif 'message' in request_data:
+            message = request_data['message']
+        # 格式3: {"content": "..."}
+        elif 'content' in request_data:
+            message = request_data['content']
+        # 格式4: 直接从请求体中获取
+        else:
+            # 尝试从FastAPI请求中获取JSON数据
+            try:
+                if hasattr(request, 'json'):
+                    body_data = await request.json()
+                    message = body_data.get('message') or body_data.get('content')
+                    print(f"  -> 从请求体获取消息: {message}")
+            except Exception as e:
+                print(f"  -> 无法解析请求体: {e}")
     
     if not message:
-        return {"error": "Message is required in params."}
+        error_msg = f"Message is required. Received request_data: {request_data}"
+        print(f"  -> ❌ {error_msg}")
+        return {"error": error_msg}
     
     if not my_llm_client:
         return {"error": "LLM client is not initialized in this module."}

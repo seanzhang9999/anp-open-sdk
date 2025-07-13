@@ -5,6 +5,9 @@ import sys
 import asyncio
 import threading
 
+# 添加路径以便导入
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from anp_server_framework.anp_service.agent_api_call import agent_api_call_post
 from anp_server_framework.anp_service.agent_message_p2p import agent_msg_post
 from anp_server.server_mode import ServerMode

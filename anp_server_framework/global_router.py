@@ -109,7 +109,8 @@ class GlobalRouter:
             user_data = user_data_manager.get_user_data(did)
             
             if user_data:
-                anp_user = ANPUser(user_data)
+                # 使用from_did方法确保使用缓存的实例
+                anp_user = ANPUser.from_did(did)
                 anp_user.api_routes[path] = handler
                 
                 # 注册到ANP_Server的api_registry

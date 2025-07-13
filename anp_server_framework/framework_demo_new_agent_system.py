@@ -54,13 +54,21 @@ async def create_agents_with_new_system():
             if agent:
                 # 使用新的Agent系统重新创建
                 if share_did_config:
-                    # 共享DID模式
+                    # 共享DID模式 - 检查是否应该是主Agent
+                    # 只有第一个共享DID的Agent才设为主Agent
+                    is_primary = not any(
+                        info.get('shared') and info.get('primary_agent') 
+                        for agents_dict in AgentManager._did_usage_registry.values()
+                        for info in agents_dict.values()
+                        if agents_dict
+                    )
+                    
                     new_agent = AgentManager.create_agent(
                         agent, 
                         agent.name, 
                         shared=True, 
                         prefix=share_did_config.get('path_prefix', ''),
-                        primary_agent=True  # 暂时都设为主Agent
+                        primary_agent=is_primary  # 智能判断是否为主Agent
                     )
                 else:
                     # 独占DID模式
@@ -70,11 +78,11 @@ async def create_agents_with_new_system():
                         shared=False
                     )
                 
-                # 注册现有的API和消息处理器
-                for path, handler in agent.api_routes.items():
+                # 注册现有的API和消息处理器 - 使用list()避免字典在迭代时被修改
+                for path, handler in list(agent.api_routes.items()):
                     new_agent.api(path)(handler)
                 
-                for msg_type, handler in agent.message_handlers.items():
+                for msg_type, handler in list(agent.message_handlers.items()):
                     new_agent.message_handler(msg_type)(handler)
                 
                 created_agents.append(new_agent)
@@ -105,19 +113,23 @@ async def create_code_generated_agents():
         
         # 注册API
         @calc_agent.api("/add")
-        def add_api(request_data, request):
+        async def add_api(request_data, request):
             """加法计算API"""
-            a = request_data.get('a', 0)
-            b = request_data.get('b', 0)
+            # 从params中获取参数
+            params = request_data.get('params', {})
+            a = params.get('a', 0)
+            b = params.get('b', 0)
             result = a + b
             logger.info(f"🔢 计算: {a} + {b} = {result}")
             return {"result": result, "operation": "add", "inputs": [a, b]}
         
         @calc_agent.api("/multiply")
-        def multiply_api(request_data, request):
+        async def multiply_api(request_data, request):
             """乘法计算API"""
-            a = request_data.get('a', 1)
-            b = request_data.get('b', 1)
+            # 从params中获取参数
+            params = request_data.get('params', {})
+            a = params.get('a', 1)
+            b = params.get('b', 1)
             result = a * b
             logger.info(f"🔢 计算: {a} × {b} = {result}")
             return {"result": result, "operation": "multiply", "inputs": [a, b]}
@@ -156,9 +168,11 @@ async def create_code_generated_agents():
         )
         
         @weather_agent.api("/current")
-        def weather_current_api(request_data, request):
+        async def weather_current_api(request_data, request):
             """获取当前天气API"""
-            city = request_data.get('city', '北京')
+            # 从params中获取参数
+            params = request_data.get('params', {})
+            city = params.get('city', '北京')
             # 模拟天气数据
             weather_data = {
                 "city": city,
@@ -171,10 +185,12 @@ async def create_code_generated_agents():
             return weather_data
         
         @weather_agent.api("/forecast")
-        def weather_forecast_api(request_data, request):
+        async def weather_forecast_api(request_data, request):
             """获取天气预报API"""
-            city = request_data.get('city', '北京')
-            days = request_data.get('days', 3)
+            # 从params中获取参数
+            params = request_data.get('params', {})
+            city = params.get('city', '北京')
+            days = params.get('days', 3)
             
             forecast = []
             conditions = ["晴天", "多云", "小雨"]
@@ -213,9 +229,11 @@ async def create_code_generated_agents():
         )
         
         @assistant_agent.api("/help")
-        def help_api(request_data, request):
+        async def help_api(request_data, request):
             """帮助信息API"""
-            topic = request_data.get('topic', 'general')
+            # 从params中获取参数
+            params = request_data.get('params', {})
+            topic = params.get('topic', 'general')
             
             help_info = {
                 "general": "我是代码生成助手，可以提供各种帮助信息",
@@ -326,6 +344,17 @@ async def main():
     handlers = GlobalMessageManager.list_handlers()
     for handler in handlers:
         logger.info(f"  💬 {handler['did']}:{handler['msg_type']} <- {handler['agent_name']}")
+
+    # 调试：检查ANPUser的API路由
+    logger.info("\n🔍 调试：检查ANPUser的API路由注册情况...")
+    for agent in all_agents:
+        if hasattr(agent, 'anp_user'):
+            logger.info(f"Agent: {agent.name}")
+            logger.info(f"  DID: {agent.anp_user.id}")
+            logger.info(f"  API路由数量: {len(agent.anp_user.api_routes)}")
+            for path, handler in agent.anp_user.api_routes.items():
+                handler_name = handler.__name__ if hasattr(handler, '__name__') else 'unknown'
+                logger.info(f"    - {path}: {handler_name}")
 
     # 测试新Agent系统功能
     await test_new_agent_system(all_agents)

@@ -54,7 +54,8 @@ class HostedDIDDemo:
             
             if users:
                 user_id=0
-                hosting_agent = ANPUser(users[user_id])
+                # 使用from_did方法确保使用缓存的实例
+                hosting_agent = ANPUser.from_did(users[user_id].did)
                 print(f"   使用现有用户作为托管服务器: {users[user_id].name}")
                 print(f"   用户目录: {user_dir}")
             else:
@@ -111,7 +112,8 @@ class HostedDIDDemo:
             
             if users:
                 user_id = 0
-                self.client_agent = ANPUser(users[user_id])
+                # 使用from_did方法确保使用缓存的实例
+                self.client_agent = ANPUser.from_did(users[user_id].did)
                 print(f"✅ 使用现有用户作为客户端: {users[user_id].name}")
                 print(f"   DID: {self.client_agent.id}")
                 print(f"   名称: {self.client_agent.name}")

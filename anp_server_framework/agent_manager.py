@@ -69,7 +69,7 @@ class AgentManager:
                     if agent_info.get('prefix') == prefix:
                         raise ValueError(f"❌ Prefix冲突: {prefix} 已被Agent '{agent_name}' 使用")
                 
-                # 检查主Agent冲突
+                # 检查主Agent冲突 - 只检查同一个DID下的Agent
                 if primary_agent:
                     for agent_name, agent_info in existing_agents.items():
                         if agent_info.get('primary_agent'):

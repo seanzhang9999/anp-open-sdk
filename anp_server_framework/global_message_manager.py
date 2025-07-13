@@ -103,7 +103,8 @@ class GlobalMessageManager:
             user_data = user_data_manager.get_user_data(did)
             
             if user_data:
-                anp_user = ANPUser(user_data)
+                # 使用from_did方法确保使用缓存的实例
+                anp_user = ANPUser.from_did(did)
                 # 使用ANPUser的内部注册方法，包含冲突检测
                 anp_user._register_message_handler_internal(msg_type, handler, agent_name)
         except Exception as e:

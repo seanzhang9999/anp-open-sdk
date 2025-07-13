@@ -41,11 +41,11 @@ class DemoAgentLoader:
     def find_hosted_agent(sdk: ANP_Server, user_datas) -> Optional[ANPUser]:
         """查找托管的智能体"""
         for user_data in user_datas:
-            agent = ANPUser(sdk, user_data.did)
+            # 使用from_did方法确保使用缓存的实例
+            agent = ANPUser.from_did(user_data.did)
             if agent.is_hosted_did:
                 logger.debug(f"hosted_did: {agent.id}")
                 logger.debug(f"parent_did: {agent.parent_did}")
                 logger.debug(f"hosted_info: {agent.hosted_info}")
                 return agent
         return None
-
