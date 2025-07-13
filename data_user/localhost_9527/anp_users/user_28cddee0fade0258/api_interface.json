@@ -1,38 +1,30 @@
 {
   "jsonrpc": "2.0",
   "info": {
-    "title": "Calculator Agent JSON-RPC Interface",
+    "title": "Large Language Model Agent JSON-RPC Interface",
     "version": "0.1.0",
-    "description": "Methods offered by Calculator Agent"
+    "description": "Methods offered by Large Language Model Agent"
   },
   "methods": [
     {
-      "name": "add",
-      "summary": "发送a和b，返回a+b的结果",
+      "name": "chat",
+      "summary": "chat_completion",
       "params": {
-        "a": {
-          "type": "float",
-          "value": 1.23
+        "request_data": {
+          "type": "Any"
         },
-        "b": {
-          "type": "float",
-          "value": 4.56
-        }
-      },
-      "result": {
-        "result": {
-          "type": "float",
-          "value": 5.79
+        "request": {
+          "type": "Any"
         }
       },
       "meta": {
         "openapi": "3.0.0",
         "info": {
-          "title": "Caculator Agent API",
+          "title": "ANP Agent API",
           "version": "1.0.0"
         },
         "httpMethod": "POST",
-        "endpoint": "/add"
+        "endpoint": "/chat"
       }
     }
   ]

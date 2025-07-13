@@ -7,13 +7,151 @@ from pathlib import Path
 import yaml
 import logging
 from typing import Dict, Optional, Tuple, Any
+from datetime import datetime
 
 from anp_sdk.anp_sdk_user_data import get_user_data_manager
 from anp_sdk.anp_user import ANPUser
 from anp_sdk.config import UnifiedConfig
 from anp_server_framework.anp_service.anp_tool import wrap_business_handler
+from anp_server_framework.agent import Agent
 
 logger = logging.getLogger(__name__)
+
+
+class AgentManager:
+    """统一的Agent管理器 - 负责Agent创建、注册和冲突管理"""
+    
+    # 类级别的DID使用注册表
+    _did_usage_registry: Dict[str, Dict[str, Dict[str, Any]]] = {}  # {did: {agent_name: agent_info}}
+    
+    @classmethod
+    def create_agent(cls, anp_user: ANPUser, name: str, 
+                    shared: bool = False, 
+                    prefix: Optional[str] = None,
+                    primary_agent: bool = False) -> Agent:
+        """统一的Agent创建接口
+        
+        Args:
+            anp_user: ANPUser实例（必选）
+            name: Agent名称（必选）
+            shared: 是否共享DID（默认False）
+            prefix: 共享模式下的API前缀（共享模式必选）
+            primary_agent: 是否为主Agent，拥有消息处理权限（共享模式可选）
+            
+        Returns:
+            Agent: 创建的Agent实例
+            
+        Raises:
+            ValueError: 当发生冲突时抛出异常
+        """
+        did = anp_user.id
+        
+        if not shared:
+            # 独占模式：检查DID是否已被使用
+            if did in cls._did_usage_registry:
+                existing_agents = list(cls._did_usage_registry[did].keys())
+                raise ValueError(
+                    f"❌ DID独占冲突: {did} 已被Agent '{existing_agents[0]}' 使用\n"
+                    f"解决方案:\n"
+                    f"  1. 使用不同的DID\n"
+                    f"  2. 设置 shared=True 进入共享模式"
+                )
+        else:
+            # 共享模式：检查prefix和主Agent
+            if not prefix:
+                raise ValueError("❌ 共享模式必须提供 prefix 参数")
+            
+            if did in cls._did_usage_registry:
+                existing_agents = cls._did_usage_registry[did]
+                
+                # 检查prefix冲突
+                for agent_name, agent_info in existing_agents.items():
+                    if agent_info.get('prefix') == prefix:
+                        raise ValueError(f"❌ Prefix冲突: {prefix} 已被Agent '{agent_name}' 使用")
+                
+                # 检查主Agent冲突
+                if primary_agent:
+                    for agent_name, agent_info in existing_agents.items():
+                        if agent_info.get('primary_agent'):
+                            raise ValueError(
+                                f"❌ 主Agent冲突: DID {did} 的主Agent已被 '{agent_name}' 占用\n"
+                                f"解决方案:\n"
+                                f"  1. 设置 primary_agent=False\n"
+                                f"  2. 修改现有主Agent配置"
+                            )
+        
+        # 创建Agent
+        agent = Agent(anp_user, name, shared, prefix, primary_agent)
+        
+        # 注册使用记录
+        if did not in cls._did_usage_registry:
+            cls._did_usage_registry[did] = {}
+        
+        cls._did_usage_registry[did][name] = {
+            'agent': agent,
+            'shared': shared,
+            'prefix': prefix,
+            'primary_agent': primary_agent,
+            'created_at': datetime.now().isoformat()
+        }
+        
+        logger.info(f"✅ Agent创建成功: {name}")
+        logger.info(f"   DID: {did} ({'共享' if shared else '独占'})")
+        if prefix:
+            logger.info(f"   Prefix: {prefix}")
+        if primary_agent:
+            logger.info(f"   主Agent: 是")
+        
+        return agent
+    
+    @classmethod
+    def get_agent_info(cls, did: str, agent_name: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """获取Agent信息"""
+        if did not in cls._did_usage_registry:
+            return None
+        
+        if agent_name:
+            return cls._did_usage_registry[did].get(agent_name)
+        else:
+            # 返回该DID下的所有Agent信息
+            return cls._did_usage_registry[did]
+    
+    @classmethod
+    def list_agents(cls) -> Dict[str, Any]:
+        """列出所有Agent信息"""
+        result = {}
+        for did, agents in cls._did_usage_registry.items():
+            result[did] = {}
+            for agent_name, agent_info in agents.items():
+                # 不包含agent实例，避免序列化问题
+                result[did][agent_name] = {
+                    'shared': agent_info['shared'],
+                    'prefix': agent_info['prefix'],
+                    'primary_agent': agent_info['primary_agent'],
+                    'created_at': agent_info['created_at']
+                }
+        return result
+    
+    @classmethod
+    def remove_agent(cls, did: str, agent_name: str) -> bool:
+        """移除Agent"""
+        if did in cls._did_usage_registry and agent_name in cls._did_usage_registry[did]:
+            del cls._did_usage_registry[did][agent_name]
+            
+            # 如果该DID下没有Agent了，删除DID记录
+            if not cls._did_usage_registry[did]:
+                del cls._did_usage_registry[did]
+            
+            logger.info(f"🗑️  Agent已移除: {agent_name} (DID: {did})")
+            return True
+        return False
+    
+    @classmethod
+    def clear_all_agents(cls):
+        """清除所有Agent（主要用于测试）"""
+        cls._did_usage_registry.clear()
+        logger.debug("清除所有Agent注册记录")
+
 
 class LocalAgentManager:
     """本地 Agent 管理器，负责加载、注册和生成接口文档"""
@@ -245,7 +383,6 @@ class LocalAgentManager:
 
 
 async def save_interface_files(user_full_path: str, interface_data: dict, inteface_file_name: str, interface_file_type: str):
-
     """保存接口配置文件"""
     # 保存智能体描述文件
     template_ad_path = Path(user_full_path) / inteface_file_name
