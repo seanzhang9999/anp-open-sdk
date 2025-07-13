@@ -17,9 +17,9 @@ anp_sdk:
   port: 9527                         # 服务端口
   
   # 路径配置（{APP_ROOT} 会自动替换为项目根目录）
-  user_did_path: "{APP_ROOT}/anp_open_sdk/anp_users"
-  user_hosted_path: "{APP_ROOT}/anp_open_sdk/anp_users_hosted"
-  group_msg_path: "{APP_ROOT}/anp_open_sdk"
+  user_did_path: "{APP_ROOT}/anp_sdk/anp_users"
+  user_hosted_path: "{APP_ROOT}/anp_sdk/anp_users_hosted"
+  group_msg_path: "{APP_ROOT}/anp_sdk"
 
   # 虚拟目录配置
   auth_virtual_dir: "wba/auth"
@@ -101,7 +101,7 @@ llm:
 # ==========================================
 mail:
   use_local_backend: true
-  local_backend_path: "{APP_ROOT}/anp_open_sdk/testuse/mail_local_backend"
+  local_backend_path: "{APP_ROOT}/anp_sdk/testuse/mail_local_backend"
   smtp_server: "smtp.gmail.com"
   smtp_port: 587
   imap_server: "imap.gmail.com"

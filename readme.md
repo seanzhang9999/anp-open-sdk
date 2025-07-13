@@ -63,7 +63,7 @@ pip install agent-connect
 
 ```bash
 python test/test_anpsdk_all.py
-python demo_anp_open_sdk/anp_demo_main.py
+python demo_anp_sdk/anp_demo_main.py
 ```
 
 ### 4. 体验完整的智能体网络
@@ -72,9 +72,9 @@ python demo_anp_open_sdk/anp_demo_main.py
 
 ```bash
 # 检查所有 Agent 插件的 DID 是否绑定，未绑定可新建 DID
-python anp_open_sdk_framework_demo/agent_user_binding.py
+python demo_anp_framework/agent_user_binding.py
 # 启动智能体网络测试
-python anp_open_sdk_framework_demo/framework_demo.py
+python demo_anp_framework/framework_demo.py
 ```
 
 逐个调试main函数中如下代码，体验插件Agent调用其他插件Agent的web服务和本地api的方法
@@ -107,7 +107,7 @@ python anp_open_sdk_framework_demo/framework_demo.py
 ## 🔧 二次开发推荐
 
 1. **复制配置文件**
-   从 `anp_open_sdk_framework_demo_agent_unified_config.yaml` 复制一份，作为你的智能体网络定义文件。
+   从 `unified_config_framework_demo.yaml` 复制一份，作为你的智能体网络定义文件。
 2. **修改主服务入口**
    直接修改 `framework_demo.py`，或复制一份作为你的 ANP Agent 插件主服务启动脚本。
 3. **在插件中添加你的业务逻辑**

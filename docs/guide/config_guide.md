@@ -9,7 +9,7 @@ ANP SDK 提供了一个强大的统一配置系统，支持 YAML 配置文件、
 ### 1.1 初始化配置
 
 ```python
-from anp_open_sdk.config import UnifiedConfig, set_global_config, get_global_config
+from anp_sdk.config import UnifiedConfig, set_global_config, get_global_config
 
 # 方式1：使用默认配置文件名和路径
 app_config = UnifiedConfig()  # 默认使用 {APP_ROOT}/unified_config.yaml
@@ -33,23 +33,24 @@ set_global_config(app_config)
 ### 1.2 在其他模块中使用配置
 
 ```python
-from anp_open_sdk.config import get_global_config
+from anp_sdk.config import get_global_config
+
 
 def some_function():
     config = get_global_config()
-    
+
     # 访问配置项（享受完整的 IDE 代码提示）
     host = config.anp_sdk.host
     port = config.anp_sdk.port
     debug_mode = config.anp_sdk.debug_mode
-    
+
     # 访问 LLM 配置
     api_url = config.llm.api_url
     model = config.llm.default_model
-    
+
     # 访问环境变量
     openai_key = config.env.openai_api_key
-    
+
     # 访问敏感信息
     db_url = config.secrets.database_url
 ```
@@ -78,13 +79,13 @@ anp_sdk:
   user_hosted_path: "{APP_ROOT}/data_user/{host}_{port}/anp_users_hosted"
 
 mail:
-  local_backend_path: "{APP_ROOT}/anp_open_sdk/testuse/mail_local_backend"
+  local_backend_path: "{APP_ROOT}/anp_sdk/testuse/mail_local_backend"
 ```
 
 ### 2.3 路径解析方法
 
 ```python
-from anp_open_sdk.config import UnifiedConfig
+from anp_sdk.config import UnifiedConfig
 
 # 类方法：解析包含 {APP_ROOT} 的路径
 resolved_path = UnifiedConfig.resolve_path("{APP_ROOT}/data/config.json")
@@ -156,7 +157,7 @@ my_service:
 ### 4.2 在类型定义中添加协议
 
 ```python
-# anp_open_sdk/config/config_types.py
+# anp_sdk/config/config_types.py
 from typing import Protocol, List
 
 # 1. 定义子配置协议
@@ -190,17 +191,18 @@ class BaseUnifiedConfigProtocol(Protocol):
 ### 4.3 使用新配置（享受完整代码提示）
 
 ```python
-from anp_open_sdk.config import get_global_config
+from anp_sdk.config import get_global_config
+
 
 def use_my_service():
     config = get_global_config()
-    
+
     # IDE 会提供完整的代码提示
     if config.my_service.enabled:
         timeout = config.my_service.timeout
         endpoints = config.my_service.endpoints
         max_retries = config.my_service.settings.max_retries
-        
+
         print(f"Service timeout: {timeout}")
         print(f"Max retries: {max_retries}")
         for endpoint in endpoints:
@@ -295,8 +297,8 @@ config.env.reload()
 
 ```python
 # main.py
-from anp_open_sdk.config import UnifiedConfig, set_global_config, get_global_config
-from anp_open_sdk.utils.log_base import setup_logging
+from anp_sdk.config import UnifiedConfig, set_global_config, get_global_config
+from anp_sdk.utils.log_base import setup_logging
 import logging
 
 # 1. 初始化配置
@@ -307,18 +309,21 @@ set_global_config(app_config)
 setup_logging()
 logger = logging.getLogger(__name__)
 
+
 # 3. 使用配置
 async def main():
     config = get_global_config()
-    
-    logger.info(f"Starting server on {config.anp_sdk.host}:{config.anp_sdk.port}")
-    
+
+    logger.info(f"Starting anp_server on {config.anp_sdk.host}:{config.anp_sdk.port}")
+
     if config.my_service.enabled:
         logger.info("My service is enabled")
         # 使用服务配置...
 
+
 if __name__ == "__main__":
     import asyncio
+
     asyncio.run(main())
 ```
 
@@ -326,24 +331,25 @@ if __name__ == "__main__":
 
 ```python
 # service_module.py
-from anp_open_sdk.config import get_global_config
+from anp_sdk.config import get_global_config
 import logging
 
 logger = logging.getLogger(__name__)
 
+
 class MyService:
     def __init__(self):
         self.config = get_global_config()
-        
+
     async def start(self):
         if not self.config.my_service.enabled:
             logger.info("Service is disabled")
             return
-            
+
         timeout = self.config.my_service.timeout
         endpoints = self.config.my_service.endpoints
         api_key = self.config.secrets.my_service_api_key
-        
+
         logger.info(f"Starting service with timeout: {timeout}")
         # 服务启动逻辑...
 ```
@@ -383,14 +389,15 @@ secrets:
 ```python
 # 1. 在应用入口处初始化配置
 # main.py 或 app.py
-from anp_open_sdk.config import UnifiedConfig, set_global_config
+from anp_sdk.config import UnifiedConfig, set_global_config
 
 app_config = UnifiedConfig()
 set_global_config(app_config)
 
 # 2. 在其他模块中使用配置
 # service.py
-from anp_open_sdk.config import get_global_config
+from anp_sdk.config import get_global_config
+
 
 def my_function():
     config = get_global_config()
@@ -401,14 +408,16 @@ def my_function():
 
 ```python
 # 利用类型提示获得更好的 IDE 支持
-from anp_open_sdk.config import get_global_config
-from anp_open_sdk.config.config_types import BaseUnifiedConfigProtocol
+from anp_sdk.config import get_global_config
+from anp_sdk.config.config_types import BaseUnifiedConfigProtocol
+
 
 def process_config(config: BaseUnifiedConfigProtocol):
     # IDE 会提供完整的代码提示
     host = config.anp_sdk.host
     port = config.anp_sdk.port
     # ...
+
 
 # 使用
 config = get_global_config()

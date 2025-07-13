@@ -3,9 +3,9 @@
 # ===================================================================
 
 # 0. 项目临时文件
-demo_anp_open_sdk/demo_data/
-demo_anp_open_sdk/demo_data_tmp/
-anp_open_sdk_framework_demo/local_methods_doc.json
+demo_anp_sdk/demo_data/
+demo_anp_sdk/demo_data_tmp/
+demo_anp_framework/local_methods_doc.json
 data_demo_simulate/
 data_tmp_result/
 
@@ -137,3 +137,4 @@ yarn-error.log*
 
 **/*/hosted_did_queue/*
 **/*/hosted_did_results/*
+/memory-bank/

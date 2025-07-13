@@ -3,17 +3,13 @@ info:
   version: 1.0.0
 openapi: 3.0.0
 paths:
-  /calculator/add:
+  /add:
     post:
       requestBody:
         content:
           application/json:
             schema:
-              properties:
-                a:
-                  type: string
-                b:
-                  type: string
+              properties: {}
               type: object
         required: true
       responses:
@@ -23,4 +19,4 @@ paths:
               schema:
                 type: object
           description: 返回结果
-      summary: Calculator Agent的/calculator/add接口
+      summary: 计算两个数的和

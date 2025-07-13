@@ -1,6 +1,10 @@
 name: Large Language Model Agent
-did: did:wba:localhost%3A9527:wba:user:27c0b1d11180f973
+# 使用共享DID配置，共享Calculator的DID
+share_did:
+  enabled: true
+  shared_did: "did:wba:localhost%3A9527:wba:user:28cddee0fade0258"
+  path_prefix: "/llm"
 api:
-- path: /llm/chat
+- path: /chat  # 原始路径，通过共享DID访问时为 /llm/chat
   method: POST
   handler: chat_completion

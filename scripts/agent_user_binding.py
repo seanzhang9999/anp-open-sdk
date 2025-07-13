@@ -22,10 +22,10 @@ import json
 import logging
 from pathlib import Path
 from typing import Dict, List, Optional
-from anp_open_sdk.utils.log_base import setup_logging
-from anp_open_sdk.config import UnifiedConfig,set_global_config
+from anp_sdk.utils.log_base import setup_logging
+from anp_sdk.config import UnifiedConfig,set_global_config
 
-app_config = UnifiedConfig(config_file='anp_open_sdk_framework_demo_agent_unified_config.yaml')
+app_config = UnifiedConfig(config_file='unified_config_framework_demo.yaml')
 set_global_config(app_config)
 
 setup_logging() # 假设 setup_logging 内部也改用 get_global_config()
@@ -41,6 +41,7 @@ class AgentUserBindingManager:
         self.user_data_dirs = []
         self.agent_mappings = {}
         self.user_dids = {}
+        self.shared_did_configs = {}  # 新增：共享DID配置
         
     def discover_directories(self):
         """发现所有相关目录"""
@@ -78,19 +79,40 @@ class AgentUserBindingManager:
                     agent_name = config.get('name', 'Unknown')
                     agent_did = config.get('did', None)
                     
+                    # 🆕 处理共享DID配置
+                    share_did_config = config.get('share_did', {})
+                    shared_did = None
+                    if share_did_config.get('enabled'):
+                        shared_did = share_did_config.get('shared_did')
+                    
                     self.agent_mappings[str(mapping_file)] = {
                         'config': config,
                         'name': agent_name,
                         'did': agent_did,
+                        'shared_did': shared_did,
+                        'share_did_config': share_did_config,
                         'file_path': mapping_file,
                         'agents_config_dir': agents_config_dir,
                         'anp_users_dir': anp_users_dir
                     }
                     
+                    # 🆕 收集共享DID配置
+                    if shared_did:
+                        if shared_did not in self.shared_did_configs:
+                            self.shared_did_configs[shared_did] = []
+                        self.shared_did_configs[shared_did].append({
+                            'agent_name': agent_name,
+                            'path_prefix': share_did_config.get('path_prefix', ''),
+                            'file_path': mapping_file,
+                            'api_paths': [api.get('path', '') for api in config.get('api', [])]
+                        })
+                    
                 except Exception as e:
                     print(f"❌ 无法加载 {mapping_file}: {e}")
         
         print(f"✅ 成功加载 {len(self.agent_mappings)} 个 agent 配置")
+        if self.shared_did_configs:
+            print(f"🔗 发现 {len(self.shared_did_configs)} 个共享DID配置")
     
     def load_user_dids(self):
         """加载所有用户 DID 信息"""
@@ -150,7 +172,7 @@ class AgentUserBindingManager:
         """为 agent 创建新的用户 DID"""
         try:
             # 导入必要的模块（延迟导入避免配置依赖）
-            from anp_open_sdk.did.did_tool import create_did_user
+            from anp_sdk.did.did_tool import create_did_user
             import uuid
             
             # 生成用户ID
@@ -276,32 +298,149 @@ class AgentUserBindingManager:
         else:
             return False
     
+    def validate_config_consistency(self):
+        """验证配置一致性"""
+        print("\n🔍 检查配置一致性...")
+        errors = []
+        
+        for file_path, agent_info in self.agent_mappings.items():
+            config = agent_info['config']
+            agent_name = agent_info['name']
+            
+            # 检查1: share_did和did不能同时存在
+            has_did = 'did' in config and config['did']
+            has_share_did = 'share_did' in config and config['share_did'].get('enabled')
+            
+            if has_did and has_share_did:
+                errors.append(f"{agent_name}: 不能同时配置 'did' 和 'share_did'")
+            
+            if not has_did and not has_share_did:
+                errors.append(f"{agent_name}: 必须配置 'did' 或 'share_did' 之一")
+            
+            # 注意：%3A 是正确的URL编码格式，不需要修复
+            # 检查2: DID基本格式验证
+            if has_did:
+                did = config['did']
+                if not did.startswith('did:'):
+                    errors.append(f"{agent_name}: DID格式错误，应以 'did:' 开头")
+            
+            # 检查3: 共享DID基本格式验证
+            if has_share_did:
+                shared_did = config['share_did']['shared_did']
+                if not shared_did.startswith('did:'):
+                    errors.append(f"{agent_name}: 共享DID格式错误，应以 'did:' 开头")
+        
+        if errors:
+            print("❌ 发现配置一致性错误:")
+            for error in errors:
+                print(f"   {error}")
+        else:
+            print("✅ 配置一致性检查通过!")
+        
+        return errors
+    
+    def check_shared_did_path_conflicts(self):
+        """检查共享DID路径冲突"""
+        print("\n🔍 检查共享DID路径冲突...")
+        conflicts = {}
+        
+        for shared_did, agents in self.shared_did_configs.items():
+            path_conflicts = []
+            path_owners = {}
+            
+            for agent in agents:
+                path_prefix = agent['path_prefix']
+                for api_path in agent['api_paths']:
+                    # 组合完整路径：path_prefix + api_path
+                    full_path = f"{path_prefix.rstrip('/')}{api_path}"
+                    
+                    if full_path in path_owners:
+                        conflict_msg = f"路径 '{full_path}' 冲突: {path_owners[full_path]} vs {agent['agent_name']}"
+                        path_conflicts.append(conflict_msg)
+                    else:
+                        path_owners[full_path] = agent['agent_name']
+            
+            if path_conflicts:
+                conflicts[shared_did] = path_conflicts
+        
+        if conflicts:
+            print("❌ 发现共享DID路径冲突:")
+            for shared_did, conflict_list in conflicts.items():
+                print(f"   共享DID: {shared_did}")
+                for conflict in conflict_list:
+                    print(f"     {conflict}")
+        else:
+            print("✅ 共享DID路径检查通过!")
+        
+        return conflicts
+    
+    def validate_did_format(self, file_path: str) -> List[str]:
+        """验证DID格式（不修复，只检查）"""
+        agent_info = self.agent_mappings[file_path]
+        config = agent_info['config']
+        agent_name = agent_info['name']
+        warnings = []
+        
+        # 检查独立DID格式
+        if 'did' in config and config['did']:
+            did = config['did']
+            if not did.startswith('did:'):
+                warnings.append(f"{agent_name}: DID格式可能有问题，应以 'did:' 开头")
+        
+        # 检查共享DID格式
+        if 'share_did' in config and config['share_did'].get('enabled'):
+            share_config = config['share_did']
+            if 'shared_did' in share_config:
+                shared_did = share_config['shared_did']
+                if not shared_did.startswith('did:'):
+                    warnings.append(f"{agent_name}: 共享DID格式可能有问题，应以 'did:' 开头")
+        
+        return warnings
+    
     def generate_report(self):
         """生成绑定关系报告"""
         print(f"\n📊 Agent 用户绑定关系报告")
-        print("=" * 100)
-        print(f"{'Agent名称':<25} {'DID':<45} {'用户名':<20} {'配置文件':<30}")
-        print("-" * 100)
+        print("=" * 120)
+        print(f"{'Agent名称':<25} {'类型':<10} {'DID/共享DID':<50} {'用户名':<20} {'配置文件':<30}")
+        print("-" * 120)
         
         for idx, (file_path, agent_info) in enumerate(self.agent_mappings.items(), 1):
             agent_name = agent_info['name']
-            agent_did = agent_info['did'] or '无DID'
             
-            if agent_info['did'] and agent_info['did'] in self.user_dids:
-                user_name = self.user_dids[agent_info['did']]['user_name']
+            # 判断类型和DID
+            if agent_info['shared_did']:
+                agent_type = "共享DID"
+                did_info = agent_info['shared_did']
+                path_prefix = agent_info['share_did_config'].get('path_prefix', '')
+                if path_prefix:
+                    did_info += f" ({path_prefix})"
+                user_name = "共享"
             else:
-                user_name = '未绑定'
+                agent_type = "独立DID"
+                did_info = agent_info['did'] or '无DID'
+                if agent_info['did'] and agent_info['did'] in self.user_dids:
+                    user_name = self.user_dids[agent_info['did']]['user_name']
+                else:
+                    user_name = '未绑定'
             
             config_file = str(agent_info['file_path']).split('agents_config/')[-1] if 'agents_config/' in str(agent_info['file_path']) else str(agent_info['file_path'])
             
-            print(f"{agent_name:<25} {agent_did:<45} {user_name:<20} {config_file:<30}")
+            print(f"{agent_name:<25} {agent_type:<10} {did_info:<50} {user_name:<20} {config_file:<30}")
         
-        print("=" * 100)
+        print("=" * 120)
         print(f"总计: {len(self.agent_mappings)} 个 Agent")
+        
+        # 共享DID统计
+        if self.shared_did_configs:
+            print(f"\n🔗 共享DID统计:")
+            for shared_did, agents in self.shared_did_configs.items():
+                print(f"   {shared_did}:")
+                for agent in agents:
+                    print(f"     - {agent['agent_name']} (前缀: {agent['path_prefix'] or '无'})")
     
     def run_checks(self, interactive: bool = True, auto_fix: bool = False):
         """运行所有检查"""
-        print("🚀 开始 Agent 用户绑定检查...")
+        print("🚀 开始增强的 Agent 用户绑定检查...")
         
         # 发现目录
         self.discover_directories()
@@ -318,7 +457,27 @@ class AgentUserBindingManager:
             print("❌ 未找到任何 agent_mappings.yaml 文件")
             return False
         
-        # 检查重复 DID
+        # 🆕 1. 配置一致性检查
+        consistency_errors = self.validate_config_consistency()
+        
+        # 🆕 2. DID格式验证
+        print("\n🔍 验证DID格式...")
+        format_warnings = []
+        for file_path in self.agent_mappings:
+            warnings = self.validate_did_format(file_path)
+            format_warnings.extend(warnings)
+        
+        if format_warnings:
+            print("⚠️  发现DID格式警告:")
+            for warning in format_warnings:
+                print(f"   {warning}")
+        else:
+            print("✅ DID格式验证通过!")
+        
+        # 🆕 3. 共享DID路径冲突检查
+        path_conflicts = self.check_shared_did_path_conflicts()
+        
+        # 4. 检查重复 DID
         duplicates = self.check_duplicate_dids()
         if duplicates:
             print(f"\n❌ 发现重复 DID:")
@@ -328,10 +487,17 @@ class AgentUserBindingManager:
                     agent_name = self.agent_mappings[file_path]['name']
                     print(f"     - {agent_name} ({file_path})")
         
-        # 检查无效 DID
-        invalid_agents = self.check_invalid_dids()
+        # 5. 检查无效 DID（只检查独立DID的agent）
+        invalid_agents = []
+        for file_path, agent_info in self.agent_mappings.items():
+            # 只检查独立DID的agent
+            if not agent_info['shared_did']:
+                did = agent_info['did']
+                if not did or did not in self.user_dids:
+                    invalid_agents.append(file_path)
+        
         if invalid_agents:
-            print(f"\n⚠️  发现 {len(invalid_agents)} 个需要修复的 Agent:")
+            print(f"\n⚠️  发现 {len(invalid_agents)} 个需要修复的独立DID Agent:")
             
             fixed_count = 0
             for file_path in invalid_agents:
@@ -346,11 +512,19 @@ class AgentUserBindingManager:
             if auto_fix or interactive:
                 print(f"\n🔧 修复完成: {fixed_count}/{len(invalid_agents)} 个 Agent")
         
-        # 如果没有问题，显示报告
-        if not duplicates and not invalid_agents:
-            print("\n✅ 所有 Agent 的 DID 绑定都正常!")
+        # 6. 总结检查结果
+        total_issues = len(consistency_errors) + len(path_conflicts) + len(duplicates) + len(invalid_agents)
+        if total_issues == 0:
+            print("\n✅ 所有检查都通过了！配置完全正常。")
+        else:
+            print(f"\n📋 检查总结:")
+            print(f"   - 配置一致性错误: {len(consistency_errors)}")
+            print(f"   - 共享DID路径冲突: {len(path_conflicts)}")
+            print(f"   - 重复DID: {len(duplicates)}")
+            print(f"   - 无效DID绑定: {len(invalid_agents)}")
+            print(f"   - DID格式修复: {format_fixed_count}")
         
-        # 生成最终报告
+        # 7. 生成最终报告
         self.generate_report()
         
         return True

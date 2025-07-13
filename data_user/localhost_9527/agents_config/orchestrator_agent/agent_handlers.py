@@ -1,17 +1,17 @@
-# anp_open_sdk/agents_config/orchestrator_agent/agent_handlers.py
+# anp_sdk/agents_config/orchestrator_agent/agent_handlers.py
 
 import httpx  # 需要安装 httpx: pip install httpx
 import json
 
-from anp_open_sdk_framework.adapter.anp_service.agent_api_call import agent_api_call_get
-from anp_open_sdk_framework.adapter.anp_service.anp_tool import ANPToolCrawler
+from anp_server_framework.anp_service.agent_api_call import agent_api_call_get, agent_api_call_post
+from anp_server_framework.anp_service.anp_tool import ANPToolCrawler
 import logging
 logger = logging.getLogger(__name__)
-from anp_open_sdk_framework.server.anp_server import ANP_Server
-from anp_open_sdk.anp_user import ANPUser
-from anp_open_sdk.auth.auth_client import send_authenticated_request
-from anp_open_sdk_framework.adapter.local_service.local_methods_caller import LocalMethodsCaller
-from anp_open_sdk_framework.adapter.local_service.local_methods_doc import LocalMethodsDocGenerator
+from anp_server.anp_server import ANP_Server
+from anp_sdk.anp_user import ANPUser
+from anp_sdk.auth.auth_client import send_authenticated_request
+from anp_server_framework.local_service.local_methods_caller import LocalMethodsCaller
+from anp_server_framework.local_service.local_methods_doc import LocalMethodsDocGenerator
 
 # 在初始化时创建调用器
 caller = None
@@ -136,7 +136,7 @@ async def run_calculator_add_demo():
         "b": 4.56
     }
 
-    result = await agent_api_call_get(
+    result = await agent_api_call_post(
     my_agent_instance.id, calculator_agent.id, "/calculator/add", params  )
 
     logger.info(f"计算api调用结果: {result}")

@@ -1,7 +1,11 @@
 name: Calculator Agent
-did: did:wba:localhost%3A9527:wba:user:28cddee0fade0258
+# 共享DID配置 - 注意：使用共享DID时不设置独立的did字段
+share_did:
+  enabled: true
+  shared_did: "did:wba:localhost%3A9527:wba:user:28cddee0fade0258"
+  path_prefix: "/calculator"
 api:
-- path: /calculator/add
+- path: /add  # 原始路径，通过共享DID访问时为 /calculator/add
   method: POST
   handler: add
   # 下面开始是为了json rpc改进添加的，未来可以考虑ai来辅助迭代生成

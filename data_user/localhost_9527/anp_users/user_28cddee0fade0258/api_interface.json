@@ -7,7 +7,7 @@
   },
   "methods": [
     {
-      "name": "calculator.add",
+      "name": "add",
       "summary": "发送a和b，返回a+b的结果",
       "params": {
         "a": {
@@ -32,7 +32,7 @@
           "version": "1.0.0"
         },
         "httpMethod": "POST",
-        "endpoint": "/calculator/add"
+        "endpoint": "/add"
       }
     }
   ]

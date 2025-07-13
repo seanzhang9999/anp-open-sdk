@@ -1,7 +1,8 @@
 import os
 import yaml
 from openai import AsyncOpenAI
-from anp_open_sdk.anp_user import ANPUser
+from anp_sdk.anp_user import ANPUser
+from anp_sdk.config import get_global_config
 
 # --- 模块级变量，代表这个Agent实例的状态 ---
 # 这些变量在模块被加载时创建，并贯穿整个应用的生命周期
@@ -30,17 +31,15 @@ async def initialize_agent(agent, sdk_instance):
     print(f"  -> Self-created agent instance: {my_agent_instance.name}")
 
     # 3. 创建并存储LLM客户端作为模块级变量
-    api_key = os.getenv("OPENAI_API_KEY", "your_default_key_if_not_set")
-    base_url = os.getenv("OPENAI_BASE_URL")
+    config = get_global_config()
+    api_key = config.secrets.openai_api_key
+    base_url = config.llm.api_url
+
     my_llm_client = AsyncOpenAI(api_key=api_key, base_url=base_url)
     print(f"  -> Self-created LLM client.")
 
-    # 4. 自己注册自己的API
-    # 注意：现在是直接在模块内调用实例的方法
-    my_agent_instance.expose_api("/llm/chat", chat_completion, methods=["POST"])
-    print(f"  -> Self-registered '/llm/chat' ability.")
-
-    # 5. 将创建和配置好的agent实例返回给加载器
+    # 4. 将创建和配置好的agent实例返回给加载器
+    # 注意：API注册现在由独立的agent_register.py处理
     return my_agent_instance
 
 
@@ -55,25 +54,102 @@ async def cleanup_agent():
         print(f"  -> LLM client cleaned up.")
 
 
-async def chat_completion(prompt: str ):
+async def chat_completion(request_data, request):
     """
     API处理函数，现在直接使用模块内的 my_llm_client。
     它不再需要从request中获取agent实例。
     """
     global my_llm_client
-    if not prompt:
-        return {"error": "Prompt is required."}
+    
+    # 从request_data中提取消息内容
+    message = None
+    if 'params' in request_data and isinstance(request_data['params'], dict):
+        message = request_data['params'].get('message')
+    elif 'message' in request_data:
+        message = request_data['message']
+    
+    if not message:
+        return {"error": "Message is required in params."}
+    
     if not my_llm_client:
         return {"error": "LLM client is not initialized in this module."}
+    
     try:
-        print(f"  -> LLM Agent Module: Sending prompt to model...")
+        print(f"  -> LLM Agent Module: Sending message to model: {message}")
         response = await my_llm_client.chat.completions.create(
             model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": prompt}],
+            messages=[{"role": "user", "content": message}],
             temperature=0.0
         )
         message_content = response.choices[0].message.content
+        print(f"  -> LLM Agent Module: Got response: {message_content}")
         return {"response": message_content}
     except Exception as e:
         print(f"  -> ❌ LLM Agent Module Error: {e}")
         return {"error": f"An error occurred: {str(e)}"}
+
+
+# 新增：消息处理器
+async def handle_message(msg):
+    """
+    通用消息处理器，处理所有类型的消息
+    """
+    global my_llm_client
+    
+    print(f"  -> LLM Agent收到消息: {msg}")
+    
+    # 提取消息内容
+    content = msg.get('content', '')
+    message_type = msg.get('message_type', 'text')
+    
+    if not content:
+        return {"reply": "LLM Agent: 消息内容为空"}
+    
+    if not my_llm_client:
+        return {"reply": "LLM Agent: LLM客户端未初始化"}
+    
+    try:
+        print(f"  -> LLM Agent: 处理{message_type}类型消息: {content}")
+        response = await my_llm_client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": content}],
+            temperature=0.0
+        )
+        message_content = response.choices[0].message.content
+        print(f"  -> LLM Agent: 生成回复: {message_content}")
+        return {"reply": f"LLM Agent回复: {message_content}"}
+    except Exception as e:
+        print(f"  -> ❌ LLM Agent消息处理错误: {e}")
+        return {"reply": f"LLM Agent: 处理消息时出错: {str(e)}"}
+
+
+async def handle_text_message(msg):
+    """
+    专门处理text类型消息的处理器
+    """
+    global my_llm_client
+    
+    print(f"  -> LLM Agent收到text消息: {msg}")
+    
+    # 提取消息内容
+    content = msg.get('content', '')
+    
+    if not content:
+        return {"reply": "LLM Agent: text消息内容为空"}
+    
+    if not my_llm_client:
+        return {"reply": "LLM Agent: LLM客户端未初始化"}
+    
+    try:
+        print(f"  -> LLM Agent: 处理text消息: {content}")
+        response = await my_llm_client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": f"请简洁回复: {content}"}],
+            temperature=0.0
+        )
+        message_content = response.choices[0].message.content
+        print(f"  -> LLM Agent: 生成text回复: {message_content}")
+        return {"reply": f"LLM Agent(text): {message_content}"}
+    except Exception as e:
+        print(f"  -> ❌ LLM Agent text消息处理错误: {e}")
+        return {"reply": f"LLM Agent: 处理text消息时出错: {str(e)}"}
