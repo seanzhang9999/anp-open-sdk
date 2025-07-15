@@ -5,7 +5,7 @@ async def hello_handler( request, message ):
     """
     这是一个打招呼的API，传入message参数即可返回问候语。
     """
-    agent_name = request.state.agent.name
+    agent_name = request.state.anp_user.name
     return {
         "msg": f"{agent_name}的/hello接口收到请求:",
         "inbox": message

@@ -69,7 +69,7 @@ async def start_server():
             print(f"  - {agent.name} ({agent.id})")
     
     # 创建服务器
-    svr = ANP_Server(mode=ServerMode.MULTI_AGENT_ROUTER, agents=all_agents)
+    svr = ANP_Server(mode=ServerMode.MULTI_AGENT_ROUTER, anp_users=all_agents)
     
     # 注册共享DID配置
     shared_did_configs = {}
@@ -96,7 +96,7 @@ async def start_server():
                 
                 if target_agent:
                     # 使用Agent名称而不是Agent ID进行注册
-                    svr.router.register_shared_did(shared_did, agent_name, path_prefix, api_paths)
+                    svr.router_agent.register_shared_did(shared_did, agent_name, path_prefix, api_paths)
                     print(f"  ✅ {shared_did} -> {agent_name} (前缀: {path_prefix})")
     
     # 启动服务器

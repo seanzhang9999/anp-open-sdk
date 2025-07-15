@@ -1,0 +1,38 @@
+{
+  "jsonrpc": "2.0",
+  "info": {
+    "title": "代码生成计算器 JSON-RPC Interface",
+    "version": "0.1.0",
+    "description": "Methods offered by 代码生成计算器"
+  },
+  "methods": [
+    {
+      "name": "add",
+      "summary": "加法计算API",
+      "params": {},
+      "meta": {
+        "openapi": "3.0.0",
+        "info": {
+          "title": "代码生成计算器 API",
+          "version": "1.0.0"
+        },
+        "httpMethod": "POST",
+        "endpoint": "/add"
+      }
+    },
+    {
+      "name": "multiply",
+      "summary": "乘法计算API",
+      "params": {},
+      "meta": {
+        "openapi": "3.0.0",
+        "info": {
+          "title": "代码生成计算器 API",
+          "version": "1.0.0"
+        },
+        "httpMethod": "POST",
+        "endpoint": "/multiply"
+      }
+    }
+  ]
+}

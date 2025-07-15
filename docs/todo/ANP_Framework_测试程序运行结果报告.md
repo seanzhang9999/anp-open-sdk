@@ -245,6 +245,131 @@ anp_server_framework/
 2. **错误恢复机制**
 3. **监控和日志系统**
 
+## ANPUser expose handler 迁移计划
+
+### 当前 ANPUser 中需要迁移的功能
+
+基于对 `anp_sdk/anp_user.py` 的分析，发现以下核心功能需要迁移到新Agent系统：
+
+#### 1. API暴露功能
+```python
+# 当前在 ANPUser 中的实现
+def expose_api(self, path: str, func: Callable = None, methods=None):
+    # 支持装饰器和函数式注册API
+    self.api_routes[path] = func
+```
+
+**迁移目标：** 移动到 `anp_server_framework/agent.py` 的 Agent 类中
+
+#### 2. 消息处理器注册
+```python
+# 当前在 ANPUser 中的实现
+def register_message_handler(self, msg_type: str, func: Callable = None, agent_name: str = None):
+    # 注册消息处理器，支持冲突检测
+    self.message_handlers[msg_type] = handler
+```
+
+**迁移目标：** 移动到新Agent系统的消息管理器中
+
+#### 3. 群组事件处理
+```python
+# 当前在 ANPUser 中的实现
+def register_group_event_handler(self, handler: Callable, group_id: str = None, event_type: str = None):
+    # 群组事件处理器注册
+```
+
+**迁移目标：** 移动到群组服务层
+
+#### 4. 请求处理核心逻辑
+```python
+# 当前在 ANPUser 中的实现
+async def handle_request(self, req_did: str, request_data: Dict[str, Any], request: Request):
+    # 统一的请求处理入口
+```
+
+**迁移目标：** 移动到Agent系统的统一请求处理器中
+
+### 迁移策略
+
+#### 阶段1：功能迁移（高优先级）
+1. **API暴露功能迁移**
+   - 从 `ANPUser.expose_api()` 迁移到 `Agent.register_api()`
+   - 保持装饰器语法兼容性
+   - 集成到全局路由器中
+
+2. **消息处理器迁移**
+   - 从 `ANPUser.register_message_handler()` 迁移到 `Agent.register_message_handler()`
+   - 利用现有的冲突检测机制
+   - 集成到全局消息管理器中
+
+3. **请求处理逻辑迁移**
+   - 从 `ANPUser.handle_request()` 迁移到 Agent 系统
+   - 保持现有的 API 调用和消息处理逻辑
+   - 确保向后兼容性
+
+#### 阶段2：架构优化（中优先级）
+1. **统一暴露接口**
+   - 实现 EOC 架构中的 Exposer 组件
+   - 提供统一的服务暴露装饰器
+   - 支持多种暴露方式（local, mcp, a2a）
+
+2. **智能路由增强**
+   - 基于现有的全局路由器
+   - 添加智能匹配和负载均衡
+   - 支持动态路由更新
+
+#### 阶段3：完全替换（低优先级）
+1. **ANPUser 简化**
+   - 移除所有 expose handler 相关功能
+   - 保留基础的 DID 身份和数据管理功能
+   - 成为纯粹的身份标识类
+
+2. **向后兼容处理**
+   - 提供迁移工具和文档
+   - 保持旧API的兼容性包装
+   - 逐步废弃旧接口
+
+### 具体实现计划
+
+#### 新Agent系统中的对应实现
+
+```python
+# anp_server_framework/agent.py 中添加
+class Agent:
+    def expose_api(self, path: str, handler: Callable = None, methods=None):
+        """API暴露功能 - 从ANPUser迁移"""
+        # 实现逻辑，集成到全局路由器
+        
+    def register_message_handler(self, msg_type: str, handler: Callable = None):
+        """消息处理器注册 - 从ANPUser迁移"""
+        # 实现逻辑，集成到全局消息管理器
+        
+    async def handle_request(self, request_data: Dict[str, Any], request: Request):
+        """请求处理 - 从ANPUser迁移"""
+        # 实现逻辑，保持兼容性
+```
+
+#### EOC架构中的统一接口
+
+```python
+# anp_server_framework/eoc/exposer.py
+@expose(source="local", expose_to="network")
+def my_api_function():
+    """统一的暴露装饰器"""
+    pass
+
+# anp_server_framework/eoc/caller.py  
+await call("auto:获取天气信息")  # 统一调用接口
+```
+
+### 迁移验证
+
+基于测试结果，当前系统已经部分实现了这个迁移：
+- ✅ Agent 系统已有基础的 API 注册功能
+- ✅ 全局路由器和消息管理器已实现
+- ✅ 冲突检测机制已验证
+- ⚠️ 需要完善从 ANPUser 到 Agent 的功能迁移
+
 ## 建议和后续工作
 
 ### 立即修复
@@ -252,14 +377,18 @@ anp_server_framework/
 2. 完善依赖管理和安装脚本
 3. 添加更详细的错误日志
 
-### 功能增强
-1. 添加Agent健康检查
-2. 实现Agent热重载
-3. 增强监控和指标收集
+### 功能增强（重新排序，优先迁移工作）
+1. **完成 ANPUser expose handler 迁移**（最高优先级）
+   - 迁移 API 暴露功能到 Agent 系统
+   - 迁移消息处理器注册功能
+   - 迁移请求处理核心逻辑
+2. 实现 EOC 统一暴露接口
+3. 添加Agent健康检查和热重载
+4. 增强监控和指标收集
 
 ### 测试完善
-1. 添加自动化测试套件
-2. 增加压力测试
+1. 添加迁移功能的自动化测试
+2. 验证向后兼容性
 3. 完善集成测试
 
 ## 结论

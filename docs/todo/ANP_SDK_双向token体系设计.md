@@ -672,9 +672,9 @@ async def _get_current_service_did(request: Request) -> Optional[str]:
         # 方法2: 从服务器配置中获取默认DID
         from anp_server.anp_server import ANP_Server
         server = ANP_Server.instance
-        if server and hasattr(server, 'router') and server.router.local_agents:
+        if server and hasattr(server, 'router') and server.router_agent.local_agents:
             # 返回第一个本地智能体的DID
-            return next(iter(server.router.local_agents.keys()))
+            return next(iter(server.router_agent.local_agents.keys()))
 
         # 方法3: 从请求头中获取（如果客户端提供）
         target_did = request.headers.get("X-Target-DID")

@@ -52,6 +52,11 @@ log_settings:
     max_size: 100
 
 anp_sdk:
+  # Framework Server配置
+  use_framework_server: false  # 是否使用framework_server
+  framework_server_url: "http://localhost:9528"  # framework_server的URL
+  fallback_to_local: true  # 转发失败时是否回退到本地处理
+
   debug_mode: true
   host: localhost
   port: 9527

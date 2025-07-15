@@ -462,10 +462,10 @@ class CallbackHandler:
 async def websocket_endpoint(websocket: WebSocket, did: str):
     """智能体WebSocket连接"""
     await websocket.accept()
-    
+
     # 注册到连接管理器
     connection_manager.add_connection(did, websocket)
-    
+
     try:
         while True:
             data = await websocket.receive_json()
@@ -474,20 +474,21 @@ async def websocket_endpoint(websocket: WebSocket, did: str):
     except WebSocketDisconnect:
         connection_manager.remove_connection(did, websocket)
 
+
 # anp_server_framework层：实时协作编排
 class RealtimeCollaborationOrchestrator:
     async def coordinate_realtime_task(self, task_data: dict):
         """实时任务协调"""
         participants = task_data.get("participants", [])
-        
+
         # 创建协作会话
         session = CollaborationSession(participants)
-        
+
         # 实时状态同步
         for participant in participants:
             await self.notify_participant(participant, {
                 "type": "task_start",
-                "session_id": session.id,
+                "session_id": session.anp_user_id,
                 "task_data": task_data
             })
 ```
@@ -589,48 +590,48 @@ class ANPUser:
 # anp_server_framework/agent_manager.py - 增强后承担所有高级功能
 class EnhancedAgentManager:
     """增强的智能体管理器，承担所有高级服务功能"""
-    
+
     def __init__(self):
         # 服务注册表
         self.api_routes = {}  # agent_id -> {path: handler}
         self.message_handlers = {}  # agent_id -> {type: handler}
         self.group_event_handlers = {}  # agent_id -> handlers
-        
+
         # 服务编排器
         self.service_orchestrator = ServiceOrchestrator()
         self.api_exposer = APIExposer()
         self.message_processor = MessageProcessor()
-    
+
     # API暴露管理（从ANPUser迁移）
     def expose_api(self, agent_id: str, path: str, handler: Callable, methods=None):
         """为指定智能体暴露API"""
         if agent_id not in self.api_routes:
             self.api_routes[agent_id] = {}
         self.api_routes[agent_id][path] = handler
-        
+
         # 注册到全局API注册表
         self._register_to_global_registry(agent_id, path, handler, methods)
-    
+
     # 消息处理管理（从ANPUser迁移）
     def register_message_handler(self, agent_id: str, msg_type: str, handler: Callable):
         """为指定智能体注册消息处理器"""
         if agent_id not in self.message_handlers:
             self.message_handlers[agent_id] = {}
-        
+
         # 冲突检测
         if msg_type in self.message_handlers[agent_id]:
             logger.warning(f"智能体 {agent_id} 的消息类型 {msg_type} 已有处理器，忽略重复注册")
             return
-        
+
         self.message_handlers[agent_id][msg_type] = handler
         logger.info(f"注册消息处理器: {agent_id} -> {msg_type}")
-    
+
     # 统一请求处理（从ANPUser迁移）
-    async def handle_agent_request(self, agent_id: str, req_did: str, 
-                                 request_data: Dict[str, Any], request: Request):
+    async def handle_agent_request(self, agent_id: str, req_did: str,
+                                   request_data: Dict[str, Any], request: Request):
         """统一处理智能体请求"""
         req_type = request_data.get("type")
-        
+
         if req_type == "api_call":
             return await self._handle_api_call(agent_id, request_data, request)
         elif req_type == "message":
@@ -639,21 +640,21 @@ class EnhancedAgentManager:
             return await self._handle_group_event(agent_id, request_data)
         else:
             return {"anp_result": {"status": "error", "message": "未知请求类型"}}
-    
+
     # 智能体加载时的统一注册
     async def register_agent_services(self, agent: ANPUser, handlers_module, cfg: Dict):
         """在智能体加载时统一注册所有服务"""
-        agent_id = agent.id
-        
+        agent_id = agent.anp_user_id
+
         # 注册API服务
         for api in cfg.get("api", []):
             handler_func = getattr(handlers_module, api["handler"])
             self.expose_api(agent_id, api["path"], handler_func, [api["method"]])
-        
+
         # 注册消息处理器
         if hasattr(handlers_module, "handle_message"):
             self.register_message_handler(agent_id, "*", handlers_module.handle_message)
-        
+
         # 注册特定类型消息处理器
         for msg_type in ["text", "command", "query", "notification"]:
             handler_name = f"handle_{msg_type}_message"

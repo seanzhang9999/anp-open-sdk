@@ -88,21 +88,25 @@ if shared:
 class Agent:
     def api(self, path: str, methods=None):
         """API装饰器"""
+
         def decorator(func):
             full_path = f"{self.prefix}{path}" if self.prefix else path
             # 注册到全局路由
-            GlobalRouter.register_api(self.anp_user.id, full_path, func, self.name)
+            GlobalRouter.register_api(self.anp_user_id, full_path, func, self.name)
             return func
+
         return decorator
-    
+
     def message_handler(self, msg_type: str):
         """消息处理器装饰器"""
+
         def decorator(func):
             if not self._can_handle_message():
                 raise PermissionError("无消息处理权限")
             # 注册消息处理器
-            GlobalMessageManager.register_handler(self.anp_user.id, msg_type, func, self.name)
+            GlobalMessageManager.register_handler(self.anp_user_id, msg_type, func, self.name)
             return func
+
         return decorator
 ```
 

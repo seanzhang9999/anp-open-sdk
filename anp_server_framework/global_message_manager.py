@@ -86,9 +86,7 @@ class GlobalMessageManager:
         message_handler = MessageHandler(did, msg_type, handler, agent_name)
         cls._handlers[did][msg_type] = message_handler
         
-        # 同时注册到ANPUser的message_handlers（保持兼容性）
-        cls._register_to_anp_user(did, msg_type, handler, agent_name)
-        
+
         logger.debug(f"💬 全局消息处理器注册: {did}:{msg_type} <- {agent_name}")
         return True
     

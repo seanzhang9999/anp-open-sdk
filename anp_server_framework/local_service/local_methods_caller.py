@@ -3,12 +3,13 @@ from typing import Any, Dict, Optional, List
 
 from .local_methods_decorators import LOCAL_METHODS_REGISTRY
 from .local_methods_doc import LocalMethodsDocGenerator
+from ..agent_manager import AgentManager
+
 
 class LocalMethodsCaller:
     """本地方法调用器"""
 
-    def __init__(self, sdk):
-        self.sdk = sdk
+    def __init__(self):
         self.doc_generator = LocalMethodsDocGenerator()
 
     async def call_method_by_search(self, search_keyword: str, *args, **kwargs) -> Any:
@@ -50,7 +51,7 @@ class LocalMethodsCaller:
             raise ValueError(f"未找到方法: {method_key}")
 
         # 获取目标agent
-        target_agent = self.sdk.get_agent(method_info["agent_did"])
+        target_agent = AgentManager.get_agent(method_info["agent_did"], method_info["agent_name"] )
         if not target_agent:
             raise ValueError(f"未找到agent: {method_info['agent_did']}")
 

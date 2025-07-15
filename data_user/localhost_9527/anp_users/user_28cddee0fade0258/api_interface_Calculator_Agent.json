@@ -1,0 +1,24 @@
+{
+  "jsonrpc": "2.0",
+  "info": {
+    "title": "Calculator Agent JSON-RPC Interface",
+    "version": "0.1.0",
+    "description": "Methods offered by Calculator Agent"
+  },
+  "methods": [
+    {
+      "name": "calculator.add",
+      "summary": "计算两个数的和",
+      "params": {},
+      "meta": {
+        "openapi": "3.0.0",
+        "info": {
+          "title": "Calculator Agent API",
+          "version": "1.0.0"
+        },
+        "httpMethod": "POST",
+        "endpoint": "/calculator/add"
+      }
+    }
+  ]
+}

@@ -63,10 +63,10 @@ def register_local_methods_to_agent(agent, module_or_dict):
 
             # 更新全局注册表
             method_info = obj._method_info.copy()
-            method_info["agent_did"] = agent.id
+            method_info["agent_did"] = agent.anp_user_id
             method_info["agent_name"] = agent.name
 
-            method_key = f"{agent.id}::{name}"
+            method_key = f"{agent.anp_user_id}::{name}"
             LOCAL_METHODS_REGISTRY[method_key] = method_info
 
             registered_count += 1

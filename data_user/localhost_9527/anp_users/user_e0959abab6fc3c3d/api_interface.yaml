@@ -1,5 +1,6 @@
 info:
-  title: Orchestrator AgentAgent API
+  description: 所有与 DID did:wba:localhost%3A9527:wba:user:e0959abab6fc3c3d 关联的服务接口
+  title: DID did:wba:localhost%3A9527:wba:user:e0959abab6fc3c3d API
   version: 1.0.0
 openapi: 3.0.0
 paths: {}

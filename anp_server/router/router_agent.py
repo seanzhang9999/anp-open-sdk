@@ -13,19 +13,165 @@
 # limitations under the License.
 import logging
 
+import aiohttp
+
+from anp_sdk.config import get_global_config
 from anp_server.router.router_did import url_did_format
 
 logger = logging.getLogger(__name__)
 
 
-from fastapi import Request
+from fastapi import Request, APIRouter
 from typing import Dict, Any, List
 from datetime import datetime
 import time
 
-from anp_sdk.utils.log_base import  logging as logger
+from anp_server_framework.agent import Agent
 import sys
 import os
+
+
+router = APIRouter(prefix="/agent", tags=["agent"])
+
+
+@router.post("/api/{did}/{subpath:path}")
+async def handle_agent_api(did: str, subpath: str, request: Request):
+    """处理Agent API调用 - 根据配置决定本地处理或转发"""
+    # 获取配置
+    config = get_global_config()
+    use_framework_server = getattr(config.anp_sdk, "use_framework_server", False)
+    framework_server_url = getattr(config.anp_sdk, "framework_server_url", "http://localhost:9528")
+
+    # 获取请求数据
+    data = await request.json() if request.headers.get("content-type") == "application/json" else {}
+
+    # 构造请求数据
+    request_data = {
+        **data,
+        "type": "message" if subpath == "message/post" else "api_call",
+        "path": f"/{subpath}",
+        "req_did": request.query_params.get("req_did", "framework_caller")
+    }
+
+    # 根据配置决定处理方式
+    if use_framework_server:
+        # 阶段三：转发到framework_server
+        try:
+            logger.debug(f"🔄 转发请求到framework_server: {did}/{subpath}")
+            async with aiohttp.ClientSession() as session:
+                target_url = f"{framework_server_url}/agent/api/{did}/{subpath}"
+                async with session.post(
+                        target_url,
+                        json=data,
+                        params=dict(request.query_params)
+                ) as response:
+                    if response.status == 200:
+                        result = await response.json()
+                        return result
+                    else:
+                        error_text = await response.text()
+                        logger.error(f"❌ Framework server返回错误: {response.status} - {error_text}")
+                        # 失败时回退到本地处理
+                        if getattr(config.anp_sdk, "fallback_to_local", True):
+                            logger.debug("⚠️ 回退到本地处理")
+                        else:
+                            return {"status": "error", "message": f"Framework server错误: {response.status}",
+                                    "details": error_text}
+        except Exception as e:
+            logger.error(f"❌ 转发到Framework server失败: {e}")
+            # 失败时回退到本地处理
+            if not getattr(config.anp_sdk, "fallback_to_local", True):
+                return {"status": "error", "message": f"Framework server连接失败: {str(e)}"}
+            logger.debug("⚠️ 回退到本地处理")
+
+    # 阶段二：本地处理（或回退处理）
+    try:
+        # 获取router_agent实例
+        router_agent = request.app.state.sdk.router_agent
+
+        # 路由请求
+        result = await router_agent.route_request(
+            request_data["req_did"],
+            did,
+            request_data,
+            request
+        )
+
+        return result
+    except Exception as e:
+        logger.error(f"❌ 本地处理请求失败: {e}")
+        return {"status": "error", "message": f"处理请求失败: {str(e)}"}
+
+
+# 同样为消息处理添加路由
+@router.post("/api/{did}/message/post")
+async def handle_agent_message(did: str, request: Request):
+    """处理Agent消息 - 根据配置决定本地处理或转发"""
+    # 获取配置
+    config = get_global_config()
+    use_framework_server = getattr(config.anp_sdk, "use_framework_server", False)
+    framework_server_url = getattr(config.anp_sdk, "framework_server_url", "http://localhost:9528")
+
+    # 获取请求数据
+    data = await request.json() if request.headers.get("content-type") == "application/json" else {}
+
+    # 构造请求数据
+    request_data = {
+        **data,
+        "type": "message",
+        "req_did": request.query_params.get("req_did", "framework_caller")
+    }
+
+    # 根据配置决定处理方式
+    if use_framework_server:
+        # 转发到framework_server
+        try:
+            logger.debug(f"🔄 转发消息到framework_server: {did}")
+            async with aiohttp.ClientSession() as session:
+                target_url = f"{framework_server_url}/agent/message/{did}/post"
+                async with session.post(
+                        target_url,
+                        json=data,
+                        params=dict(request.query_params)
+                ) as response:
+                    if response.status == 200:
+                        result = await response.json()
+                        return result
+                    else:
+                        error_text = await response.text()
+                        logger.error(f"❌ Framework server返回错误: {response.status} - {error_text}")
+                        # 失败时回退到本地处理
+                        if getattr(config.anp_sdk, "fallback_to_local", True):
+                            logger.debug("⚠️ 回退到本地处理")
+                        else:
+                            return {"anp_result": {"status": "error",
+                                                   "message": f"Framework server错误: {response.status}"}}
+        except Exception as e:
+            logger.error(f"❌ 转发到Framework server失败: {e}")
+            # 失败时回退到本地处理
+            if not getattr(config.anp_sdk, "fallback_to_local", True):
+                return {"anp_result": {"status": "error", "message": f"Framework server连接失败: {str(e)}"}}
+            logger.debug("⚠️ 回退到本地处理")
+
+    # 本地处理（或回退处理）
+    try:
+        # 获取router_agent实例
+        router_agent = request.app.state.sdk.router_agent
+
+        # 路由请求
+        result = await router_agent.route_request(
+            request_data["req_did"],
+            did,
+            request_data,
+            request
+        )
+
+        return result
+    except Exception as e:
+        logger.error(f"❌ 本地处理消息失败: {e}")
+        return {"anp_result": {"status": "error", "message": f"处理消息失败: {str(e)}"}}
+
+
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..","..")))
 
@@ -155,7 +301,7 @@ class AgentRouter:
     
     def __init__(self):
         # 多级索引结构：domain -> port -> agent_id -> agent
-        self.domain_agents = {}  # {domain: {port: {agent_id: agent}}}
+        self.domain_anp_users = {}  # {domain: {port: {agent_id: agent}}}
         self.global_agents = {}  # 向后兼容的全局索引 {agent_id: agent}
         self.logger = logger
         
@@ -179,12 +325,12 @@ class AgentRouter:
         """注册智能体（向后兼容方法）"""
         return self.register_agent_with_domain(agent)
     
-    def register_agent_with_domain(self, agent, domain: str = None, port: int = None, request: Request = None):
+    def register_agent_with_domain(self, agent: Agent, domain: str = None, port: int = None, request: Request = None):
         """
         注册智能体到指定域名
         
         Args:
-            agent: 智能体实例
+            agent: Agent实例
             domain: 域名（可选，从request中提取或使用默认值）
             port: 端口（可选，从request中提取或使用默认值）
             request: HTTP请求对象（用于自动提取域名信息）
@@ -196,34 +342,47 @@ class AgentRouter:
             domain, port = self._get_default_host_port()
         
         # 2. 初始化域名结构
-        if domain not in self.domain_agents:
-            self.domain_agents[domain] = {}
+        if domain not in self.domain_anp_users:
+            self.domain_anp_users[domain] = {}
             self.stats['domains_count'] += 1
         
-        if port not in self.domain_agents[domain]:
-            self.domain_agents[domain][port] = {}
+        if port not in self.domain_anp_users[domain]:
+            self.domain_anp_users[domain][port] = {}
         
         # 3. 确定注册键：使用 DID+Agent名称 的组合键，确保唯一性
-        agent_id = str(agent.id)
-        agent_name = agent.name if hasattr(agent, 'name') and agent.name else "unnamed"
+        anp_user = agent.anp_user
+        agent_id = str(anp_user.id)
+        agent_name = agent.name if agent.name else "unnamed"
         registration_key = f"{agent_id}#{agent_name}"  # 使用#分隔符避免冲突
         
         # 4. DID冲突检测（仅对独立DID Agent进行检测）
-        if registration_key == agent_id:  # 独立DID Agent
+        if not agent.shared:  # 独立DID Agent
             self._check_did_conflict(agent_id, "independent")
             # 注册为独立DID
             self.did_usage_registry[agent_id] = {
                 "type": "independent", 
-                "agents": [agent.name if hasattr(agent, 'name') else agent_id]
+                "agents": [agent_name]
             }
+        else:
+            # 共享DID Agent
+            if agent_id in self.did_usage_registry:
+                # 更新共享DID的Agent列表
+                if agent_name not in self.did_usage_registry[agent_id]["agents"]:
+                    self.did_usage_registry[agent_id]["agents"].append(agent_name)
+            else:
+                # 新建共享DID记录
+                self.did_usage_registry[agent_id] = {
+                    "type": "shared",
+                    "agents": [agent_name]
+                }
         
         # 5. 检查Agent注册冲突
-        if registration_key in self.domain_agents[domain][port]:
+        if registration_key in self.domain_anp_users[domain][port]:
             self.stats['registration_conflicts'] += 1
             self.logger.warning(f"智能体注册冲突: {domain}:{port} 已存在 {registration_key}")
         
         # 6. 注册智能体（使用注册键）
-        self.domain_agents[domain][port][registration_key] = agent
+        self.domain_anp_users[domain][port][registration_key] = agent
         
         # 7. 更新全局索引（向后兼容）
         global_key = f"{domain}:{port}:{agent_id}"
@@ -235,9 +394,9 @@ class AgentRouter:
             # 检查Agent名称冲突
             if registration_key in self.global_agents:
                 existing_agent = self.global_agents[registration_key]
-                if existing_agent.id != agent.id:  # 不同的Agent使用了相同的名称
+                if existing_agent.anp_user_id != anp_user.id:  # 不同的Agent使用了相同的名称
                     self.stats['registration_conflicts'] += 1
-                    self.logger.warning(f"⚠️ 全局索引Agent名称冲突: '{registration_key}' 已被Agent {existing_agent.id} 使用，现在被Agent {agent.id} 覆盖")
+                    self.logger.warning(f"⚠️ 全局索引Agent名称冲突: '{registration_key}' 已被Agent {existing_agent.anp_user_id} 使用，现在被Agent {anp_user.id} 覆盖")
             
             self.global_agents[registration_key] = agent
         
@@ -284,15 +443,15 @@ class AgentRouter:
             return self._find_agent_in_global_index(agent_id)
         
         # 优先级1: 精确匹配域名和端口
-        if (request_domain in self.domain_agents and 
-            request_port in self.domain_agents[request_domain]):
+        if (request_domain in self.domain_anp_users and
+            request_port in self.domain_anp_users[request_domain]):
             agent = self._find_agent_in_domain_port(agent_id, request_domain, request_port)
             if agent:
                 return agent
         
         # 优先级2: 同域名不同端口
-        if request_domain in self.domain_agents:
-            for other_port, agents in self.domain_agents[request_domain].items():
+        if request_domain in self.domain_anp_users:
+            for other_port, agents in self.domain_anp_users[request_domain].items():
                 agent = self._find_agent_in_agents_dict(agent_id, agents)
                 if agent:
                     self.logger.warning(f"跨端口访问: {agent_id} @ {request_domain}:{other_port} -> {request_domain}:{request_port}")
@@ -308,7 +467,7 @@ class AgentRouter:
     
     def _find_agent_in_domain_port(self, agent_id: str, domain: str, port: int):
         """在指定域名端口下查找Agent"""
-        agents = self.domain_agents[domain][port]
+        agents = self.domain_anp_users[domain][port]
         return self._find_agent_in_agents_dict(agent_id, agents)
     
     def _find_agent_in_agents_dict(self, agent_id: str, agents: dict):
@@ -323,6 +482,9 @@ class AgentRouter:
                 did_part, name_part = key.split('#', 1)
                 if did_part == agent_id or name_part == agent_id:
                     return agent
+            # 3. 检查Agent实例的ID是否匹配
+            elif hasattr(agent, 'id') and str(agent.anp_user_id) == agent_id:
+                return agent
         
         return None
     
@@ -356,25 +518,56 @@ class AgentRouter:
         
         # 消息类型请求不使用共享DID路由，直接路由到Agent
         if request_type == "message" or api_path.startswith("/message/"):
-            self.logger.info(f"📨 消息路由: 直接路由到 {resp_did}")
+            self.logger.debug(f"📨 消息路由: 直接路由到 {resp_did}")
             agent = self.find_agent_with_domain_priority(resp_did, domain, port)
-        elif resp_did in self.shared_did_registry and api_path and request_type == "api_call":
-            # 共享DID API路由处理
-            target_agent_name, original_path = self._resolve_shared_did(resp_did, api_path)
-            if target_agent_name and original_path:
-                # 更新请求数据中的路径
-                request_data = request_data.copy()
-                request_data["path"] = original_path
-                # 使用目标Agent的名称进行路由（因为共享DID的Agent使用名称注册）
-                agent = self.find_agent_with_domain_priority(target_agent_name, domain, port)
-                self.logger.info(f"🔄 共享DID路由: {resp_did}{api_path} -> {target_agent_name}{original_path}")
-            else:
-                self.stats['routing_errors'] += 1
-                raise ValueError(f"共享DID {resp_did} 中未找到路径 {api_path} 的处理器")
         else:
-            # 常规路由处理
-            agent = self.find_agent_with_domain_priority(resp_did, domain, port)
-        
+            # 尝试从AgentManager获取共享DID信息
+            try:
+                from anp_server_framework.agent_manager import AgentManager
+                agent_info = AgentManager.get_agent_info(resp_did)
+
+                # 如果是共享DID，并且有多个Agent
+                if agent_info and len(agent_info) > 1:
+                    # 根据API路径前缀选择正确的Agent
+                    for agent_name, info in agent_info.items():
+                        agent_obj = info.get('agent')
+                        if agent_obj and agent_obj.shared and agent_obj.prefix and api_path.startswith(
+                                agent_obj.prefix):
+                            # 找到匹配的Agent
+                            agent = agent_obj
+                            self.logger.debug(f"✅ 根据路径前缀 {agent_obj.prefix} 找到共享DID Agent: {agent_name}")
+                            break
+                    else:
+                        # 如果没有找到匹配的Agent，使用常规路由
+                        agent = self.find_agent_with_domain_priority(resp_did, domain, port)
+                else:
+                    # 如果不是共享DID，或者只有一个Agent，使用常规路由
+                    agent = self.find_agent_with_domain_priority(resp_did, domain, port)
+            except (ImportError, Exception) as e:
+                # 如果出错，使用常规路由
+                self.logger.warning(f"尝试从AgentManager获取共享DID信息失败: {e}")
+                agent = self.find_agent_with_domain_priority(resp_did, domain, port)
+
+        if not agent:
+            # 尝试从AgentManager中查找
+            try:
+                from anp_server_framework.agent_manager import AgentManager
+
+                # 检查AgentManager中是否有该Agent
+                agent_info = AgentManager.get_agent_info(resp_did)
+                if agent_info:
+                    # 找到了Agent，获取第一个
+                    for agent_name, info in agent_info.items():
+                        agent_obj = info.get('agent')
+                        if agent_obj:
+                            # 注册到router_agent
+                            self.register_agent_with_domain(agent_obj, domain, port)
+                            agent = agent_obj
+                            self.logger.debug(f"✅ 从AgentManager中找到并注册智能体: {resp_did} -> {agent_name}")
+                            break
+            except (ImportError, Exception) as e:
+                self.logger.warning(f"尝试从AgentManager查找Agent失败: {e}")
+
         if not agent:
             self.stats['routing_errors'] += 1
             available_agents = self._get_available_agents_for_domain(domain, port)
@@ -394,8 +587,8 @@ class AgentRouter:
         
         # 6. 执行路由
         try:
-            self.logger.info(f"🚀 路由请求: {req_did} -> {resp_did} @ {domain}:{port}")
-            self.logger.info(f"route_request -- forward to {agent.id}'s handler, forward data:{request_data}\n")
+            self.logger.debug(f"🚀 路由请求: {req_did} -> {resp_did} @ {domain}:{port}")
+            self.logger.debug(f"route_request -- forward to {agent.anp_user_id}'s handler, forward data:{request_data}\n")
             self.logger.debug(f"route_request -- url: {request.url} \nbody: {await request.body()}")
             
             result = await agent.handle_request(req_did, request_data, request)
@@ -408,21 +601,21 @@ class AgentRouter:
     def _get_available_agents_for_domain(self, domain: str, port: int):
         """获取指定域名下的可用智能体列表"""
         agents = []
-        if domain in self.domain_agents and port in self.domain_agents[domain]:
-            agents = list(self.domain_agents[domain][port].keys())
+        if domain in self.domain_anp_users and port in self.domain_anp_users[domain]:
+            agents = list(self.domain_anp_users[domain][port].keys())
         return agents
     
     def get_agents_by_domain(self, domain: str, port: int = None):
         """获取指定域名下的所有智能体"""
-        if domain not in self.domain_agents:
+        if domain not in self.domain_anp_users:
             return {}
         
         if port:
-            return self.domain_agents[domain].get(port, {})
+            return self.domain_anp_users[domain].get(port, {})
         else:
             # 返回该域名下所有端口的智能体
             all_agents = {}
-            for p, agents in self.domain_agents[domain].items():
+            for p, agents in self.domain_anp_users[domain].items():
                 for agent_id, agent in agents.items():
                     all_agents[f"{p}:{agent_id}"] = agent
             return all_agents
@@ -433,7 +626,7 @@ class AgentRouter:
         
         # 详细统计
         domain_details = {}
-        for domain, ports in self.domain_agents.items():
+        for domain, ports in self.domain_anp_users.items():
             domain_details[domain] = {
                 'ports': list(ports.keys()),
                 'total_agents': sum(len(agents) for agents in ports.values()),
@@ -450,8 +643,19 @@ class AgentRouter:
         """获取所有智能体（向后兼容方法）"""
         return self.global_agents
     
-    def register_shared_did(self, shared_did: str, agent_name: str, path_prefix: str, api_paths: List[str]):
+    def register_shared_did(self, shared_did: str, agent: Agent, api_paths: List[str]):
         """注册共享DID配置"""
+        if not agent.shared:
+            self.logger.error(f"❌ 尝试注册非共享DID Agent到共享DID: {agent.name}")
+            raise ValueError(f"Agent {agent.name} 不是共享DID模式，无法注册到共享DID")
+            
+        if not agent.prefix:
+            self.logger.error(f"❌ 共享DID Agent缺少prefix: {agent.name}")
+            raise ValueError(f"共享DID Agent {agent.name} 缺少prefix参数")
+            
+        agent_name = agent.name
+        path_prefix = agent.prefix
+        
         if shared_did not in self.shared_did_registry:
             self.shared_did_registry[shared_did] = {
                 'path_mappings': {}

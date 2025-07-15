@@ -34,6 +34,9 @@ class AnpSdkConfig(Protocol):
     agent: AnpSdkAgentConfig
 
 
+    use_framework_server: bool  # 是否使用framework_server
+    framework_server_url: str  # framework_server的URL
+    fallback_to_local: bool  # 转发失败时是否回退到本地处理
 
 
 class AnpSdkProxyConfig(Protocol):

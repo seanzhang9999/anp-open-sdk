@@ -15,7 +15,12 @@ anp_sdk:
   debug_mode: true                    # 调试模式
   host: localhost                     # 服务主机
   port: 9527                         # 服务端口
-  
+
+  # Framework Server配置
+  use_framework_server: false  # 是否使用framework_server
+  framework_server_url: "http://localhost:9528"  # framework_server的URL
+  fallback_to_local: true  # 转发失败时是否回退到本地处理
+
   # 路径配置（{APP_ROOT} 会自动替换为项目根目录）
   user_did_path: "{APP_ROOT}/anp_sdk/anp_users"
   user_hosted_path: "{APP_ROOT}/anp_sdk/anp_users_hosted"

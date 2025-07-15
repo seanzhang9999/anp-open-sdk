@@ -412,339 +412,343 @@ class DIDHostManager:
 # 添加HTTP方式的托管DID处理函数
 
 async def register_hosted_did_http(agent: ANPUser, target_host: str, target_port: int = 9527) -> Tuple[bool, str, str]:
-    """
-    HTTP方式申请托管DID
-    
-    Args:
-        agent: ANP用户
-        target_host: 目标托管服务主机
-        target_port: 目标托管服务端口
-        
-    Returns:
-        tuple: (是否成功, 申请ID, 错误信息)
-    """
-    try:
-        if not agent.user_data.did_document:
-            return False, "", "当前用户没有DID文档"
-        
-        # 构建申请请求
-        request_data = {
-            "did_document": agent.user_data.did_document,
-            "requester_did": agent.user_data.did_document.get('id'),
-            "callback_info": {
-                "client_host": agent.host,
-                "client_port": agent.port
-            }
-        }
-        
-        # 发送申请请求
-        target_url = f"http://{target_host}:{target_port}/wba/hosted-did/request"
-        
-        import httpx
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                target_url,
-                json=request_data,
-                timeout=30.0
-            )
-            
-            if response.status_code == 200:
-                result = response.json()
-                if result.get('success'):
-                    request_id = result.get('request_id')
-                    logger.info(f"托管DID申请已提交: {request_id}")
-                    return True, request_id, ""
-                else:
-                    error_msg = result.get('message', '申请失败')
-                    return False, "", error_msg
-            else:
-                error_msg = f"申请请求失败: HTTP {response.status_code}"
-                logger.error(error_msg)
-                return False, "", error_msg
-                
-    except Exception as e:
-        error_msg = f"申请托管DID失败: {e}"
+  """
+  HTTP方式申请托管DID
+  
+  Args:
+      agent: ANP用户
+      target_host: 目标托管服务主机
+      target_port: 目标托管服务端口
+      
+  Returns:
+      tuple: (是否成功, 申请ID, 错误信息)
+  """
+  try:
+    if not agent.user_data.did_document:
+      return False, "", "当前用户没有DID文档"
+
+    # 构建申请请求
+    request_data = {
+      "did_document": agent.user_data.did_document,
+      "requester_did": agent.user_data.did_document.get('id'),
+      "callback_info": {
+        "client_host": agent.host,
+        "client_port": agent.port
+      }
+    }
+
+    # 发送申请请求
+    target_url = f"http://{target_host}:{target_port}/wba/hosted-did/request"
+
+    import httpx
+    async with httpx.AsyncClient() as client:
+      response = await client.post(
+        target_url,
+        json=request_data,
+        timeout=30.0
+      )
+
+      if response.status_code == 200:
+        result = response.json()
+        if result.get('success'):
+          request_id = result.get('request_id')
+          logger.info(f"托管DID申请已提交: {request_id}")
+          return True, request_id, ""
+        else:
+          error_msg = result.get('message', '申请失败')
+          return False, "", error_msg
+      else:
+        error_msg = f"申请请求失败: HTTP {response.status_code}"
         logger.error(error_msg)
         return False, "", error_msg
 
+  except Exception as e:
+    error_msg = f"申请托管DID失败: {e}"
+    logger.error(error_msg)
+    return False, "", error_msg
+
+
 async def check_hosted_did_http(agent: ANPUser) -> Tuple[bool, List[Dict[str, Any]], str]:
-    """
-    HTTP方式检查托管DID结果
-    
-    Args:
-        agent: ANP用户
-        
-    Returns:
-        tuple: (是否成功, 结果列表, 错误信息)
-    """
-    try:
-        if not agent.user_data.did_document:
-            return False, [], "当前用户没有DID文档"
-        
-        # 从自己的DID中提取ID
-        did_parts = agent.user_data.did_document.get('id', '').split(':')
-        requester_id = did_parts[-1] if did_parts else ""
-        
-        if not requester_id:
-            return False, [], "无法从DID中提取用户ID"
-        
-        # 检查结果（可以检查多个托管服务）
-        all_results = []
-        
-        # 从配置获取目标服务列表
-        config = get_global_config()
-        target_services = config.hosted_did.get('target_services', [
-            {"host": "localhost", "port": 9527},
-            {"host": "open.localhost", "port": 9527},
-        ])
-        
-        import httpx
-        for service in target_services:
-            target_host = service['host']
-            target_port = service['port']
-            
-            try:
-                check_url = f"http://{target_host}:{target_port}/wba/hosted-did/check/{requester_id}"
-                
-                async with httpx.AsyncClient() as client:
-                    response = await client.get(check_url, timeout=10.0)
-                    
-                    if response.status_code == 200:
-                        result = response.json()
-                        if result.get('success') and result.get('results'):
-                            for res in result['results']:
-                                res['source_host'] = target_host
-                                res['source_port'] = target_port
-                            all_results.extend(result['results'])
-                    
-            except Exception as e:
-                logger.warning(f"检查托管服务 {target_host}:{target_port} 失败: {e}")
-        
-        return True, all_results, ""
-        
-    except Exception as e:
-        error_msg = f"检查托管DID结果失败: {e}"
-        logger.error(error_msg)
-        return False, [], error_msg
+  """
+  HTTP方式检查托管DID结果
+  
+  Args:
+      agent: ANP用户
+      
+  Returns:
+      tuple: (是否成功, 结果列表, 错误信息)
+  """
+  try:
+    if not agent.user_data.did_document:
+      return False, [], "当前用户没有DID文档"
+
+    # 从自己的DID中提取ID
+    did_parts = agent.user_data.did_document.get('id', '').split(':')
+    requester_id = did_parts[-1] if did_parts else ""
+
+    if not requester_id:
+      return False, [], "无法从DID中提取用户ID"
+
+    # 检查结果（可以检查多个托管服务）
+    all_results = []
+
+    # 从配置获取目标服务列表
+    config = get_global_config()
+    target_services = config.hosted_did.get('target_services', [
+      {"host": "localhost", "port": 9527},
+      {"host": "open.localhost", "port": 9527},
+    ])
+
+    import httpx
+    for service in target_services:
+      target_host = service['host']
+      target_port = service['port']
+
+      try:
+        check_url = f"http://{target_host}:{target_port}/wba/hosted-did/check/{requester_id}"
+
+        async with httpx.AsyncClient() as client:
+          response = await client.get(check_url, timeout=10.0)
+
+          if response.status_code == 200:
+            result = response.json()
+            if result.get('success') and result.get('results'):
+              for res in result['results']:
+                res['source_host'] = target_host
+                res['source_port'] = target_port
+              all_results.extend(result['results'])
+
+      except Exception as e:
+        logger.warning(f"检查托管服务 {target_host}:{target_port} 失败: {e}")
+
+    return True, all_results, ""
+
+  except Exception as e:
+    error_msg = f"检查托管DID结果失败: {e}"
+    logger.error(error_msg)
+    return False, [], error_msg
+
 
 # 统一的处理函数（兼容新旧方式）
 async def register_hosted_did(agent: ANPUser, use_http: bool = True, target_host: str = None, target_port: int = 9527):
-    """
-    注册托管DID（支持HTTP和邮件两种方式）
-    
-    Args:
-        agent: ANP用户
-        use_http: 是否使用HTTP方式（默认True）
-        target_host: 目标主机（HTTP方式使用）
-        target_port: 目标端口（HTTP方式使用）
-    """
-    if use_http and target_host:
-        # 使用新的HTTP方式
-        success, request_id, error = await register_hosted_did_http(agent, target_host, target_port)
-        if success:
-            logger.info(f"托管DID申请已提交: {request_id}")
-            return True
-        else:
-            logger.error(f"托管DID申请失败: {error}")
-            return False
+  """
+  注册托管DID（支持HTTP和邮件两种方式）
+  
+  Args:
+      agent: ANP用户
+      use_http: 是否使用HTTP方式（默认True）
+      target_host: 目标主机（HTTP方式使用）
+      target_port: 目标端口（HTTP方式使用）
+  """
+  if use_http and target_host:
+    # 使用新的HTTP方式
+    success, request_id, error = await register_hosted_did_http(agent, target_host, target_port)
+    if success:
+      logger.info(f"托管DID申请已提交: {request_id}")
+      return True
     else:
-        # 保持现有的邮件方式完全不变
-        try:
-            did_document = agent.user_data.did_document
-            if did_document is None:
-                raise ValueError("当前 LocalAgent 未包含 did_document")
-            
-            config = get_global_config()
-            use_local = config.mail.use_local_backend
-            logger.debug(f"注册邮箱检查前初始化，使用本地文件邮件后端参数设置:{use_local}")
-            
-            mail_manager = EnhancedMailManager(use_local_backend=use_local)
-            register_email = os.environ.get('REGISTER_MAIL_USER')
-            success = mail_manager.send_hosted_did_request(did_document, register_email)
-            
-            if success:
-                logger.info(f"{agent.id}的托管DID申请邮件已发送")
-                return True
-            else:
-                logger.error("发送托管DID申请邮件失败")
-                return False
-        except Exception as e:
-            logger.error(f"注册托管DID失败: {e}")
-            return False
+      logger.error(f"托管DID申请失败: {error}")
+      return False
+  else:
+    # 保持现有的邮件方式完全不变
+    try:
+      did_document = agent.user_data.did_document
+      if did_document is None:
+        raise ValueError("当前 LocalAgent 未包含 did_document")
+
+      config = get_global_config()
+      use_local = config.mail.use_local_backend
+      logger.debug(f"注册邮箱检查前初始化，使用本地文件邮件后端参数设置:{use_local}")
+
+      mail_manager = EnhancedMailManager(use_local_backend=use_local)
+      register_email = os.environ.get('REGISTER_MAIL_USER')
+      success = mail_manager.send_hosted_did_request(did_document, register_email)
+
+      if success:
+        logger.info(f"{agent.anp_user_id}的托管DID申请邮件已发送")
+        return True
+      else:
+        logger.error("发送托管DID申请邮件失败")
+        return False
+    except Exception as e:
+      logger.error(f"注册托管DID失败: {e}")
+      return False
+
 
 async def check_hosted_did(agent: ANPUser, use_http: bool = True):
-    """
-    检查托管DID（支持HTTP和邮件两种方式）
-    """
-    if use_http:
-        # 使用新的HTTP方式检查
-        try:
-            success, results, error = await check_hosted_did_http(agent)
-            
-            if success and results:
-                # 处理结果，使用现有的create_hosted_did方法
-                processed_count = 0
-                for result in results:
-                    try:
-                        if result.get('success') and result.get('hosted_did_document'):
-                            hosted_did_doc = result['hosted_did_document']
-                            source_host = result.get('source_host', 'unknown')
-                            source_port = result.get('source_port', 9527)
-                            
-                            # 使用现有的create_hosted_did方法
-                            success, hosted_dir_name = agent.create_hosted_did(
-                                source_host, str(source_port), hosted_did_doc
-                            )
-                            
-                            if success:
-                                logger.info(f"托管DID已保存到: {hosted_dir_name}")
-                                processed_count += 1
-                            else:
-                                logger.error(f"保存托管DID失败: {hosted_dir_name}")
-                        else:
-                            logger.warning(f"托管DID申请失败: {result.get('error_message', '未知错误')}")
-                            
-                    except Exception as e:
-                        logger.error(f"处理托管DID结果失败: {e}")
-                
-                if processed_count > 0:
-                    return f"成功处理{processed_count}个托管DID结果"
-                else:
-                    return "没有新的托管DID结果"
-            elif error:
-                return f"检查托管DID结果时发生错误: {error}"
+  """
+  检查托管DID（支持HTTP和邮件两种方式）
+  """
+  if use_http:
+    # 使用新的HTTP方式检查
+    try:
+      success, results, error = await check_hosted_did_http(agent)
+
+      if success and results:
+        # 处理结果，使用现有的create_hosted_did方法
+        processed_count = 0
+        for result in results:
+          try:
+            if result.get('success') and result.get('hosted_did_document'):
+              hosted_did_doc = result['hosted_did_document']
+              source_host = result.get('source_host', 'unknown')
+              source_port = result.get('source_port', 9527)
+
+              # 使用现有的create_hosted_did方法
+              success, hosted_dir_name = agent.create_hosted_did(
+                source_host, str(source_port), hosted_did_doc
+              )
+
+              if success:
+                logger.info(f"托管DID已保存到: {hosted_dir_name}")
+                processed_count += 1
+              else:
+                logger.error(f"保存托管DID失败: {hosted_dir_name}")
             else:
-                return "没有找到匹配的托管DID结果"
-                
-        except Exception as e:
-            logger.error(f"HTTP检查托管DID失败: {e}")
-            return f"HTTP检查托管DID时发生错误: {e}"
-    else:
-        # 保持现有的邮件方式完全不变
+              logger.warning(f"托管DID申请失败: {result.get('error_message', '未知错误')}")
+
+          except Exception as e:
+            logger.error(f"处理托管DID结果失败: {e}")
+
+        if processed_count > 0:
+          return f"成功处理{processed_count}个托管DID结果"
+        else:
+          return "没有新的托管DID结果"
+      elif error:
+        return f"检查托管DID结果时发生错误: {error}"
+      else:
+        return "没有找到匹配的托管DID结果"
+
+    except Exception as e:
+      logger.error(f"HTTP检查托管DID失败: {e}")
+      return f"HTTP检查托管DID时发生错误: {e}"
+  else:
+    # 保持现有的邮件方式完全不变
+    try:
+      import re
+      import json
+
+      config = get_global_config()
+      use_local = config.mail.use_local_backend
+      logger.debug(f"注册邮箱检查前初始化，使用本地文件邮件后端参数设置:{use_local}")
+
+      mail_manager = EnhancedMailManager(use_local_backend=use_local)
+      responses = mail_manager.get_unread_hosted_responses()
+
+      if not responses:
+        return "没有找到匹配的托管 DID 激活邮件"
+
+      count = 0
+      for response in responses:
         try:
-            import re
-            import json
-            
-            config = get_global_config()
-            use_local = config.mail.use_local_backend
-            logger.debug(f"注册邮箱检查前初始化，使用本地文件邮件后端参数设置:{use_local}")
-            
-            mail_manager = EnhancedMailManager(use_local_backend=use_local)
-            responses = mail_manager.get_unread_hosted_responses()
-            
-            if not responses:
-                return "没有找到匹配的托管 DID 激活邮件"
-            
-            count = 0
-            for response in responses:
-                try:
-                    body = response.get('content', '')
-                    message_id = response.get('message_id')
-                    try:
-                        if isinstance(body, str):
-                            did_document = json.loads(body)
-                        else:
-                            did_document = body
-                    except Exception as e:
-                        logger.debug(f"无法解析 did_document: {e}")
-                        continue
-                    
-                    did_id = did_document.get('id', '')
-                    m = re.search(r'did:wba:([^:]+)%3A(\d+):', did_id)
-                    if not m:
-                        logger.debug(f"无法从id中提取host:port: {did_id}")
-                        continue
-                    
-                    host = m.group(1)
-                    port = m.group(2)
-                    
-                    # 使用现有的create_hosted_did方法
-                    success, hosted_dir_name = agent.create_hosted_did(host, port, did_document)
-                    if success:
-                        mail_manager.mark_message_as_read(message_id)
-                        logger.info(f"已创建{agent.id}申请的托管DID{did_id}的文件夹: {hosted_dir_name}")
-                        count += 1
-                    else:
-                        logger.error(f"创建托管DID文件夹失败: {host}:{port}")
-                except Exception as e:
-                    logger.error(f"处理邮件时出错: {e}")
-            
-            if count > 0:
-                return f"成功处理{count}封托管DID邮件"
+          body = response.get('content', '')
+          message_id = response.get('message_id')
+          try:
+            if isinstance(body, str):
+              did_document = json.loads(body)
             else:
-                return "未能成功处理任何托管DID邮件"
+              did_document = body
+          except Exception as e:
+            logger.debug(f"无法解析 did_document: {e}")
+            continue
+
+          did_id = did_document.get('id', '')
+          m = re.search(r'did:wba:([^:]+)%3A(\d+):', did_id)
+          if not m:
+            logger.debug(f"无法从id中提取host:port: {did_id}")
+            continue
+
+          host = m.group(1)
+          port = m.group(2)
+
+          # 使用现有的create_hosted_did方法
+          success, hosted_dir_name = agent.create_hosted_did(host, port, did_document)
+          if success:
+            mail_manager.mark_message_as_read(message_id)
+            logger.info(f"已创建{agent.anp_user_id}申请的托管DID{did_id}的文件夹: {hosted_dir_name}")
+            count += 1
+          else:
+            logger.error(f"创建托管DID文件夹失败: {host}:{port}")
         except Exception as e:
-            logger.error(f"检查托管DID时发生错误: {e}")
-            return f"检查托管DID时发生错误: {e}"
+          logger.error(f"处理邮件时出错: {e}")
+
+      if count > 0:
+        return f"成功处理{count}封托管DID邮件"
+      else:
+        return "未能成功处理任何托管DID邮件"
+    except Exception as e:
+      logger.error(f"检查托管DID时发生错误: {e}")
+      return f"检查托管DID时发生错误: {e}"
+
 
 # 保持现有的check_did_host_request函数，但添加多域名支持
 async def check_did_host_request(host: str = None, port: int = None):
-    """
-    检查DID托管请求（支持多域名）
-    
-    Args:
-        host: 指定主机名（用于多域名环境）
-        port: 指定端口（用于多域名环境）
-    """
-    try:
-        config = get_global_config()
-        use_local = config.mail.use_local_backend
-        logger.debug(f"管理邮箱检查前初始化，使用本地文件邮件后端参数设置:{use_local}")
-        
-        mail_manager = EnhancedMailManager(use_local_backend=use_local)
-        
-        # 根据参数创建DID管理器
-        if host and port:
-            did_manager = DIDHostManager.create_for_domain(host, port)
-        else:
-            did_manager = DIDHostManager()
+  """
+  检查DID托管请求（支持多域名）
+  
+  Args:
+      host: 指定主机名（用于多域名环境）
+      port: 指定端口（用于多域名环境）
+  """
+  try:
+    config = get_global_config()
+    use_local = config.mail.use_local_backend
+    logger.debug(f"管理邮箱检查前初始化，使用本地文件邮件后端参数设置:{use_local}")
 
-        did_requests = mail_manager.get_unread_did_requests()
-        if not did_requests:
-            return "没有新的DID托管请求"
+    mail_manager = EnhancedMailManager(use_local_backend=use_local)
 
-        result = "开始处理DID托管请求\n"
-        for request in did_requests:
-            did_document = request['content']
-            from_address = request['from_address']
-            message_id = request['message_id']
+    # 根据参数创建DID管理器
+    if host and port:
+      did_manager = DIDHostManager.create_for_domain(host, port)
+    else:
+      did_manager = DIDHostManager()
 
-            parsed_json = json.loads(did_document)
-            did_document_dict = dict(parsed_json)
+    did_requests = mail_manager.get_unread_did_requests()
+    if not did_requests:
+      return "没有新的DID托管请求"
 
-            if did_manager.is_duplicate_did(did_document):
-                mail_manager.send_reply_email(
-                    from_address,
-                    "DID已申请",
-                    "重复的DID申请，请联系管理员"
-                )
-                mail_manager.mark_message_as_read(message_id)
-                result += f"{from_address}的DID {did_document_dict.get('id')} 已申请，退回\n"
-                continue
+    result = "开始处理DID托管请求\n"
+    for request in did_requests:
+      did_document = request['content']
+      from_address = request['from_address']
+      message_id = request['message_id']
 
-            success, new_did_doc, error = did_manager.store_did_document(did_document_dict)
-            if success:
-                mail_manager.send_reply_email(
-                    from_address,
-                    "ANP HOSTED DID RESPONSED",
-                    new_did_doc)
+      parsed_json = json.loads(did_document)
+      did_document_dict = dict(parsed_json)
 
-                result += f"{from_address}的DID {new_did_doc['id']} 已保存到域名 {did_manager.hostdomain}:{did_manager.hostport}\n"
-            else:
-                mail_manager.send_reply_email(
-                    from_address,
-                    "DID托管申请失败",
-                    f"处理DID文档时发生错误: {error}"
-                )
-                result += f"{from_address}的DID处理失败: {error}\n"
-            mail_manager.mark_message_as_read(message_id)
-        
-        logger.info(f"DID托管受理检查结果{result}")
-        return result
-    except Exception as e:
-        error_msg = f"处理DID托管请求时发生错误: {e}"
-        logger.error(error_msg)
-        return error_msg
+      if did_manager.is_duplicate_did(did_document):
+        mail_manager.send_reply_email(
+          from_address,
+          "DID已申请",
+          "重复的DID申请，请联系管理员"
+        )
+        mail_manager.mark_message_as_read(message_id)
+        result += f"{from_address}的DID {did_document_dict.get('id')} 已申请，退回\n"
+        continue
+
+      success, new_did_doc, error = did_manager.store_did_document(did_document_dict)
+      if success:
+        mail_manager.send_reply_email(
+          from_address,
+          "ANP HOSTED DID RESPONSED",
+          new_did_doc)
+
+        result += f"{from_address}的DID {new_did_doc['id']} 已保存到域名 {did_manager.hostdomain}:{did_manager.hostport}\n"
+      else:
+        mail_manager.send_reply_email(
+          from_address,
+          "DID托管申请失败",
+          f"处理DID文档时发生错误: {error}"
+        )
+        result += f"{from_address}的DID处理失败: {error}\n"
+      mail_manager.mark_message_as_read(message_id)
+
+    logger.info(f"DID托管受理检查结果{result}")
+    return result
+  except Exception as e:
+    error_msg = f"处理DID托管请求时发生错误: {e}"
+    logger.error(error_msg)
+    return error_msg
 ```
 
 ### 3. 队列管理器设计

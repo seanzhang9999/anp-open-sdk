@@ -78,18 +78,15 @@ async def get_did_document(user_id: str, request: Request) -> Dict:
 # 注意：托管 DID 文档的功能已移至 router_publisher.py
 # 未来对于托管 did-doc/ad.json/yaml 以及消息转发/api转发都将通过 did_host 路由处理
 
-
 @router.get("/wba/user/{user_id}/ad.json", summary="Get agent description")
 async def get_agent_description(user_id: str, request: Request) -> Dict:
     """
-    user_id可以是did 也可以是 最后hex序号
-    返回符合 schema.org/did/ad 规范的 JSON-LD 格式智能体描述，端点信息动态取自 agent 实例。
-    支持多域名环境。
+    返回符合 schema.org/did/ad 规范的 JSON-LD 格式智能体描述。
     """
     # 集成域名管理器
     domain_manager = get_domain_manager()
     host, port = domain_manager.get_host_port_from_request(request)
-    
+
     # 验证域名访问权限
     is_valid, error_msg = domain_manager.validate_domain_access(host, port)
     if not is_valid:
@@ -100,139 +97,29 @@ async def get_agent_description(user_id: str, request: Request) -> Dict:
 
     success, did_doc, user_dir = find_user_by_did(resp_did)
     if not success:
-        raise HTTPException(status_code=404, detail=f"Agent with DID {resp_did} not found")
-    
+        raise HTTPException(status_code=404, detail=f"DID {resp_did} not found")
+
     if user_dir is None:
         raise HTTPException(status_code=404, detail=f"User directory not found for DID {resp_did}")
-    
-    sdk = request.app.state.sdk
-    agent = sdk.get_agent(resp_did)
 
-    if agent.is_hosted_did:
-        raise HTTPException(status_code=403, detail=f"{resp_did} is hosted did")
-
-    user_cfg = get_agent_cfg_by_user_dir(user_dir)
-    
-    # 获取基础端点
-    # 动态遍历 FastAPI 路由，自动生成 endpoints
-    endpoints = {}
-    for route in sdk.app.routes:
-        if hasattr(route, "methods") and hasattr(route, "path"):
-            path = route.path
-            # 只导出 /agent/api/、/agent/message/、/agent/group/、/wba/ 相关路由
-            # if not (path.startswith("/agent/api/") or path.startswith("/agent/message/") or path.startswith("/agent/group/") or path.startswith("/wba/")):
-            if not (path.startswith("/agent/api/")) :
-                continue
-            # endpoint 名称自动生成
-            endpoint_name = path.replace("/agent/api/", "api_").replace("/agent/message/", "message_").replace("/agent/group/", "group_").replace("/wba/", "wba_").replace("/", "_").strip("_")
-            endpoints[endpoint_name] = {
-                "path": path,
-                "description": getattr(route, "summary", getattr(route, "name", "相关端点"))
-            }
-
-    for path, _ in agent.api_routes.items():
-        endpoint_name = path.replace('/', '_').strip('_')
-        endpoints[endpoint_name] = {
-            "path": f"/agent/api/{resp_did}{path}",
-            "description": f"API 路径 {path} 的端点"
-        }
-    agent_id = f"{request.url.scheme}://{request.url.netloc}/wba/user/{resp_did}/ad.json"
-    
     # 使用动态路径获取用户目录
     paths = domain_manager.get_all_data_paths(host, port)
     user_full_path = paths['user_did_path'] / user_dir
 
-    template_ad_path = user_full_path / "template-ad.json"
+    # 从文件系统读取ad.json
+    ad_json_path = user_full_path / "ad.json"
 
-    # 默认模板内容
-    default_template = {
-        "name": f"ANP Agent {agent.name}",
-        "owner": {
-            "name": f"{agent.name}的开发者",
-            "@id": agent.id
-        },
-        "description": "ANP Agent ",
-        "version": "0.1.0",
-        "created_at": "2025-04-21T00:00:00Z",
-        "security_definitions": {
-        "didwba_sc": {
-            "scheme": "didwba",
-            "in": "header",
-            "name": "Authorization"
-        }
-        },
-        "interfaces": [],
-        "sub_agents": []
-    }
-
-    template_data = default_template
-
-    result = template_data
-
-    # 从模板获取或初始化接口列表，使用 "ad:interfaces" 作为标准键，并兼容旧的 "interfaces"
-    # 只保留 /agent/api/ 相关接口
-    all_interfaces = result.get("ad:interfaces", result.get("interfaces", [])).copy()
-
-    # 添加您指定的静态接口
-    # 添加静态接口（如需保留，可注释掉以下三项）
-    all_interfaces.extend([
-        {
-            "@type": "ad:NaturalLanguageInterface",
-            "protocol": "YAML",
-            "url": f"http://{host}:{port}/wba/user/{quote(resp_did)}/nlp_interface.yaml",
-            "description": "提供自然语言交互接口的OpenAPI的YAML文件，可以通过接口与智能体进行自然语言交互."
-        },
-        {
-            "@type": "ad:StructuredInterface",
-            "protocol": "YAML",
-            "url": f"http://{host}:{port}/wba/user/{quote(resp_did)}/api_interface.yaml",
-            "description": "智能体的 YAML 描述的接口调用方法"
-        },
-        {
-            "@type": "ad:StructuredInterface",
-            "protocol": "JSON",
-            "url": f"http://{host}:{port}/wba/user/{quote(resp_did)}/api_interface.json",
-            "description": "智能体的 JSON RPC 描述的接口调用方法"
-        }
-    ])
-
-    # 只添加 /agent/api/ 相关端点
-    for name, data in endpoints.items():
-        if data.get("path", "").startswith("/agent/api/"):
-            all_interfaces.append({
-                "@type": "ad:StructuredInterface",
-                "protocol": "HTTP",
-                "name": name,
-                "url": data.get("path"),
-                "description": data.get("description")
-            })
-
-    result["ad:interfaces"] = all_interfaces
-    if "interfaces" in result:
-        del result["interfaces"]
-
-    # 添加动态发现的端点，并统一格式
-    for name, data in endpoints.items():
-        all_interfaces.append({
-            "@type": "ad:StructuredInterface",
-            "protocol": "HTTP",
-            "name": name,
-            "url": data.get("path"),
-            "description": data.get("description")
-        })
-
-    result["ad:interfaces"] = all_interfaces
-    if "interfaces" in result:
-        del result["interfaces"]
-
-    # 确保必要的字段存在
-    result["@context"] = result.get("@context", {
-            "@vocab": "https://schema.org/",
-            "did": "https://w3id.org/did#",
-            "ad": "https://agent-network-protocol.com/ad#"
-    })
-    result["@type"] = result.get("@type", "ad:AgentDescription")
-    return result
+    if ad_json_path.exists():
+        try:
+            with open(ad_json_path, 'r', encoding='utf-8') as f:
+                ad_json = json.load(f)
+            return ad_json
+        except Exception as e:
+            logger.error(f"读取ad.json失败: {e}")
+            raise HTTPException(status_code=500, detail=f"读取ad.json失败: {e}")
+    else:
+        # 如果ad.json不存在，返回错误
+        raise HTTPException(status_code=404, detail=f"ad.json not found for DID {resp_did}")
 
 
 def url_did_format(user_id: str, request: Request) -> str:
@@ -290,11 +177,8 @@ async def get_agent_openapi_yaml(resp_did: str, yaml_file_name: str, request: Re
     if user_dir is None:
         raise HTTPException(status_code=404, detail=f"User directory not found for DID {resp_did}")
 
-    sdk = request.app.state.sdk
-    agent = sdk.get_agent(resp_did)
 
-    if agent.is_hosted_did:
-        raise HTTPException(status_code=403, detail=f"{resp_did} is hosted did")
+
     
     # 使用动态路径
     paths = domain_manager.get_all_data_paths(host, port)
@@ -332,11 +216,7 @@ async def get_agent_jsonrpc(resp_did: str, jsonrpc_file_name: str, request: Requ
     if user_dir is None:
         raise HTTPException(status_code=404, detail=f"User directory not found for DID {resp_did}")
 
-    sdk = request.app.state.sdk
-    agent = sdk.get_agent(resp_did)
 
-    if agent.is_hosted_did:
-        raise HTTPException(status_code=403, detail=f"{resp_did} is hosted did")
     
     # 使用动态路径
     paths = domain_manager.get_all_data_paths(host, port)

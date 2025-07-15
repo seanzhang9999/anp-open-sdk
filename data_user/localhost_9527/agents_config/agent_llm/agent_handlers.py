@@ -10,7 +10,7 @@ my_agent_instance = None
 my_llm_client = None
 
 
-async def initialize_agent(agent, sdk_instance):
+async def initialize_agent(agent):
     """
     初始化钩子，现在由插件自己负责创建和配置Agent实例。
     它不再接收参数，而是返回创建好的agent实例。

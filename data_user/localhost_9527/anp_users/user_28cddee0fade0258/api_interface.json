@@ -1,38 +1,81 @@
 {
   "jsonrpc": "2.0",
   "info": {
-    "title": "Calculator Agent JSON-RPC Interface",
+    "title": "DID did:wba:localhost%3A9527:wba:user:28cddee0fade0258 JSON-RPC Interface",
     "version": "0.1.0",
-    "description": "Methods offered by Calculator Agent"
+    "description": "Methods offered by DID did:wba:localhost%3A9527:wba:user:28cddee0fade0258"
   },
   "methods": [
     {
-      "name": "add",
-      "summary": "发送a和b，返回a+b的结果",
-      "params": {
-        "a": {
-          "type": "float",
-          "value": 1.23
-        },
-        "b": {
-          "type": "float",
-          "value": 4.56
-        }
-      },
-      "result": {
-        "result": {
-          "type": "float",
-          "value": 5.79
-        }
-      },
+      "name": "llm.llm.chat",
+      "summary": "\n    API处理函数，现在直接使用模块内的 my_llm_client。\n    它不再需要从request中获取agent实例。\n    ",
+      "description": "由 Large Language Model Agent 提供的服务",
+      "params": {},
+      "tags": [
+        "Large Language Model Agent"
+      ],
       "meta": {
         "openapi": "3.0.0",
         "info": {
-          "title": "Caculator Agent API",
+          "title": "Large Language Model Agent API",
           "version": "1.0.0"
         },
         "httpMethod": "POST",
-        "endpoint": "/add"
+        "endpoint": "/llm/llm/chat"
+      }
+    },
+    {
+      "name": "llm.calculator.add",
+      "summary": "计算两个数的和",
+      "description": "由 Large Language Model Agent 提供的服务",
+      "params": {},
+      "tags": [
+        "Large Language Model Agent"
+      ],
+      "meta": {
+        "openapi": "3.0.0",
+        "info": {
+          "title": "Large Language Model Agent API",
+          "version": "1.0.0"
+        },
+        "httpMethod": "POST",
+        "endpoint": "/llm/calculator/add"
+      }
+    },
+    {
+      "name": "calculator.calculator.add",
+      "summary": "计算两个数的和",
+      "description": "由 Calculator Agent 提供的服务",
+      "params": {},
+      "tags": [
+        "Calculator Agent"
+      ],
+      "meta": {
+        "openapi": "3.0.0",
+        "info": {
+          "title": "Calculator Agent API",
+          "version": "1.0.0"
+        },
+        "httpMethod": "POST",
+        "endpoint": "/calculator/calculator/add"
+      }
+    },
+    {
+      "name": "calculator.llm.chat",
+      "summary": "\n    API处理函数，现在直接使用模块内的 my_llm_client。\n    它不再需要从request中获取agent实例。\n    ",
+      "description": "由 Calculator Agent 提供的服务",
+      "params": {},
+      "tags": [
+        "Calculator Agent"
+      ],
+      "meta": {
+        "openapi": "3.0.0",
+        "info": {
+          "title": "Calculator Agent API",
+          "version": "1.0.0"
+        },
+        "httpMethod": "POST",
+        "endpoint": "/calculator/llm/chat"
       }
     }
   ]

@@ -35,10 +35,10 @@ class HostedAgentManager:
                         if hasattr(agent, 'is_hosted_did') and agent.is_hosted_did:
                             # 设置托管Agent名称
                             if not hasattr(agent, 'name') or not agent.name:
-                                agent.name = f"托管Agent_{agent.id.split(':')[-1][:8]}"
+                                agent.name = f"托管Agent_{agent.anp_user_id.split(':')[-1][:8]}"
                             
                             hosted_agents.append(agent)
-                            logger.debug(f"发现托管Agent: {agent.name} ({agent.id})")
+                            logger.debug(f"发现托管Agent: {agent.name} ({agent.anp_user_id})")
                             
                             # 记录托管信息
                             if hasattr(agent, 'parent_did') and agent.parent_did:
@@ -62,7 +62,7 @@ class HostedAgentManager:
         """注册托管Agent到SDK"""
         try:
             if sdk and hasattr(sdk, 'register_agent'):
-                sdk.register_agent(agent)
+                sdk.register_anp_user(agent)
                 self.agent_registry[agent.id] = agent
                 logger.info(f"注册托管Agent: {agent.name}")
                 return True
@@ -195,9 +195,9 @@ class HostedAgentManager:
                 summary['agents_by_parent'][parent_did] += 1
                 
                 # 活跃Agent列表
-                if agent.id in self.agent_registry:
+                if agent.anp_user_id in self.agent_registry:
                     summary['active_agents'].append({
-                        'id': agent.id,
+                        'id': agent.anp_user_id,
                         'name': getattr(agent, 'name', 'Unknown'),
                         'host': host
                     })

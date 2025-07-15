@@ -2,7 +2,7 @@
   "generated_at": "/Users/seanzhang/seanrework/anp-open-sdk",
   "total_methods": 3,
   "methods": {
-    "did:wba:localhost%3A9527:wba:user:5fea49e183c6c211::demo_method": {
+    "did:wba:localhost%3A9527:wba:user:3ea884878ea5fbb1::demo_method": {
       "name": "demo_method",
       "description": "演示方法，返回agent信息",
       "tags": [
@@ -11,12 +11,12 @@
       ],
       "signature": "()",
       "parameters": {},
-      "agent_did": "did:wba:localhost%3A9527:wba:user:5fea49e183c6c211",
+      "agent_did": "did:wba:localhost%3A9527:wba:user:3ea884878ea5fbb1",
       "agent_name": "我的小铃木",
       "module": "data_user.localhost_9527.agents_config.agent_002.agent_register",
       "is_async": false
     },
-    "did:wba:localhost%3A9527:wba:user:5fea49e183c6c211::calculate_sum": {
+    "did:wba:localhost%3A9527:wba:user:3ea884878ea5fbb1::calculate_sum": {
       "name": "calculate_sum",
       "description": "计算两个数的和",
       "tags": [
@@ -36,12 +36,12 @@
           "required": true
         }
       },
-      "agent_did": "did:wba:localhost%3A9527:wba:user:5fea49e183c6c211",
+      "agent_did": "did:wba:localhost%3A9527:wba:user:3ea884878ea5fbb1",
       "agent_name": "我的小铃木",
       "module": "data_user.localhost_9527.agents_config.agent_002.agent_register",
       "is_async": false
     },
-    "did:wba:localhost%3A9527:wba:user:5fea49e183c6c211::async_demo": {
+    "did:wba:localhost%3A9527:wba:user:3ea884878ea5fbb1::async_demo": {
       "name": "async_demo",
       "description": "异步演示方法",
       "tags": [
@@ -50,7 +50,7 @@
       ],
       "signature": "()",
       "parameters": {},
-      "agent_did": "did:wba:localhost%3A9527:wba:user:5fea49e183c6c211",
+      "agent_did": "did:wba:localhost%3A9527:wba:user:3ea884878ea5fbb1",
       "agent_name": "我的小铃木",
       "module": "data_user.localhost_9527.agents_config.agent_002.agent_register",
       "is_async": true

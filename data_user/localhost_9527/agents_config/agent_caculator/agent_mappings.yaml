@@ -4,6 +4,7 @@ share_did:
   enabled: true
   shared_did: "did:wba:localhost%3A9527:wba:user:28cddee0fade0258"
   path_prefix: "/calculator"
+  primary_agent: false  # 不是主Agent，避免与LLM Agent冲突
 api:
 - path: /add  # 原始路径，通过共享DID访问时为 /calculator/add
   method: POST

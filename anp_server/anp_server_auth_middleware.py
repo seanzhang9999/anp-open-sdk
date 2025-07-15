@@ -14,8 +14,10 @@ logger = logging.getLogger(__name__)
 EXEMPT_PATHS = [
     "/docs", "/anp-nlp/", "/ws/", "/did_host/agents", "/agent/group/*",
     "/redoc", "/openapi.json", "/wba/hostuser/*", "/wba/user/*", "/", "/favicon.ico",
-    "/agents/example/ad.json","/wba/auth", "/wba/hosted-did/*"
+    "/agents/example/ad.json","/wba/auth", "/wba/hosted-did/*","/publisher/agents"
 ]
+from anp_server_framework.agent_manager import AgentManager
+
 
 
 async def _check_permissions(request: Request, auth_info: dict) :
@@ -90,7 +92,9 @@ async def auth_middleware(request: Request, call_next: Callable, auth_method: st
             content={"detail": exc.detail}
         )
     except Exception as e:
-        logger.debug(f"Unexpected error in auth middleware: {e}")
+        logger.error(f"Unexpected error in auth middleware: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         return JSONResponse(
             status_code=500,
             content={"detail": "Internal anp_server error"}

@@ -65,7 +65,7 @@ class HostedDIDDemo:
             # 启动托管服务器
             self.hosting_server = ANP_Server(
                 mode=ServerMode.MULTI_AGENT_ROUTER,
-                agents=[hosting_agent],
+                anp_users=[hosting_agent],
                 host="localhost",
                 port=9527
             )

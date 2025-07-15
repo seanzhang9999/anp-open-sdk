@@ -130,7 +130,7 @@ class DemoTaskRunner:
             temp_agent = ANPUser.from_did(did_document['id'])
 
             # 注册到SDK
-            self.sdk.register_agent(temp_agent)
+            self.sdk.register_anp_user(temp_agent)
             logger.debug(f"临时智能体 {temp_agent.name} 注册成功")
 
             # 3. 为临时智能体注册消息监听函数
@@ -156,19 +156,19 @@ class DemoTaskRunner:
 
             # 临时智能体向agent2发送消息
             logger.debug(f"=== {temp_agent.name} -> {agent2.name} ===")
-            resp = await agent_msg_post(temp_agent.id, agent2.id, f"你好，我是{temp_agent.name}")
+            resp = await agent_msg_post(temp_agent.anp_user_id, agent2.anp_user_id, f"你好，我是{temp_agent.name}")
             logger.debug(f"[{temp_agent.name}] 已发送消息给 {agent2.name},响应: {resp}")
 
 
             # 临时智能体向agent3发送消息
             logger.debug(f"=== {temp_agent.name} -> {agent3.name} ===")
-            resp = await agent_msg_post(temp_agent.id, agent3.id, f"你好，我是{temp_agent.name}")
+            resp = await agent_msg_post(temp_agent.anp_user_id, agent3.anp_user_id, f"你好，我是{temp_agent.name}")
             logger.debug(f"[{temp_agent.name}] 已发送消息给 {agent3.name},响应: {resp}")
 
 
             # agent1向临时智能体发送消息
             logger.debug(f"=== {agent1.name} -> {temp_agent.name} ===")
-            resp = await agent_msg_post(agent1.id, temp_agent.id, f"你好，我是{agent1.name}")
+            resp = await agent_msg_post(agent1.anp_user_id, temp_agent.anp_user_id, f"你好，我是{agent1.name}")
             logger.debug(f"[{agent1.name}] 已发送消息给 {temp_agent.name},响应: {resp}")
 
 
@@ -222,16 +222,16 @@ class DemoTaskRunner:
 
     async def public_hosted_agent_demo(self, agent1, hosted_agent, public_hosted_agent):
         # 公共智能体向托管智能体发送消息
-        resp = await agent_msg_post(public_hosted_agent.id, hosted_agent.id,
+        resp = await agent_msg_post(public_hosted_agent.anp_user_id, hosted_agent.anp_user_id,
                                     f"你好托管智能体，我是公共智能体{public_hosted_agent.name}")
         logger.info(f"-- public-host user to host user：{public_hosted_agent.name} -> {hosted_agent.name}: {resp}")
         # 托管智能体向公共智能体发送消息
-        resp = await agent_msg_post(hosted_agent.id, public_hosted_agent.id,
+        resp = await agent_msg_post(hosted_agent.anp_user_id, public_hosted_agent.anp_user_id,
                                     f"你好公共智能体，我是托管智能体{hosted_agent.name}")
         logger.info(
             f"-- host user to public-host user：{hosted_agent.name} -> {public_hosted_agent.name}: {resp}")
         # 公共智能体向普通智能体发送消息
-        resp = await agent_msg_post(public_hosted_agent.id, agent1.id,
+        resp = await agent_msg_post(public_hosted_agent.anp_user_id, agent1.anp_user_id,
                                     f"你好本地智能体，我是公共智能体{public_hosted_agent.name}")
         logger.info(
             f"-- public-host user to local user：{public_hosted_agent.name} -> {agent1.name}: {resp}")
@@ -262,7 +262,7 @@ class DemoTaskRunner:
 
         user_data = user_data_manager.get_user_data_by_name("公共智能体_did:wba:agent-did.com:test:public")
         agent_anptool = ANPUser.from_did(user_data.did)
-        self.sdk.register_agent(agent_anptool)    
+        self.sdk.register_anp_user(agent_anptool)
             
 
 
@@ -338,8 +338,8 @@ class DemoTaskRunner:
         self.step_helper.pause("显示智能体ad.json信息")
         
         for agent in agents:
-            host, port = ANP_Server.get_did_host_port_from_did(agent.id)
-            user_id = quote(str(agent.id))
+            host, port = ANP_Server.get_did_host_port_from_did(agent.anp_user_id)
+            user_id = quote(str(agent.anp_user_id))
             url = f"http://{host}:{port}/wba/user/{user_id}/ad.json"
 
             try:
@@ -643,7 +643,7 @@ class DemoTaskRunner:
                 messages.append(
                     {
                         "role": "tool",
-                        "tool_call_id": tool_call.id,
+                        "tool_call_id": tool_call.anp_user_id,
                         "content": json.dumps(result, ensure_ascii=False),
                     }
                 )
@@ -653,7 +653,7 @@ class DemoTaskRunner:
                 messages.append(
                     {
                         "role": "tool",
-                        "tool_call_id": tool_call.id,
+                        "tool_call_id": tool_call.anp_user_id,
                         "content": json.dumps(
                             {
                                 "error": f"使用 ANPTool 获取 URL 失败: {url}",
@@ -938,7 +938,7 @@ def find_and_register_hosted_agent(sdk, user_datas):
         for user_data in user_datas:
             agent = ANPUser.from_did(user_data.did)
             if agent.is_hosted_did:
-                logger.debug(f"hosted_did: {agent.id}")
+                logger.debug(f"hosted_did: {agent.anp_user_id}")
                 logger.debug(f"parent_did: {agent.parent_did}")
                 logger.debug(f"hosted_info: {agent.hosted_info}")
                 hosted_agents.append(agent)

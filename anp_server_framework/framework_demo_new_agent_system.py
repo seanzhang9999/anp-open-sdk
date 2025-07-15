@@ -5,6 +5,7 @@ import sys
 import asyncio
 import threading
 
+
 # 添加路径以便导入
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -31,9 +32,9 @@ setup_logging()
 logger = logging.getLogger(__name__)
 
 
-async def create_agents_with_new_system():
+async def create_agents_with_cfg_path():
     """使用新的Agent系统创建Agent"""
-    logger.info("🔧 使用新Agent系统创建Agent...")
+    logger.debug("🔧 使用新Agent系统创建Agent...")
     
     # 清理之前的状态
     AgentManager.clear_all_agents()
@@ -41,7 +42,9 @@ async def create_agents_with_new_system():
     GlobalMessageManager.clear_handlers()
     
     created_agents = []
-    
+    lifecycle_modules = {}
+    shared_did_configs = {}
+
     # 1. 加载现有的Agent配置文件
     agent_files = glob.glob("data_user/localhost_9527/agents_config/*/agent_mappings.yaml")
     if not agent_files:
@@ -50,57 +53,22 @@ async def create_agents_with_new_system():
     # 2. 使用现有配置创建Agent
     for agent_file in agent_files:
         try:
-            agent, handler_module, share_did_config = await LocalAgentManager.load_agent_from_module(agent_file)
-            if agent:
-                # 使用新的Agent系统重新创建
-                if share_did_config:
-                    # 共享DID模式 - 检查是否应该是主Agent
-                    # 只有第一个共享DID的Agent才设为主Agent
-                    is_primary = not any(
-                        info.get('shared') and info.get('primary_agent') 
-                        for agents_dict in AgentManager._did_usage_registry.values()
-                        for info in agents_dict.values()
-                        if agents_dict
-                    )
-                    
-                    new_agent = AgentManager.create_agent(
-                        agent, 
-                        agent.name, 
-                        shared=True, 
-                        prefix=share_did_config.get('path_prefix', ''),
-                        primary_agent=is_primary  # 智能判断是否为主Agent
-                    )
-                else:
-                    # 独占DID模式
-                    new_agent = AgentManager.create_agent(
-                        agent, 
-                        agent.name, 
-                        shared=False
-                    )
-                
-                # 注册现有的API和消息处理器 - 使用list()避免字典在迭代时被修改
-                for path, handler in list(agent.api_routes.items()):
-                    new_agent.api(path)(handler)
-                
-                for msg_type, handler in list(agent.message_handlers.items()):
-                    new_agent.message_handler(msg_type)(handler)
-                
-                created_agents.append(new_agent)
-                logger.info(f"✅ 已转换Agent: {agent.name}")
-                
+            anp_agent, handler_module, share_did_config = await LocalAgentManager.load_agent_from_module(agent_file)
+            if anp_agent:
+               created_agents.append(anp_agent)
+            if handler_module:
+               lifecycle_modules[anp_agent.name] = handler_module
+            if share_did_config:
+               shared_did_configs[anp_agent.name] = share_did_config
         except Exception as e:
             logger.error(f"❌ 转换Agent失败 {agent_file}: {e}")
-    
-    # 3. 创建代码生成的Agent
-    code_generated_agents = await create_code_generated_agents()
-    created_agents.extend(code_generated_agents)
-    
-    return created_agents
+
+    return created_agents,lifecycle_modules,shared_did_configs
 
 
-async def create_code_generated_agents():
+async def create_agents_with_code():
     """创建代码生成的Agent"""
-    logger.info("🤖 创建代码生成的Agent...")
+    logger.debug("🤖 创建代码生成的Agent...")
     
     from anp_sdk.anp_user import ANPUser
     
@@ -120,7 +88,7 @@ async def create_code_generated_agents():
             a = params.get('a', 0)
             b = params.get('b', 0)
             result = a + b
-            logger.info(f"🔢 计算: {a} + {b} = {result}")
+            logger.debug(f"🔢 计算: {a} + {b} = {result}")
             return {"result": result, "operation": "add", "inputs": [a, b]}
         
         @calc_agent.api("/multiply")
@@ -131,14 +99,14 @@ async def create_code_generated_agents():
             a = params.get('a', 1)
             b = params.get('b', 1)
             result = a * b
-            logger.info(f"🔢 计算: {a} × {b} = {result}")
+            logger.debug(f"🔢 计算: {a} × {b} = {result}")
             return {"result": result, "operation": "multiply", "inputs": [a, b]}
         
         # 注册消息处理器
         @calc_agent.message_handler("text")
         async def handle_calc_message(msg_data):
             content = msg_data.get('content', '')
-            logger.info(f"💬 代码生成计算器收到消息: {content}")
+            logger.debug(f"💬 代码生成计算器收到消息: {content}")
             
             # 简单的计算解析
             if '+' in content:
@@ -155,7 +123,7 @@ async def create_code_generated_agents():
             return {"reply": f"代码生成计算器收到: {content}。支持格式如 '5 + 3'"}
         
         code_agents.append(calc_agent)
-        logger.info("✅ 创建代码生成计算器Agent成功")
+        logger.debug("✅ 创建代码生成计算器Agent成功")
         
         # 创建一个代码生成的天气Agent（共享DID）
         weather_user = ANPUser.from_did("did:wba:localhost%3A9527:wba:user:5fea49e183c6c211")
@@ -181,7 +149,7 @@ async def create_code_generated_agents():
                 "humidity": "65%",
                 "wind": "微风"
             }
-            logger.info(f"🌤️ 查询天气: {city} - {weather_data['condition']}")
+            logger.debug(f"🌤️ 查询天气: {city} - {weather_data['condition']}")
             return weather_data
         
         @weather_agent.api("/forecast")
@@ -203,13 +171,13 @@ async def create_code_generated_agents():
                 })
             
             result = {"city": city, "forecast": forecast}
-            logger.info(f"🌤️ 查询{days}天预报: {city}")
+            logger.debug(f"🌤️ 查询{days}天预报: {city}")
             return result
         
         @weather_agent.message_handler("text")
         async def handle_weather_message(msg_data):
             content = msg_data.get('content', '')
-            logger.info(f"💬 代码生成天气Agent收到消息: {content}")
+            logger.debug(f"💬 代码生成天气Agent收到消息: {content}")
             
             if '天气' in content:
                 return {"reply": f"天气查询服务已收到: {content}。可以查询任何城市的天气信息。"}
@@ -217,7 +185,7 @@ async def create_code_generated_agents():
             return {"reply": f"代码生成天气Agent收到: {content}"}
         
         code_agents.append(weather_agent)
-        logger.info("✅ 创建代码生成天气Agent成功")
+        logger.debug("✅ 创建代码生成天气Agent成功")
         
         # 创建一个助手Agent（共享DID，非主Agent）
         assistant_agent = AgentManager.create_agent(
@@ -247,11 +215,11 @@ async def create_code_generated_agents():
                 "available_topics": list(help_info.keys())
             }
             
-            logger.info(f"❓ 提供帮助: {topic}")
+            logger.debug(f"❓ 提供帮助: {topic}")
             return response
         
         code_agents.append(assistant_agent)
-        logger.info("✅ 创建代码生成助手Agent成功")
+        logger.debug("✅ 创建代码生成助手Agent成功")
         
     except Exception as e:
         logger.error(f"❌ 创建代码生成Agent失败: {e}")
@@ -262,43 +230,139 @@ async def create_code_generated_agents():
 
 
 async def main():
-    logger.debug("🚀 Starting New Agent System Demo...")
+    logger.debug("🚀 Starting Agent System Demo...")
     if os.getcwd() not in sys.path:
         sys.path.append(os.getcwd())
-
     config = get_global_config()
-    
-    # 使用新的Agent系统创建Agent
-    all_agents = await create_agents_with_new_system()
-    
-    if not all_agents:
-        logger.info("No agents were created. Exiting.")
-        return
 
-    # 获取ANPUser实例用于服务器
-    anp_users = []
+    # 清除之前的Agent注册记录
+    AgentManager.clear_all_agents()
+    logger.debug("🧹 已清除之前的Agent注册记录")
+    # 初始化三个列表 agent列表 需要init和clean的agent 共享did的agent
+    all_agents = []
+    lifecycle_agents = {}
+    shared_did_configs = {}
+
+    # 从配置目录动态加载Agent
+    all_agents,lifecycle_agents,shared_did_configs = await create_agents_with_cfg_path()
+    # 用代码直接生成Agent
+    code_generated_agents = await create_agents_with_code()
+    all_agents.extend(code_generated_agents)
+    # --- 后期初始化循环 ---
     for agent in all_agents:
-        if hasattr(agent, 'anp_user'):
-            anp_users.append(agent.anp_user)
-    
-    # --- 启动SDK ---
-    logger.info("\n✅ All agents created with new system. Creating SDK instance...")
-    svr = ANP_Server(mode=ServerMode.MULTI_AGENT_ROUTER, agents=anp_users)
-    
+        module = lifecycle_agents.get(agent.name)
+        if module and hasattr(module, "initialize_agent"):
+            logger.debug(f"  - 调用 initialize_agent: {agent.name}...")
+            await module.initialize_agent(agent)  # 传入agent实例
     # 生成接口文档
+    processed_dids = set()  # 用于跟踪已处理的 DID
     for agent in all_agents:
         if hasattr(agent, 'anp_user'):
-            await LocalAgentManager.generate_and_save_agent_interfaces(agent.anp_user, svr)
+            did = agent.anp_user_id
+            if did not in processed_dids:
+                await LocalAgentManager.generate_and_save_agent_interfaces(agent)
+                processed_dids.add(did)
+                logger.debug(f"✅ 为 DID '{did}' 生成接口文档")
+    if not all_agents:
+        logger.debug("No agents were created. Exiting.")
+        return
+    # 生成本地方法文档
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    doc_path = os.path.join(script_dir, "local_methods_doc.json")
+    LocalMethodsDocGenerator.generate_methods_doc(doc_path)
 
+
+    # --- 启动SDK ---
+    logger.debug("\n✅ All agents created with new system. Creating SDK instance...")
+    svr = ANP_Server(mode=ServerMode.MULTI_AGENT_ROUTER)
+    host = config.anp_sdk.host
+    port = config.anp_sdk.port
+    logger.debug(f"⏳ 等待服务器启动 {host}:{port} ...")
+    await launch_anp_server(host, port,svr)
+    logger.debug("✅ 服务器就绪，开始执行任务。")
+
+
+    # 显示Agent管理器状态
+    logger.debug("\n📊 Agent管理器状态:")
+    agents_info = AgentManager.list_agents()
+    for did, agent_dict in agents_info.items():
+        logger.debug(f"  DID: {did}共有{len(agent_dict)}个agent")
+        for agent_name, agent_info in agent_dict.items():
+            mode = "共享" if agent_info['shared'] else "独占"
+            primary = " (主)" if agent_info.get('primary_agent') else ""
+            prefix = f" prefix:{agent_info['prefix']}" if agent_info['prefix'] else ""
+            logger.debug(f"    - {agent_name}: {mode}{primary}{prefix}")
+
+
+    # 显示全局路由器状态
+    logger.debug("\n🔗 全局路由器状态:")
+    routes = GlobalRouter.list_routes()
+    for route in routes:
+        logger.debug(f"  🔗 {route['did']}{route['path']} <- {route['agent_name']}")
+
+    # 显示全局消息管理器状态
+    logger.debug("\n💬 全局消息管理器状态:")
+    handlers = GlobalMessageManager.list_handlers()
+    for handler in handlers:
+        logger.debug(f"  💬 {handler['did']}:{handler['msg_type']} <- {handler['agent_name']}")
+
+    # 调试：检查API路由
+    logger.debug("\n🔍 调试：检查Agent的API路由注册情况...")
+    for agent in all_agents:
+        if hasattr(agent, 'anp_user'):
+            logger.debug(f"Agent: {agent.name}")
+            logger.debug(f"  DID: {agent.anp_user_id}")
+            logger.debug(f"  API路由数量: {len(agent.anp_user.api_routes)}")
+            for path, handler in agent.anp_user.api_routes.items():
+                handler_name = handler.__name__ if hasattr(handler, '__name__') else 'unknown'
+                logger.debug(f"    - {path}: {handler_name}")
+
+    # 测试新Agent系统功能
+    #await test_new_agent_system(all_agents)
+
+    logger.debug("\n🔍 Searching for an agent with discovery capabilities...")
+    discovery_agent = None
+    for agent in all_agents:
+        if hasattr(agent, 'discover_and_describe_agents'):
+            discovery_agent = agent
+            break
+    if discovery_agent:
+        logger.debug(f"✅ Found discovery agent: '{discovery_agent.name}'. Starting its discovery task...")
+        # 直接调用 agent 实例上的方法
+        publisher_url = "http://localhost:9527/publisher/agents"
+        # agent中的自动抓取函数，自动从主地址搜寻所有did/ad/yaml文档
+        #result = await discovery_agent.discover_and_describe_agents(publisher_url)
+        # agent中的联网调用函数，调用计算器
+        result = await discovery_agent.run_calculator_add_demo()
+        # agent中的联网调用函数，相当于发送消息
+        # result = await discovery_agent.run_hello_demo()
+        # agent中的AI联网爬取函数，从一个did地址开始爬取
+        result = await discovery_agent.run_ai_crawler_demo()
+        # agent中的AI联网爬取函数，从多个did汇总地址开始爬取
+        # result = await discovery_agent.run_ai_root_crawler_demo()
+        # agent中的本地api去调用另一个agent的本地api
+        # result = await discovery_agent.run_agent_002_demo(sdk)
+        # agent中的本地api通过搜索本地api注册表去调用另一个agent的本地api
+        # result = await discovery_agent.run_agent_002_demo_new()
+
+    else:
+        logger.debug("⚠️ No agent with discovery capabilities was found.")
+
+    input("\n🔥 Demo completed. Press anykey to stop.")
+
+    await stop_server(svr, all_agents, lifecycle_agents)
+
+
+
+async def launch_anp_server(host, port,svr):
     # 用线程启动 anp_server
     def run_server():
         svr.start_server()
+
     server_thread = threading.Thread(target=run_server, daemon=True)
     server_thread.start()
-
     import time
     import socket
-
     def wait_for_port(host, port, timeout=10.0):
         start = time.time()
         while time.time() - start < timeout:
@@ -309,67 +373,19 @@ async def main():
                 time.sleep(0.2)
         raise RuntimeError(f"Server on {host}:{port} did not start within {timeout} seconds")
 
-    host = config.anp_sdk.host
-    port = config.anp_sdk.port
-    logger.info(f"⏳ 等待服务器启动 {host}:{port} ...")
     wait_for_port(host, port, timeout=15)
-    logger.info("✅ 服务器就绪，开始执行任务。")
-
-    logger.info("\n🔥 Server is running. Press Ctrl+C to stop.")
-
-    # 生成本地方法文档
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    doc_path = os.path.join(script_dir, "local_methods_doc.json")
-    LocalMethodsDocGenerator.generate_methods_doc(doc_path)
-
-    # 显示Agent管理器状态
-    logger.info("\n📊 Agent管理器状态:")
-    agents_info = AgentManager.list_agents()
-    for did, agent_dict in agents_info.items():
-        logger.info(f"  DID: {did}")
-        for agent_name, agent_info in agent_dict.items():
-            mode = "共享" if agent_info['shared'] else "独占"
-            primary = " (主)" if agent_info.get('primary_agent') else ""
-            prefix = f" prefix:{agent_info['prefix']}" if agent_info['prefix'] else ""
-            logger.info(f"    - {agent_name}: {mode}{primary}{prefix}")
-
-    # 显示全局路由器状态
-    logger.info("\n🔗 全局路由器状态:")
-    routes = GlobalRouter.list_routes()
-    for route in routes:
-        logger.info(f"  🔗 {route['did']}{route['path']} <- {route['agent_name']}")
-
-    # 显示全局消息管理器状态
-    logger.info("\n💬 全局消息管理器状态:")
-    handlers = GlobalMessageManager.list_handlers()
-    for handler in handlers:
-        logger.info(f"  💬 {handler['did']}:{handler['msg_type']} <- {handler['agent_name']}")
-
-    # 调试：检查ANPUser的API路由
-    logger.info("\n🔍 调试：检查ANPUser的API路由注册情况...")
-    for agent in all_agents:
-        if hasattr(agent, 'anp_user'):
-            logger.info(f"Agent: {agent.name}")
-            logger.info(f"  DID: {agent.anp_user.id}")
-            logger.info(f"  API路由数量: {len(agent.anp_user.api_routes)}")
-            for path, handler in agent.anp_user.api_routes.items():
-                handler_name = handler.__name__ if hasattr(handler, '__name__') else 'unknown'
-                logger.info(f"    - {path}: {handler_name}")
-
-    # 测试新Agent系统功能
-    await test_new_agent_system(all_agents)
-
-    logger.info("\n🔥 Demo completed. Press Ctrl+C to stop.")
 
 
 async def test_new_agent_system(agents):
     """测试新Agent系统的功能"""
-    logger.info("\n🧪 开始测试新Agent系统功能...")
+    logger.debug("\n🧪 开始测试新Agent系统功能...")
     
     # 找到不同类型的Agent
     calc_agent = None
     weather_agent = None
     assistant_agent = None
+    llm_agent = None
+    discovery_agent = None
     
     for agent in agents:
         if "计算器" in agent.name:
@@ -378,13 +394,21 @@ async def test_new_agent_system(agents):
             weather_agent = agent
         elif "助手" in agent.name:
             assistant_agent = agent
+        elif "llm" in agent.name.lower() or "language" in agent.name.lower():
+            llm_agent = agent
+        elif hasattr(agent.anp_user, 'discover_and_describe_agents'):
+            discovery_agent = agent
     
-    # 测试1: API调用
+    # 基础测试
+    logger.debug("\n🔍 基础功能测试...")
+    
+    # 测试1: 计算器API调用
+    calc_api_success = False
     if calc_agent:
         logger.info(f"\n🔧 测试计算器Agent API调用...")
         try:
             # 模拟API调用
-            calc_did = calc_agent.anp_user.id if hasattr(calc_agent, 'anp_user') else calc_agent.did
+            calc_did = calc_agent.anp_user_id if hasattr(calc_agent, 'anp_user') else calc_agent.did
             result = await agent_api_call_post(
                 caller_agent="did:wba:localhost%3A9527:wba:user:e0959abab6fc3c3d",
                 target_agent=calc_did,
@@ -392,14 +416,16 @@ async def test_new_agent_system(agents):
                 params={"a": 15, "b": 25}
             )
             logger.info(f"✅ 计算器API调用成功: {result}")
+            calc_api_success = True
         except Exception as e:
-            logger.error(f"❌ 计算器API调用失败: {e}")
+            logger.info(f"❌ 计算器API调用失败: {e}")
     
     # 测试2: 消息发送
+    msg_success = False
     if weather_agent:
         logger.info(f"\n📨 测试天气Agent消息发送...")
         try:
-            weather_did = weather_agent.anp_user.id if hasattr(weather_agent, 'anp_user') else weather_agent.did
+            weather_did = weather_agent.anp_user_id if hasattr(weather_agent, 'anp_user') else weather_agent.did
             result = await agent_msg_post(
                 caller_agent="did:wba:localhost%3A9527:wba:user:e0959abab6fc3c3d",
                 target_agent=weather_did,
@@ -407,15 +433,20 @@ async def test_new_agent_system(agents):
                 message_type="text"
             )
             logger.info(f"✅ 天气Agent消息发送成功: {result}")
+            msg_success = True
         except Exception as e:
-            logger.error(f"❌ 天气Agent消息发送失败: {e}")
+            logger.info(f"❌ 天气Agent消息发送失败: {e}")
+    
+    # === 共享DID功能测试 ===
+    logger.debug(f"\n🧪 开始共享DID功能测试...")
     
     # 测试3: 共享DID API调用
+    shared_api_success = False
     if weather_agent and assistant_agent:
         logger.info(f"\n🔗 测试共享DID API调用...")
         try:
             # 调用天气API
-            weather_did = weather_agent.anp_user.id if hasattr(weather_agent, 'anp_user') else weather_agent.did
+            weather_did = weather_agent.anp_user_id if hasattr(weather_agent, 'anp_user') else weather_agent.did
             weather_result = await agent_api_call_post(
                 caller_agent="did:wba:localhost%3A9527:wba:user:e0959abab6fc3c3d",
                 target_agent=weather_did,
@@ -425,7 +456,7 @@ async def test_new_agent_system(agents):
             logger.info(f"✅ 天气API调用成功: {weather_result}")
             
             # 调用助手API
-            assistant_did = assistant_agent.anp_user.id if hasattr(assistant_agent, 'anp_user') else assistant_agent.did
+            assistant_did = assistant_agent.anp_user_id if hasattr(assistant_agent, 'anp_user') else assistant_agent.did
             help_result = await agent_api_call_post(
                 caller_agent="did:wba:localhost%3A9527:wba:user:e0959abab6fc3c3d",
                 target_agent=assistant_did,
@@ -433,11 +464,13 @@ async def test_new_agent_system(agents):
                 params={"topic": "weather"}
             )
             logger.info(f"✅ 助手API调用成功: {help_result}")
+            shared_api_success = True
             
         except Exception as e:
-            logger.error(f"❌ 共享DID API调用失败: {e}")
+            logger.info(f"❌ 共享DID API调用失败: {e}")
     
     # 测试4: 冲突检测
+    conflict_test_success = False
     logger.info(f"\n⚠️  测试冲突检测...")
     try:
         # 尝试创建冲突的Agent
@@ -450,14 +483,187 @@ async def test_new_agent_system(agents):
         
     except ValueError as e:
         logger.info(f"✅ 冲突检测成功: {e}")
+        conflict_test_success = True
     except Exception as e:
-        logger.error(f"❌ 冲突检测异常: {e}")
+        logger.info(f"❌ 冲突检测异常: {e}")
     
-    logger.info(f"\n🎉 新Agent系统测试完成!")
+    # === 从framework_demo.py移植的测试 ===
+    
+    # 测试5: Calculator共享DID API调用
+    logger.debug(f"\n🔧 测试Calculator共享DID API调用...")
+    calc_api_success = await test_shared_did_api()
+    
+    # 测试6: LLM共享DID API调用
+    logger.debug(f"\n🤖 测试LLM共享DID API调用...")
+    llm_api_success = await test_llm_shared_did_api()
+    
+    # 测试7: 共享DID消息发送
+    logger.debug(f"\n📨 测试共享DID消息发送...")
+    msg_success = await test_message_sending()
+    
+    # 测试结果总结
+    logger.debug(f"\n📊 共享DID测试结果总结:")
+    logger.debug(f"  🔧 Calculator共享DID API: {'✅ 成功' if calc_api_success else '❌ 失败'}")
+    logger.debug(f"  🤖 LLM共享DID API: {'✅ 成功' if llm_api_success else '❌ 失败'}")
+    logger.debug(f"  📨 共享DID消息发送: {'✅ 成功' if msg_success else '❌ 失败'}")
+    logger.debug(f"  🔗 共享DID API调用: {'✅ 成功' if shared_api_success else '❌ 失败'}")
+    logger.debug(f"  ⚠️  冲突检测: {'✅ 成功' if conflict_test_success else '❌ 失败'}")
+    
+    success_count = sum([calc_api_success, llm_api_success, msg_success, shared_api_success, conflict_test_success])
+    total_count = 5
+    
+    if success_count == total_count:
+        logger.debug(f"\n🎉 所有共享DID测试通过! ({success_count}/{total_count}) 架构重构验证成功!")
+    else:
+        logger.debug(f"\n⚠️  部分共享DID测试失败 ({success_count}/{total_count})，需要进一步调试")
+    
+    logger.debug(f"\n🎉 新Agent系统测试完成!")
+
+
+async def test_shared_did_api():
+    """测试共享DID的API调用"""
+    logger.info("\n🧪 测试共享DID API调用...")
+
+    # 测试参数
+    caller_agent = "did:wba:localhost%3A9527:wba:user:e0959abab6fc3c3d"  # Orchestrator Agent
+    target_agent = "did:wba:localhost%3A9527:wba:user:28cddee0fade0258"  # 共享DID
+    api_path = "/calculator/add"  # 共享DID路径
+    params = {"a": 10, "b": 20}
+
+    try:
+        logger.info(f"📞 调用API: {target_agent}{api_path}")
+        logger.info(f"📊 参数: {params}")
+
+        # 调用API
+        result = await agent_api_call_post(
+            caller_agent=caller_agent,
+            target_agent=target_agent,
+            api_path=api_path,
+            params=params
+        )
+
+        logger.info(f"✅ API调用成功!")
+        logger.info(f"📋 响应: {json.dumps(result, ensure_ascii=False, indent=2)}")
+
+        # 验证结果
+        if isinstance(result, dict) and "result" in result:
+            expected_result = 30  # 10 + 20
+            actual_result = result["result"]
+            if actual_result == expected_result:
+                logger.info(f"🎉 计算结果正确: {actual_result}")
+                return True
+            else:
+                logger.info(f"❌ 计算结果错误: 期望 {expected_result}, 实际 {actual_result}")
+                return False
+        else:
+            logger.info(f"❌ 响应格式不正确: {result}")
+            return False
+
+    except Exception as e:
+        logger.info(f"❌ API调用失败: {e}")
+        return False
+
+
+async def test_message_sending():
+    """测试消息发送功能"""
+    logger.info("\n📨 测试消息发送...")
+
+    caller_agent = "did:wba:localhost%3A9527:wba:user:e0959abab6fc3c3d"  # Orchestrator Agent
+    target_agent = "did:wba:localhost%3A9527:wba:user:28cddee0fade0258"  # 共享DID (Calculator Agent)
+    message = "测试消息：请问你能帮我计算 5 + 3 吗？"
+
+    try:
+        logger.info(f"📞 发送消息到: {target_agent}")
+        logger.info(f"💬 消息内容: {message}")
+
+        # 发送消息
+        result = await agent_msg_post(
+            caller_agent=caller_agent,
+            target_agent=target_agent,
+            content=message,
+            message_type="text"
+        )
+
+        logger.info(f"✅ 消息发送成功!")
+        logger.info(f"📋 响应: {json.dumps(result, ensure_ascii=False, indent=2)}")
+
+        # 验证响应
+        if isinstance(result, dict) and "anp_result" in result:
+            anp_result = result["anp_result"]
+            if isinstance(anp_result, dict) and "reply" in anp_result:
+                logger.info(f"💬 Agent回复: {anp_result['reply']}")
+                return True
+
+        logger.info(f"❌ 消息响应格式不正确: {result}")
+        return False
+
+    except Exception as e:
+        logger.info(f"❌ 消息发送失败: {e}")
+        return False
+
+
+async def test_llm_shared_did_api():
+    """测试LLM Agent的共享DID API调用"""
+    logger.info("\n🤖 测试LLM Agent共享DID API调用...")
+
+    # 测试参数
+    caller_agent = "did:wba:localhost%3A9527:wba:user:e0959abab6fc3c3d"  # Orchestrator Agent
+    target_agent = "did:wba:localhost%3A9527:wba:user:28cddee0fade0258"  # 共享DID
+    api_path = "/llm/chat"  # LLM共享DID路径
+    params = {"message": "你好，请介绍一下你自己"}
+
+    try:
+        logger.info(f"📞 调用LLM API: {target_agent}{api_path}")
+        logger.info(f"📊 参数: {params}")
+
+        # 调用API
+        result = await agent_api_call_post(
+            caller_agent=caller_agent,
+            target_agent=target_agent,
+            api_path=api_path,
+            params=params
+        )
+
+        logger.info(f"✅ LLM API调用成功!")
+        logger.info(f"📋 响应: {json.dumps(result, ensure_ascii=False, indent=2)}")
+
+        # 验证结果
+        if isinstance(result, dict) and ("response" in result or "reply" in result or "content" in result):
+            logger.info(f"🎉 LLM响应成功!")
+            return True
+        else:
+            logger.info(f"❌ LLM响应格式不正确: {result}")
+            return False
+
+    except Exception as e:
+        logger.info(f"❌ LLM API调用失败: {e}")
+        return False
+
+
+async def stop_server(svr, all_agents, lifecycle_agents):
+    # --- 清理 ---
+    logger.debug("\n🛑 收到关闭信号，开始清理...")
+    # 停止服务器
+    if hasattr(svr, "stop_server"):
+        logger.debug("  - 停止anp_server...")
+        svr.stop_server()
+        logger.debug("  - 服务器已停止")
+    else:
+        logger.debug("  - SDK实例没有stop_server方法，无法主动停止服务")
+    # 清理Agent
+    cleanup_tasks = []
+    for agent in all_agents:
+        module = lifecycle_agents.get(agent.name)
+        if module and hasattr(module, "cleanup_agent"):
+            logger.debug(f"  - 安排清理Agent模块: {agent.name}...")
+            cleanup_tasks.append(module.cleanup_agent())
+    if cleanup_tasks:
+        await asyncio.gather(*cleanup_tasks)
+    logger.debug("✅ 所有Agent已清理完成，退出程序")
 
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        pass
+
+       asyncio.run(main())
+
+

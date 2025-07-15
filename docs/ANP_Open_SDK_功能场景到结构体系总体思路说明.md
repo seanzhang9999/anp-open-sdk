@@ -622,18 +622,22 @@ A: 解密获得对称密钥，用于后续通信加密
 # EOC架构示例
 from eoc import expose, orchestrate, call
 
+
 # Exposer：统一暴露各种服务
 @expose(source="local")
 def local_calculate(a: int, b: int) -> int:
     return a + b
 
+
 @expose(source="mcp", server="weather")
 def mcp_weather(location: str) -> dict:
     pass  # 实际调用由Exposer处理
 
+
 @expose(source="a2a", endpoint="http://api.translate.com")
 def a2a_translate(text: str, target_lang: str) -> dict:
     pass  # 实际调用由Exposer处理
+
 
 # Orchestrator：智能编排复杂任务
 @orchestrate.workflow("分析天气并发送报告")
@@ -643,7 +647,8 @@ async def weather_analysis_workflow(city: str, recipient: str):
     analysis = await call("analysis.weather_trend", data=weather_data)
     report = await call("report.generate", analysis=analysis)
     await call("email.send", to=recipient, content=report)
-    return {"status": "completed", "report_id": report.id}
+    return {"status": "completed", "report_id": report.anp_user_id}
+
 
 # Caller：统一调用接口
 result = await call("weather_analysis_workflow", city="北京", recipient="user@example.com")

@@ -1,15 +1,19 @@
 info:
-  title: 我的小本田Agent API
+  description: 所有与 DID did:wba:localhost%3A9527:wba:user:3ea884878ea5fbb1 关联的服务接口
+  title: DID did:wba:localhost%3A9527:wba:user:3ea884878ea5fbb1 API
   version: 1.0.0
 openapi: 3.0.0
 paths:
   /hello:
     post:
+      description: 由 我的小铃木 提供的服务
       requestBody:
         content:
           application/json:
             schema:
-              properties: {}
+              properties:
+                message:
+                  type: string
               type: object
         required: true
       responses:
@@ -19,9 +23,12 @@ paths:
               schema:
                 type: object
           description: 返回结果
-      summary: 我的小本田的/hello接口
+      summary: "\n    这是一个打招呼的API，传入message参数即可返回问候语。\n    "
+      tags:
+      - 我的小铃木
   /info:
     post:
+      description: 由 我的小铃木 提供的服务
       requestBody:
         content:
           application/json:
@@ -36,4 +43,6 @@ paths:
               schema:
                 type: object
           description: 返回结果
-      summary: 我的小本田的/info接口
+      summary: 我的小铃木的/info接口
+      tags:
+      - 我的小铃木

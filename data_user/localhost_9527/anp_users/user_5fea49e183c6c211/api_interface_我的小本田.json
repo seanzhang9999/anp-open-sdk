@@ -1,0 +1,38 @@
+{
+  "jsonrpc": "2.0",
+  "info": {
+    "title": "我的小本田 JSON-RPC Interface",
+    "version": "0.1.0",
+    "description": "Methods offered by 我的小本田"
+  },
+  "methods": [
+    {
+      "name": "calculator.hello",
+      "summary": "我的小本田的/calculator/hello接口",
+      "params": {},
+      "meta": {
+        "openapi": "3.0.0",
+        "info": {
+          "title": "我的小本田 API",
+          "version": "1.0.0"
+        },
+        "httpMethod": "POST",
+        "endpoint": "/calculator/hello"
+      }
+    },
+    {
+      "name": "calculator.info",
+      "summary": "我的小本田的/calculator/info接口",
+      "params": {},
+      "meta": {
+        "openapi": "3.0.0",
+        "info": {
+          "title": "我的小本田 API",
+          "version": "1.0.0"
+        },
+        "httpMethod": "POST",
+        "endpoint": "/calculator/info"
+      }
+    }
+  ]
+}

@@ -1,9 +1,46 @@
 {
   "jsonrpc": "2.0",
   "info": {
-    "title": "用户智能体安鹏 JSON-RPC Interface",
+    "title": "DID did:wba:localhost%3A9527:wba:user:27c0b1d11180f973 JSON-RPC Interface",
     "version": "0.1.0",
-    "description": "Methods offered by 用户智能体安鹏"
+    "description": "Methods offered by DID did:wba:localhost%3A9527:wba:user:27c0b1d11180f973"
   },
-  "methods": []
+  "methods": [
+    {
+      "name": "add",
+      "summary": "加法计算API",
+      "description": "由 代码生成计算器 提供的服务",
+      "params": {},
+      "tags": [
+        "代码生成计算器"
+      ],
+      "meta": {
+        "openapi": "3.0.0",
+        "info": {
+          "title": "代码生成计算器 API",
+          "version": "1.0.0"
+        },
+        "httpMethod": "POST",
+        "endpoint": "/add"
+      }
+    },
+    {
+      "name": "multiply",
+      "summary": "乘法计算API",
+      "description": "由 代码生成计算器 提供的服务",
+      "params": {},
+      "tags": [
+        "代码生成计算器"
+      ],
+      "meta": {
+        "openapi": "3.0.0",
+        "info": {
+          "title": "代码生成计算器 API",
+          "version": "1.0.0"
+        },
+        "httpMethod": "POST",
+        "endpoint": "/multiply"
+      }
+    }
+  ]
 }

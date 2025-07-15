@@ -15,6 +15,7 @@
 - **完善的共享DID路由**：增强 `register_shared_did()` 方法
 
 #### 关键改进：
+
 ```python
 # DID冲突检测
 def _check_did_conflict(self, did: str, new_type: str):
@@ -23,21 +24,23 @@ def _check_did_conflict(self, did: str, new_type: str):
         if existing_type != new_type:
             raise ValueError(f"❌ DID冲突: {did} 已被用作{existing_type}DID，不能用作{new_type}DID")
 
+
 # 增强的Agent注册 - 使用DID#Agent名称组合键避免同名冲突
 def register_agent_with_domain(self, agent, ...):
     # 3. 确定注册键：使用 DID+Agent名称 的组合键，确保唯一性
-    agent_id = str(agent.id)
+    agent_id = str(agent.anp_user_id)
     agent_name = agent.name if hasattr(agent, 'name') and agent.name else "unnamed"
     registration_key = f"{agent_id}#{agent_name}"  # 使用#分隔符避免冲突
-    
+
     # DID冲突检测（仅对独立DID Agent进行检测）
     if registration_key == agent_id:  # 独立DID Agent
         self._check_did_conflict(agent_id, "independent")
         # 注册为独立DID
         self.did_usage_registry[agent_id] = {
-            "type": "independent", 
+            "type": "independent",
             "agents": [agent.name if hasattr(agent, 'name') else agent_id]
         }
+
 
 # 智能Agent查找 - 支持DID和Agent名称查找
 def _find_agent_in_agents_dict(self, agent_id: str, agents: dict):
@@ -45,14 +48,14 @@ def _find_agent_in_agents_dict(self, agent_id: str, agents: dict):
     # 1. 直接匹配（向后兼容）
     if agent_id in agents:
         return agents[agent_id]
-    
+
     # 2. 通过组合键匹配（DID#Agent名称）
     for key, agent in agents.items():
         if '#' in key:
             did_part, name_part = key.split('#', 1)
             if did_part == agent_id or name_part == agent_id:
                 return agent
-    
+
     return None
 ```
 
@@ -64,17 +67,19 @@ def _find_agent_in_agents_dict(self, agent_id: str, agents: dict):
 - **智能冲突处理**：使用第一个注册的处理器，忽略后续冲突
 
 #### 关键改进：
+
 ```python
 def register_message_handler(self, msg_type: str, func: Callable = None, agent_name: str = None):
     """注册消息处理器，支持冲突检测"""
     # 支持装饰器和直接调用两种方式
-    
+
+
 def _register_message_handler_internal(self, msg_type: str, handler: Callable, agent_name: str = None):
     """内部消息处理器注册方法，包含冲突检测"""
     # 检查是否已有消息处理器
     if msg_type in self.message_handlers:
         # 报警并使用第一个注册的处理器
-        self.logger.warning(f"⚠️  DID {self.id} 的消息类型 '{msg_type}' 已有处理器")
+        self.logger.warning(f"⚠️  DID {self.anp_user_id} 的消息类型 '{msg_type}' 已有处理器")
         return  # 使用第一个，忽略后续的
 ```
 
@@ -185,9 +190,10 @@ share_did:
 采用 `DID#Agent名称` 的组合键机制，彻底避免Agent同名冲突：
 
 **1. 注册键生成**：
+
 ```python
 # 使用 DID+Agent名称 的组合键，确保唯一性
-agent_id = str(agent.id)
+agent_id = str(agent.anp_user_id)
 agent_name = agent.name if hasattr(agent, 'name') and agent.name else "unnamed"
 registration_key = f"{agent_id}#{agent_name}"  # 使用#分隔符避免冲突
 ```

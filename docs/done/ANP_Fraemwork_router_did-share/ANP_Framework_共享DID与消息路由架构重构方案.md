@@ -93,23 +93,24 @@ Request -> DID -> ANPUser -> Message Handler -> [内部路由] -> Sub Agents
 3. 共享DID注册时检查是否已被独立DID使用
 
 **实现方案**：
+
 ```python
 class AgentRouter:
     def __init__(self):
         self.did_usage_registry = {}  # did -> {"type": "independent|shared", "agents": [...]}
-    
+
     def register_agent_with_domain(self, agent, ...):
-        agent_did = str(agent.id)
-        
+        agent_did = str(agent.anp_user_id)
+
         # 检查DID使用冲突
         if agent_did in self.did_usage_registry:
             existing_type = self.did_usage_registry[agent_did]["type"]
             if existing_type == "shared":
                 raise ValueError(f"❌ DID {agent_did} 已被用作共享DID，不能注册为独立Agent")
-        
+
         # 注册为独立DID
         self.did_usage_registry[agent_did] = {
-            "type": "independent", 
+            "type": "independent",
             "agents": [agent.name]
         }
 ```

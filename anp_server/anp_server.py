@@ -31,7 +31,8 @@ from anp_sdk.anp_sdk_user_data import get_user_data_manager
 from anp_server.anp_server_auth_middleware import auth_middleware
 from anp_sdk.config import get_global_config
 from anp_server.server_mode import ServerMode
-from anp_server_framework.anp_service.anp_sdk_group_runner import GroupManager, GroupRunner, Message, MessageType, Agent
+from anp_server_framework.anp_service.anp_sdk_group_runner import GroupManager, GroupRunner, Message, MessageType, Agent as GroupAgent
+from anp_server_framework.agent import Agent
 from anp_server.router import router_did,router_host
 from anp_server.router import router_publisher, router_auth
 
@@ -54,11 +55,11 @@ class ANP_Server:
             cls.instance = super().__new__(cls)
         return cls.instance
     
-    def __init__(self, mode = ServerMode.MULTI_AGENT_ROUTER, agents=None, ws_host="0.0.0.0", ws_port=9527, **kwargs):
+    def __init__(self, mode = ServerMode.MULTI_AGENT_ROUTER, anp_users=None, ws_host="0.0.0.0", ws_port=9527, **kwargs):
         if hasattr(self, 'initialized'):
             return
         self.mode = mode
-        self.agents = agents or []
+        self.anp_users = anp_users or []
         self.port = ws_port
         self.server_running = False
         self.api_routes = {}
@@ -72,15 +73,15 @@ class ANP_Server:
         self.proxy_task = None
         self.group_manager = GroupManager(self)
         self.user_data_manager = get_user_data_manager()
-        self.agent = None
+        self.anp_user = None
         self.initialized = True
         config = get_global_config()
         self.debug_mode = config.anp_sdk.debug_mode
 
         if self.debug_mode:
             self.app = FastAPI(
-                title="ANP SDK Server in DebugMode",
-                description="ANP SDK Server in DebugMode",
+                title="ANP DID Server in DebugMode",
+                description="ANP DID Server in DebugMode",
                 version="0.1.0",
                 reload=False,
                 docs_url="/docs",
@@ -88,8 +89,8 @@ class ANP_Server:
                     )
         else:
             self.app = FastAPI(
-                title="ANP SDK Server",
-                description="ANP SDK Server",
+                title="ANP DID Server",
+                description="ANP DID Server",
                 version="0.1.0",
                 reload=True,
                 docs_url=None,
@@ -110,42 +111,23 @@ class ANP_Server:
             return await auth_middleware(request, call_next)
 
         from anp_server.router.router_agent import AgentRouter
-        self.router = AgentRouter()
+        self.router_agent = AgentRouter()
         if mode == ServerMode.MULTI_AGENT_ROUTER:
-            for agent in self.agents:
-                self.register_agent(agent)
+            for anp_user in self.anp_users:
+                self.register_anp_user(anp_user)
             self._register_default_routes()
         elif mode == ServerMode.DID_REG_PUB_SERVER:
             self._register_default_routes()
         elif mode == ServerMode.SDK_WS_PROXY_SERVER:
             self._register_default_routes()
-            self._register_ws_proxy_server(ws_host, ws_port)
         elif mode == ServerMode.AGENT_SELF_SERVICE:
-            for agent in self.agents:
-                self.register_agent(agent)
+            for anp_user in self.anp_users:
+                self.register_anp_user(anp_user)
             self._register_default_routes()
-        # 其他模式由LocalAgent主导
 
 
 
 
-    def _register_ws_proxy_server(self, ws_host, ws_port):
-        self.ws_clients = {}
-
-        @self.app.websocket("/ws/agent")
-        async def ws_agent_endpoint(websocket: WebSocket):
-            await websocket.accept()
-            client_id = id(websocket)
-            self.ws_clients[client_id] = websocket
-            try:
-                while True:
-                    msg = await websocket.receive_text()
-                    data = json.loads(msg)
-                    # 处理代理注册、DID发布、API代理等
-            except Exception as e:
-                    self.logger.error(f"WebSocket客户端断开: {e}")
-            finally:
-                    self.ws_clients.pop(client_id, None)
 
     def register_group_runner(self, group_id: str, runner_class: type[GroupRunner],
                              url_pattern: Optional[str] = None):
@@ -161,33 +143,132 @@ class ANP_Server:
         return self.group_manager.list_groups()
 
 
-    def register_agent(self, agent: ANPUser):
-        # 从agent的DID中解析域名和端口
-        domain, port = self.get_did_host_port_from_did(agent.id)
+    def register_anp_user(self, anp_user: ANPUser):
+        # 从anp_user的DID中解析域名和端口
+        domain, port = self.get_did_host_port_from_did(anp_user.id)
 
         # 标准化域名
         if domain in ['127.0.0.1', '0.0.0.0']:
             domain = 'localhost'
+        
+        # 确保ANPUser有正确的名称
+        if not hasattr(anp_user, 'name') or not anp_user.name or anp_user.name == "未命名":
+            # 如果没有名称，使用DID的最后一部分作为默认名称
+            anp_user.name = anp_user.id.split(':')[-1] if ':' in anp_user.id else anp_user.id
+            self.logger.debug(f"为ANPUser设置默认名称: {anp_user.name}")
+        
+        self.logger.info(f"🔧 注册ANPUser到SDK: {anp_user.name} (DID: {anp_user.id}) @ {domain}:{port}")
+        
+        # 创建Agent实例
+        agent = anp_user.get_or_create_agent(anp_user.name)
+        
         # 使用解析出的域名和端口注册
-        self.router.register_agent_with_domain(
+        self.router_agent.register_agent_with_domain(
             agent,
             domain=domain,
             port=port
         )
-        self.logger.debug(f"已注册智能体到SDK: {agent.id} @ {domain}:{port}")
+        self.logger.info(f"✅ 已注册智能体到SDK: {anp_user.id} @ {domain}:{port}")
+        
+        # 手动注册Agent名称索引到全局索引（确保共享DID路由能找到）
+        if agent.name and agent.name != anp_user.id:
+            agent_key = f"{anp_user.id}#{agent.name}"
+            if hasattr(self.router_agent, 'global_agents'):
+                self.router_agent.global_agents[agent_key] = agent
+                self.logger.info(f"✅ 手动注册Agent名称索引: {agent_key}")
+    
+    def register_agent(self, agent: Agent):
+        # 从agent的DID中解析域名和端口
+        anp_user = agent.anp_user
+        domain, port = self.get_did_host_port_from_did(anp_user.id)
+
+        # 标准化域名
+        if domain in ['127.0.0.1', '0.0.0.0']:
+            domain = 'localhost'
+        
+        # 确保Agent有正确的名称
+        if not agent.name or agent.name == "未命名":
+            # 如果没有名称，使用DID的最后一部分作为默认名称
+            agent.name = anp_user.id.split(':')[-1] if ':' in anp_user.id else anp_user.id
+            self.logger.debug(f"为Agent设置默认名称: {agent.name}")
+        
+        self.logger.info(f"🔧 注册Agent到SDK: {agent.name} (DID: {anp_user.id}) @ {domain}:{port}")
+        
+        # 使用解析出的域名和端口注册
+        self.router_agent.register_agent_with_domain(
+            agent,
+            domain=domain,
+            port=port
+        )
+        self.logger.info(f"✅ 已注册智能体到SDK: {anp_user.id} @ {domain}:{port}")
+        
+        # 手动注册Agent名称索引到全局索引（确保共享DID路由能找到）
+        if agent.name and agent.name != anp_user.id:
+            agent_key = f"{anp_user.id}#{agent.name}"
+            if hasattr(self.router_agent, 'global_agents'):
+                self.router_agent.global_agents[agent_key] = agent
+                self.logger.info(f"✅ 手动注册Agent名称索引: {agent_key}")
+    
+    def ensure_all_anp_user_registered(self):
+        """确保所有Agent都被正确注册到全局索引中"""
+        if not hasattr(self.router_agent, 'global_agents'):
+            return
+        
+        self.logger.info("🔧 开始检查和补充Agent全局索引...")
+        
+        # 检查所有域名下的Agent
+        for domain, ports in self.router_agent.domain_anp_users.items():
+            for port, agents in ports.items():
+                self.logger.info(f"🔧 检查域名 {domain}:{port} 下的Agent: {list(agents.keys())}")
+                for registration_key, agent in agents.items():
+                    # 如果注册键包含#，说明是Agent名称注册
+                    if '#' in registration_key:
+                        # 确保在全局索引中也有这个Agent
+                        if registration_key not in self.router_agent.global_agents:
+                            self.router_agent.global_agents[registration_key] = agent
+                            self.logger.info(f"补充全局索引: {registration_key}")
+                        
+                        # 同时确保DID也在全局索引中
+                        did_part = registration_key.split('#')[0]
+                        if did_part not in self.router_agent.global_agents:
+                            self.router_agent.global_agents[did_part] = agent
+                            self.logger.info(f"补充DID索引: {did_part}")
+        
+        # 额外检查：确保所有已注册的Agent都有正确的名称索引
+        all_agents_in_system = []
+        self.logger.info(f"🔧 检查系统中的所有Agent: {len(self.anp_users)} 个")
+        for anp_user in self.anp_users:
+            if hasattr(anp_user, 'name') and anp_user.name:
+                agent_key = f"{anp_user_id}#{anp_user.name}"
+                self.logger.info(f"🔧 检查Agent: {anp_user.name} -> {agent_key}")
+                if agent_key not in self.router_agent.global_agents:
+                    # 创建Agent实例
+                    agent = Agent(anp_user, anp_user.name, shared=False)
+                    self.router_agent.global_agents[agent_key] = agent
+                    self.logger.info(f"✅ 补充缺失的Agent名称索引: {agent_key}")
+                else:
+                    self.logger.info(f"✅ Agent名称索引已存在: {agent_key}")
+                all_agents_in_system.append(agent_key)
+        
+        self.logger.info(f"🔧 全局索引检查完成，当前所有Agent: {list(self.router_agent.global_agents.keys())}")
+        self.logger.info(f"🔧 系统中的Agent: {all_agents_in_system}")
 
 
     def get_agents(self):
-        return self.router.get_all_agents().values()
+        return self.router_agent.get_all_agents().values()
 
     def get_agent(self, did: str):
-        return self.router.get_agent(did)
+        return self.router_agent.get_agent(did)
 
     def _register_default_routes(self):
         self.app.include_router(router_auth.router)
         self.app.include_router(router_did.router)
         self.app.include_router(router_publisher.router)
         self.app.include_router(router_host.router)
+        # 使用router_agent中的路由函数
+        from anp_server.router.router_agent import router as agent_router
+        self.app.include_router(agent_router)
+
         @self.app.get("/", tags=["status"])
         async def root():
             return {
@@ -198,39 +279,6 @@ class ANP_Server:
                 "documentation": "/docs"
             }
 
-        # 统一路由入口 - GET请求
-        @self.app.get("/agent/api/{did}/{subpath:path}")
-        async def unified_api_entry_get(did: str, subpath: str, request: Request):
-            # 解析请求类型和参数
-            request_type, processed_data = await self._parse_unified_request(
-                did, subpath, dict(request.query_params), request, "GET"
-            )
-            
-            # 统一路由处理
-            return await self._handle_unified_request(
-                request_type, did, processed_data, request
-            )
-
-        # 统一路由入口 - POST请求
-        @self.app.post("/agent/api/{did}/{subpath:path}")
-        async def unified_api_entry_post(did: str, subpath: str, request: Request):
-            # 获取请求体
-            try:
-                data = await request.json()
-                if not data:
-                    data = {}
-            except Exception:
-                data = {}
-            
-            # 解析请求类型和参数
-            request_type, processed_data = await self._parse_unified_request(
-                did, subpath, data, request, "POST"
-            )
-            
-            # 统一路由处理
-            return await self._handle_unified_request(
-                request_type, did, processed_data, request
-            )
 
         # 注释掉向后兼容的消息路由，强制使用统一路由
         # @self.app.post("/agent/message/{did}/post")
@@ -247,15 +295,15 @@ class ANP_Server:
             req_did = request.query_params.get("req_did", "demo_caller")
             runner = self.group_manager.get_runner(group_id)
             if runner:
-                agent = Agent(
+                group_agent = GroupAgent(
                     id=req_did,
                     name=data.get("name", req_did),
                     port=data.get("port", 0),
                     metadata=data.get("metadata", {})
                 )
-                allowed = await runner.on_agent_join(agent)
+                allowed = await runner.on_agent_join(group_agent)
                 if allowed:
-                    runner.agents[req_did] = agent
+                    runner.agents[req_did] = group_agent
                     return {"status": "success", "message": "Joined group", "group_id": group_id}
                 else:
                     return {"status": "error", "message": "Join request rejected"}
@@ -263,7 +311,7 @@ class ANP_Server:
             data["type"] = "group_join"
             data["group_id"] = group_id
             data["req_did"] = req_did
-            result = await self.router.route_request(req_did, resp_did, data, request)
+            result = await self.router_agent.route_request(req_did, resp_did, data, request)
             if asyncio.iscoroutine(result):
                 result = await result
             return result
@@ -274,15 +322,15 @@ class ANP_Server:
             req_did = request.query_params.get("req_did", "demo_caller")
             runner = self.group_manager.get_runner(group_id)
             if runner and req_did in runner.agents:
-                agent = runner.agents[req_did]
-                await runner.on_agent_leave(agent)
+                group_agent = runner.agents[req_did]
+                await runner.on_agent_leave(group_agent)
                 del runner.agents[req_did]
                 return {"status": "success", "message": "Left group"}
             resp_did = did
             data["type"] = "group_leave"
             data["group_id"] = group_id
             data["req_did"] = req_did
-            result = await self.router.route_request(req_did, resp_did, data, request)
+            result = await self.router_agent.route_request(req_did, resp_did, data, request)
             if asyncio.iscoroutine(result):
                 result = await result
             return result
@@ -311,7 +359,7 @@ class ANP_Server:
             data["type"] = "group_message"
             data["group_id"] = group_id
             data["req_did"] = req_did
-            result = await self.router.route_request(req_did, resp_did, data, request)
+            result = await self.router_agent.route_request(req_did, resp_did, data, request)
             if asyncio.iscoroutine(result):
                 result = await result
             return result
@@ -336,7 +384,7 @@ class ANP_Server:
                 return StreamingResponse(event_generator(), media_type="text/event-stream")
             resp_did = did
             data = {"type": "group_connect", "group_id": group_id, "req_did": req_did}
-            result = await self.router.route_request(req_did, resp_did, data)
+            result = await self.router_agent.route_request(req_did, resp_did, data)
             if result and "event_generator" in result:
                 return StreamingResponse(result["event_generator"], media_type="text/event-stream")
             return result
@@ -353,15 +401,15 @@ class ANP_Server:
                     return {"status": "success", "members": members}
                 elif action == "add":
                     agent_id = data.get("agent_id")
-                    agent = Agent(
+                    group_agent = GroupAgent(
                         id=agent_id,
                         name=data.get("name", agent_id),
                         port=data.get("port", 0),
                         metadata=data.get("metadata", {})
                     )
-                    allowed = await runner.on_agent_join(agent)
+                    allowed = await runner.on_agent_join(group_agent)
                     if allowed:
-                        runner.agents[agent_id] = agent
+                        runner.agents[agent_id] = group_agent
                         return {"status": "success", "message": "Member added"}
                     return {"status": "error", "message": "Add member rejected"}
                 elif action == "remove":
@@ -376,7 +424,7 @@ class ANP_Server:
             data["type"] = "group_members"
             data["group_id"] = group_id
             data["req_did"] = req_did
-            result = await self.router.route_request(req_did, resp_did, data, request)
+            result = await self.router_agent.route_request(req_did, resp_did, data, request)
             if asyncio.iscoroutine(result):
                 result = await result
             return result
@@ -390,7 +438,7 @@ class ANP_Server:
                 return {"status": "success", "members": members}
             resp_did = did
             data = {"type": "group_members", "action": "list", "group_id": group_id, "req_did": req_did}
-            result = await self.router.route_request(req_did, resp_did, data, request)
+            result = await self.router_agent.route_request(req_did, resp_did, data, request)
             if asyncio.iscoroutine(result):
                 result = await result
             return result
@@ -481,21 +529,21 @@ class ANP_Server:
         # 根据请求类型处理
         if request_type == "api_call":
             # API调用 - 保持原有逻辑
-            result = await self.router.route_request(req_did, resp_did, processed_data, request)
+            result = await self.router_agent.route_request(req_did, resp_did, processed_data, request)
             if asyncio.iscoroutine(result):
                 result = await result
             return result
             
         elif request_type == "message":
             # 消息发送 - 保持原有逻辑
-            result = await self.router.route_request(req_did, resp_did, processed_data, request)
+            result = await self.router_agent.route_request(req_did, resp_did, processed_data, request)
             if asyncio.iscoroutine(result):
                 result = await result
             return result
             
         elif request_type == "group":
             # 群组操作 - 保持原有逻辑
-            result = await self.router.route_request(req_did, resp_did, processed_data, request)
+            result = await self.router_agent.route_request(req_did, resp_did, processed_data, request)
             if asyncio.iscoroutine(result):
                 result = await result
             return result
@@ -590,7 +638,7 @@ class ANP_Server:
         try:
             if hasattr(self, 'enable_local_acceleration') and self.enable_local_acceleration and hasattr(self, 'accelerator') and self.accelerator.is_local_agent(target_did):
                 return self.accelerator.call_api(
-                    from_did=self.agent.id if self.agent else "unknown",
+                    from_did=self.anp_user_id if self.anp_user else "unknown",
                     target_did=target_did,
                     api_path=api_path,
                     method=method,
@@ -598,7 +646,7 @@ class ANP_Server:
                     headers={}
                 )
 
-            if not self.agent:
+            if not self.anp_user:
                 self.logger.error("智能体未初始化")
                 return None
 
@@ -606,7 +654,7 @@ class ANP_Server:
             target_url = f"{host}:{port}"
             url = f"http://{target_url}/{api_path}"
 
-            return self.agent.call_api(url, params, method)
+            return self.anp_user.call_api(url, params, method)
 
         except Exception as e:
             self.logger.error(f"API调用失败: {e}")
@@ -632,17 +680,17 @@ class ANP_Server:
         try:
             if hasattr(self, 'enable_local_acceleration') and self.enable_local_acceleration and hasattr(self, 'accelerator') and self.accelerator.is_local_agent(target_did):
                 return self.accelerator.send_message(
-                    from_did=self.agent.id if self.agent else "unknown",
+                    from_did=self.anp_user_id if self.anp_user else "unknown",
                     target_did=target_did,
                     message=message,
                     message_type=message_type
                 )
-            target_agent = self.router.get_agent(target_did)
+            target_agent = self.router_agent.get_agent(target_did)
             if not target_agent:
                 self.logger.error(f"未找到目标智能体: {target_did}")
                 return False
             message_data = {
-                "from_did": self.agent.id if self.agent else "unknown",
+                "from_did": self.anp_user_id if self.anp_user else "unknown",
                 "to_did": target_did,
                 "content": message,
                 "type": message_type,
@@ -682,7 +730,7 @@ class ANP_Server:
         self.stop_server()
 
     async def _handle_api_call(self, req_did: str, resp_did: str, api_path: str, method: str, params: Dict[str, Any]):
-        if resp_did != self.agent.id:
+        if resp_did != self.anp_user_id:
             return {"status": "error", "message": f"未找到智能体: {resp_did}"}
         api_key = f"{method.lower()}:{api_path}"
         if api_key in self.api_routes:
@@ -719,13 +767,13 @@ class ANP_Server:
 
     async def unregister_agent(self, agent_id: str):
         try:
-            all_agents = self.router.get_all_agents()
+            all_agents = self.router_agent.get_all_agents()
             if agent_id not in all_agents:
                 self.logger.warning(f"Agent {agent_id} not found in the router")
                 return False
 
             # 从全局索引中移除
-            agent = all_agents.pop(agent_id, None)
+            anp_user = all_agents.pop(agent_id, None)
 
             if agent_id in self.api_registry:
                 del self.api_registry[agent_id]
@@ -737,7 +785,7 @@ class ANP_Server:
 
             self.logger.debug(f"Successfully unregistered agent: {agent_id}")
 
-            if not self.router.get_all_agents():
+            if not self.router_agent.get_all_agents():
                 self.logger.debug(f"No agents remaining in the router")
 
             return True

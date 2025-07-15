@@ -120,57 +120,58 @@ class UnifiedAgentRouter(AgentRouter):
 ### 2. Agent管理统一
 
 #### 混合管理模式
+
 ```python
 class UnifiedAgentManager:
-    """统一Agent管理器 - 结合配置管理和运行时管理"""
-    
-    def __init__(self, anp_server: ANP_Server):
-        self.anp_server = anp_server
-        self.config_manager = LocalAgentManager()
-        self.runtime_agents = {}  # agent_id -> agent_instance
-        self.shared_did_mappings = {}  # shared_did -> [agent_ids]
-        
-    async def load_and_register_agents(self):
-        """从配置加载Agent并注册到服务器"""
-        
-        # 1. 发现所有Agent配置
-        agent_configs = self._discover_agent_configs()
-        
-        # 2. 验证配置
-        self._validate_configurations(agent_configs)
-        
-        # 3. 加载Agent实例
-        for config_path in agent_configs:
-            agent, handler_module = self.config_manager.load_agent_from_module(config_path)
-            if agent:
-                # 注册到运行时
-                self.runtime_agents[agent.id] = agent
-                self.anp_server.register_agent(agent)
-                
-                # 处理共享DID
-                await self._process_shared_did_config(agent, config_path)
-                
-                # 生成接口文档
-                await self.config_manager.generate_and_save_agent_interfaces(agent, self.anp_server)
-    
-    async def _process_shared_did_config(self, agent: ANPUser, config_path: str):
-        """处理共享DID配置"""
-        with open(config_path, 'r') as f:
-            config = yaml.safe_load(f)
-        
-        share_config = config.get('share_did', {})
-        if share_config.get('enabled'):
-            shared_did = share_config['shared_did']
-            path_prefix = share_config.get('path_prefix', '')
-            
-            if shared_did not in self.shared_did_mappings:
-                self.shared_did_mappings[shared_did] = []
-            
-            self.shared_did_mappings[shared_did].append({
-                'agent_id': agent.id,
-                'path_prefix': path_prefix,
-                'original_paths': [api['path'] for api in config.get('api', [])]
-            })
+   """统一Agent管理器 - 结合配置管理和运行时管理"""
+
+   def __init__(self, anp_server: ANP_Server):
+      self.anp_server = anp_server
+      self.config_manager = LocalAgentManager()
+      self.runtime_agents = {}  # agent_id -> agent_instance
+      self.shared_did_mappings = {}  # shared_did -> [agent_ids]
+
+   async def load_and_register_agents(self):
+      """从配置加载Agent并注册到服务器"""
+
+      # 1. 发现所有Agent配置
+      agent_configs = self._discover_agent_configs()
+
+      # 2. 验证配置
+      self._validate_configurations(agent_configs)
+
+      # 3. 加载Agent实例
+      for config_path in agent_configs:
+         agent, handler_module = self.config_manager.load_agent_from_module(config_path)
+         if agent:
+            # 注册到运行时
+            self.runtime_agents[agent.anp_user_id] = agent
+            self.anp_server.register_anp_user(agent)
+
+            # 处理共享DID
+            await self._process_shared_did_config(agent, config_path)
+
+            # 生成接口文档
+            await self.config_manager.generate_and_save_agent_interfaces(agent, self.anp_server)
+
+   async def _process_shared_did_config(self, agent: ANPUser, config_path: str):
+      """处理共享DID配置"""
+      with open(config_path, 'r') as f:
+         config = yaml.safe_load(f)
+
+      share_config = config.get('share_did', {})
+      if share_config.get('enabled'):
+         shared_did = share_config['shared_did']
+         path_prefix = share_config.get('path_prefix', '')
+
+         if shared_did not in self.shared_did_mappings:
+            self.shared_did_mappings[shared_did] = []
+
+         self.shared_did_mappings[shared_did].append({
+            'agent_id': agent.anp_user_id,
+            'path_prefix': path_prefix,
+            'original_paths': [api['path'] for api in config.get('api', [])]
+         })
 ```
 
 ## DID共享机制
@@ -588,51 +589,51 @@ class EnhancedAgentUserBindingManager(AgentUserBindingManager):
 
 ```python
 class UnifiedRoutingMiddleware:
-    """统一路由中间件"""
-    
-    def __init__(self, agent_manager: UnifiedAgentManager):
-        self.agent_manager = agent_manager
-        self.router = agent_manager.anp_server.router
-    
-    async def __call__(self, request: Request, call_next):
-        """中间件处理逻辑"""
-        
-        # 检查是否为Agent API请求
-        if request.url.path.startswith('/agent/api/'):
-            return await self._handle_agent_request(request)
-        
-        # 其他请求正常处理
-        return await call_next(request)
-    
-    async def _handle_agent_request(self, request: Request):
-        """处理Agent API请求"""
-        
-        # 解析路径: /agent/api/{did}/{api_path}
-        path_parts = request.url.path.split('/')
-        if len(path_parts) < 4:
-            raise HTTPException(status_code=400, detail="Invalid agent API path")
-        
-        resp_did = path_parts[3]  # 目标DID
-        api_path = '/' + '/'.join(path_parts[4:]) if len(path_parts) > 4 else '/'
-        
-        # 获取请求DID（从认证头中）
-        req_did = self._extract_req_did_from_auth(request)
-        
-        # 获取请求数据
-        if request.method == 'POST':
-            request_data = await request.json()
-        else:
-            request_data = dict(request.query_params)
-        
-        # 统一路由处理
-        return await self.router.route_unified_request(
-            req_did=req_did,
-            resp_did=resp_did,
-            api_path=api_path,
-            method=request.method,
-            request_data=request_data,
-            request=request
-        )
+   """统一路由中间件"""
+
+   def __init__(self, agent_manager: UnifiedAgentManager):
+      self.agent_manager = agent_manager
+      self.router = agent_manager.anp_server.router_agent
+
+   async def __call__(self, request: Request, call_next):
+      """中间件处理逻辑"""
+
+      # 检查是否为Agent API请求
+      if request.url.path.startswith('/agent/api/'):
+         return await self._handle_agent_request(request)
+
+      # 其他请求正常处理
+      return await call_next(request)
+
+   async def _handle_agent_request(self, request: Request):
+      """处理Agent API请求"""
+
+      # 解析路径: /agent/api/{did}/{api_path}
+      path_parts = request.url.path.split('/')
+      if len(path_parts) < 4:
+         raise HTTPException(status_code=400, detail="Invalid agent API path")
+
+      resp_did = path_parts[3]  # 目标DID
+      api_path = '/' + '/'.join(path_parts[4:]) if len(path_parts) > 4 else '/'
+
+      # 获取请求DID（从认证头中）
+      req_did = self._extract_req_did_from_auth(request)
+
+      # 获取请求数据
+      if request.method == 'POST':
+         request_data = await request.json()
+      else:
+         request_data = dict(request.query_params)
+
+      # 统一路由处理
+      return await self.router.route_unified_request(
+         req_did=req_did,
+         resp_did=resp_did,
+         api_path=api_path,
+         method=request.method,
+         request_data=request_data,
+         request=request
+      )
 ```
 
 ## 部署与迁移
@@ -720,19 +721,20 @@ class AgentRoutingMonitor:
 ### 1. 多域名支持问题分析
 
 #### 当前 `AgentRouter` 的问题
+
 ```python
 # 当前的问题代码
 class AgentRouter:
-    def __init__(self):
-        self.local_agents = {}  # 问题：全局共享，没有域名隔离
-    
-    def register_agent(self, agent):
-        self.local_agents[str(agent.id)] = agent  # 问题：可能覆盖不同域名的同名agent
-    
-    async def route_request(self, req_did: str, resp_did: str, request_data: Dict, request: Request):
-        resp_did = url_did_format(resp_did, request)
-        if resp_did in self.local_agents:  # 问题：没有验证域名权限
-            return await self.local_agents[resp_did].handle_request(...)
+   def __init__(self):
+      self.local_agents = {}  # 问题：全局共享，没有域名隔离
+
+   def register_agent(self, agent):
+      self.local_agents[str(agent.anp_user_id)] = agent  # 问题：可能覆盖不同域名的同名agent
+
+   async def route_request(self, req_did: str, resp_did: str, request_data: Dict, request: Request):
+      resp_did = url_did_format(resp_did, request)
+      if resp_did in self.local_agents:  # 问题：没有验证域名权限
+         return await self.local_agents[resp_did].handle_request(...)
 ```
 
 #### 具体风险场景
@@ -767,263 +769,272 @@ class EnhancedAgentRouter(AgentRouter):
 ```
 
 #### 增强的注册方法
+
 ```python
 def register_agent_with_domain(self, agent, domain: str = None, port: int = None, request: Request = None):
-    """
-    注册智能体到指定域名
-    
-    Args:
-        agent: 智能体实例
-        domain: 域名（可选，从request中提取）
-        port: 端口（可选，从request中提取）
-        request: HTTP请求对象（用于自动提取域名信息）
-    """
-    # 1. 确定域名和端口
-    if request:
-        domain, port = self.domain_manager.get_host_port_from_request(request)
-    elif not domain or not port:
-        domain, port = self.domain_manager._get_default_host_port()
-    
-    # 2. 验证域名权限
-    is_valid, error_msg = self.domain_manager.validate_domain_access(domain, port)
-    if not is_valid:
-        raise ValueError(f"域名注册被拒绝: {error_msg}")
-    
-    # 3. 确保域名目录存在
-    self.domain_manager.ensure_domain_directories(domain, port)
-    
-    # 4. 初始化域名结构
-    if domain not in self.domain_agents:
-        self.domain_agents[domain] = {}
-        self.stats['domains_count'] += 1
-    
-    if port not in self.domain_agents[domain]:
-        self.domain_agents[domain][port] = {}
-    
-    # 5. 检查冲突
-    agent_id = str(agent.id)
-    if agent_id in self.domain_agents[domain][port]:
-        self.stats['registration_conflicts'] += 1
-        self.logger.warning(f"智能体注册冲突: {domain}:{port} 已存在 {agent_id}")
-        if not getattr(agent, 'allow_override', False):
-            raise ValueError(f"智能体 {agent_id} 已在 {domain}:{port} 注册")
-    
-    # 6. 注册智能体
-    self.domain_agents[domain][port][agent_id] = agent
-    
-    # 7. 更新全局索引（向后兼容）
-    global_key = f"{domain}:{port}:{agent_id}"
-    self.global_agents[global_key] = agent
-    self.global_agents[agent_id] = agent  # 保持原有行为
-    
-    # 8. 更新统计
-    self.stats['total_agents'] += 1
-    
-    self.logger.info(f"✅ 智能体注册成功: {agent_id} @ {domain}:{port}")
-    return agent
+   """
+   注册智能体到指定域名
+   
+   Args:
+       agent: 智能体实例
+       domain: 域名（可选，从request中提取）
+       port: 端口（可选，从request中提取）
+       request: HTTP请求对象（用于自动提取域名信息）
+   """
+   # 1. 确定域名和端口
+   if request:
+      domain, port = self.domain_manager.get_host_port_from_request(request)
+   elif not domain or not port:
+      domain, port = self.domain_manager._get_default_host_port()
+
+   # 2. 验证域名权限
+   is_valid, error_msg = self.domain_manager.validate_domain_access(domain, port)
+   if not is_valid:
+      raise ValueError(f"域名注册被拒绝: {error_msg}")
+
+   # 3. 确保域名目录存在
+   self.domain_manager.ensure_domain_directories(domain, port)
+
+   # 4. 初始化域名结构
+   if domain not in self.domain_anp_users:
+      self.domain_anp_users[domain] = {}
+      self.stats['domains_count'] += 1
+
+   if port not in self.domain_anp_users[domain]:
+      self.domain_anp_users[domain][port] = {}
+
+   # 5. 检查冲突
+   agent_id = str(agent.anp_user_id)
+   if agent_id in self.domain_anp_users[domain][port]:
+      self.stats['registration_conflicts'] += 1
+      self.logger.warning(f"智能体注册冲突: {domain}:{port} 已存在 {agent_id}")
+      if not getattr(agent, 'allow_override', False):
+         raise ValueError(f"智能体 {agent_id} 已在 {domain}:{port} 注册")
+
+   # 6. 注册智能体
+   self.domain_anp_users[domain][port][agent_id] = agent
+
+   # 7. 更新全局索引（向后兼容）
+   global_key = f"{domain}:{port}:{agent_id}"
+   self.global_agents[global_key] = agent
+   self.global_agents[agent_id] = agent  # 保持原有行为
+
+   # 8. 更新统计
+   self.stats['total_agents'] += 1
+
+   self.logger.info(f"✅ 智能体注册成功: {agent_id} @ {domain}:{port}")
+   return agent
+
 
 # 向后兼容的注册方法
 def register_agent(self, agent):
-    """向后兼容的注册方法"""
-    return self.register_agent_with_domain(agent)
+   """向后兼容的注册方法"""
+   return self.register_agent_with_domain(agent)
 ```
 
 #### 增强的路由方法
+
 ```python
-async def route_request_with_domain_validation(self, req_did: str, resp_did: str, 
-                                             request_data: Dict, request: Request) -> Any:
-    """带域名验证的路由请求"""
-    
-    # 1. 提取请求域名信息
-    domain, port = self.domain_manager.get_host_port_from_request(request)
-    
-    # 2. 验证域名访问权限
-    is_valid, error_msg = self.domain_manager.validate_domain_access(domain, port)
-    if not is_valid:
-        self.stats['routing_errors'] += 1
-        raise HTTPException(status_code=403, detail=f"域名访问被拒绝: {error_msg}")
-    
-    # 3. 格式化目标DID
-    resp_did = url_did_format(resp_did, request)
-    
-    # 4. 多级查找智能体
-    agent = self._find_agent_with_domain_priority(resp_did, domain, port)
-    
-    if not agent:
-        self.stats['routing_errors'] += 1
-        available_agents = self._get_available_agents_for_domain(domain, port)
-        raise ValueError(
-            f"未找到智能体: {resp_did} @ {domain}:{port}\n"
-            f"可用智能体: {available_agents}"
-        )
-    
-    # 5. 验证跨域访问权限
-    if not self._validate_cross_domain_access(req_did, resp_did, domain, port):
-        self.stats['routing_errors'] += 1
-        raise HTTPException(status_code=403, detail="跨域访问被拒绝")
-    
-    # 6. 设置请求上下文
-    request.state.agent = agent
-    request.state.domain = domain
-    request.state.port = port
-    
-    # 7. 执行路由
-    try:
-        self.logger.info(f"🚀 路由请求: {req_did} -> {resp_did} @ {domain}:{port}")
-        result = await agent.handle_request(req_did, request_data, request)
-        return result
-    except Exception as e:
-        self.stats['routing_errors'] += 1
-        self.logger.error(f"❌ 路由执行失败: {e}")
-        raise
+async def route_request_with_domain_validation(self, req_did: str, resp_did: str,
+                                               request_data: Dict, request: Request) -> Any:
+   """带域名验证的路由请求"""
+
+   # 1. 提取请求域名信息
+   domain, port = self.domain_manager.get_host_port_from_request(request)
+
+   # 2. 验证域名访问权限
+   is_valid, error_msg = self.domain_manager.validate_domain_access(domain, port)
+   if not is_valid:
+      self.stats['routing_errors'] += 1
+      raise HTTPException(status_code=403, detail=f"域名访问被拒绝: {error_msg}")
+
+   # 3. 格式化目标DID
+   resp_did = url_did_format(resp_did, request)
+
+   # 4. 多级查找智能体
+   agent = self._find_agent_with_domain_priority(resp_did, domain, port)
+
+   if not agent:
+      self.stats['routing_errors'] += 1
+      available_agents = self._get_available_agents_for_domain(domain, port)
+      raise ValueError(
+         f"未找到智能体: {resp_did} @ {domain}:{port}\n"
+         f"可用智能体: {available_agents}"
+      )
+
+   # 5. 验证跨域访问权限
+   if not self._validate_cross_domain_access(req_did, resp_did, domain, port):
+      self.stats['routing_errors'] += 1
+      raise HTTPException(status_code=403, detail="跨域访问被拒绝")
+
+   # 6. 设置请求上下文
+   request.state.anp_user = agent
+   request.state.domain = domain
+   request.state.port = port
+
+   # 7. 执行路由
+   try:
+      self.logger.info(f"🚀 路由请求: {req_did} -> {resp_did} @ {domain}:{port}")
+      result = await agent.handle_request(req_did, request_data, request)
+      return result
+   except Exception as e:
+      self.stats['routing_errors'] += 1
+      self.logger.error(f"❌ 路由执行失败: {e}")
+      raise
+
 
 def _find_agent_with_domain_priority(self, agent_id: str, domain: str, port: int):
-    """
-    按优先级查找智能体：
-    1. 当前域名:端口下的智能体
-    2. 当前域名下其他端口的智能体
-    3. 全局智能体（向后兼容）
-    """
-    # 优先级1: 精确匹配域名和端口
-    if (domain in self.domain_agents and 
-        port in self.domain_agents[domain] and 
-        agent_id in self.domain_agents[domain][port]):
-        return self.domain_agents[domain][port][agent_id]
-    
-    # 优先级2: 同域名不同端口
-    if domain in self.domain_agents:
-        for other_port, agents in self.domain_agents[domain].items():
-            if agent_id in agents:
-                self.logger.warning(f"跨端口访问: {agent_id} @ {domain}:{other_port} -> {domain}:{port}")
-                return agents[agent_id]
-    
-    # 优先级3: 全局查找（向后兼容）
-    if agent_id in self.global_agents:
-        self.logger.warning(f"全局智能体访问: {agent_id}")
-        return self.global_agents[agent_id]
-    
-    return None
+   """
+   按优先级查找智能体：
+   1. 当前域名:端口下的智能体
+   2. 当前域名下其他端口的智能体
+   3. 全局智能体（向后兼容）
+   """
+   # 优先级1: 精确匹配域名和端口
+   if (domain in self.domain_anp_users and
+           port in self.domain_anp_users[domain] and
+           agent_id in self.domain_anp_users[domain][port]):
+      return self.domain_anp_users[domain][port][agent_id]
+
+   # 优先级2: 同域名不同端口
+   if domain in self.domain_anp_users:
+      for other_port, agents in self.domain_anp_users[domain].items():
+         if agent_id in agents:
+            self.logger.warning(f"跨端口访问: {agent_id} @ {domain}:{other_port} -> {domain}:{port}")
+            return agents[agent_id]
+
+   # 优先级3: 全局查找（向后兼容）
+   if agent_id in self.global_agents:
+      self.logger.warning(f"全局智能体访问: {agent_id}")
+      return self.global_agents[agent_id]
+
+   return None
+
 
 def _validate_cross_domain_access(self, req_did: str, resp_did: str, domain: str, port: int) -> bool:
-    """验证跨域访问权限"""
-    try:
-        # 检查是否允许跨域访问
-        cross_domain_config = self.domain_manager.config.did_config.cross_domain
-        if not cross_domain_config.get('enabled', False):
-            return True  # 默认允许
-        
-        # 检查白名单
-        whitelist = cross_domain_config.get('whitelist', [])
-        if req_did in whitelist:
-            return True
-        
-        # 检查黑名单
-        blacklist = cross_domain_config.get('blacklist', [])
-        if req_did in blacklist:
-            return False
-        
-        # 检查域名规则
-        domain_rules = cross_domain_config.get('domain_rules', {})
-        current_domain_key = f"{domain}:{port}"
-        if current_domain_key in domain_rules:
-            allowed_patterns = domain_rules[current_domain_key]
-            for pattern in allowed_patterns:
-                if self.domain_manager._match_pattern(req_did, pattern):
-                    return True
-            return False
-        
-        return True  # 默认允许
-        
-    except Exception as e:
-        self.logger.error(f"跨域访问验证失败: {e}")
-        return True  # 出错时默认允许
+   """验证跨域访问权限"""
+   try:
+      # 检查是否允许跨域访问
+      cross_domain_config = self.domain_manager.config.did_config.cross_domain
+      if not cross_domain_config.get('enabled', False):
+         return True  # 默认允许
+
+      # 检查白名单
+      whitelist = cross_domain_config.get('whitelist', [])
+      if req_did in whitelist:
+         return True
+
+      # 检查黑名单
+      blacklist = cross_domain_config.get('blacklist', [])
+      if req_did in blacklist:
+         return False
+
+      # 检查域名规则
+      domain_rules = cross_domain_config.get('domain_rules', {})
+      current_domain_key = f"{domain}:{port}"
+      if current_domain_key in domain_rules:
+         allowed_patterns = domain_rules[current_domain_key]
+         for pattern in allowed_patterns:
+            if self.domain_manager._match_pattern(req_did, pattern):
+               return True
+         return False
+
+      return True  # 默认允许
+
+   except Exception as e:
+      self.logger.error(f"跨域访问验证失败: {e}")
+      return True  # 出错时默认允许
 ```
 
 ### 3. 域名管理增强
 
 #### 智能体查询方法
+
 ```python
 def get_agents_by_domain(self, domain: str, port: int = None) -> Dict:
-    """获取指定域名下的所有智能体"""
-    if domain not in self.domain_agents:
-        return {}
-    
-    if port:
-        return self.domain_agents[domain].get(port, {})
-    else:
-        # 返回该域名下所有端口的智能体
-        all_agents = {}
-        for p, agents in self.domain_agents[domain].items():
-            for agent_id, agent in agents.items():
-                all_agents[f"{p}:{agent_id}"] = agent
-        return all_agents
+   """获取指定域名下的所有智能体"""
+   if domain not in self.domain_anp_users:
+      return {}
+
+   if port:
+      return self.domain_anp_users[domain].get(port, {})
+   else:
+      # 返回该域名下所有端口的智能体
+      all_agents = {}
+      for p, agents in self.domain_anp_users[domain].items():
+         for agent_id, agent in agents.items():
+            all_agents[f"{p}:{agent_id}"] = agent
+      return all_agents
+
 
 def get_domain_statistics(self) -> Dict:
-    """获取域名统计信息"""
-    stats = self.stats.copy()
-    
-    # 详细统计
-    domain_details = {}
-    for domain, ports in self.domain_agents.items():
-        domain_details[domain] = {
-            'ports': list(ports.keys()),
-            'total_agents': sum(len(agents) for agents in ports.values()),
-            'agents_by_port': {
-                str(port): list(agents.keys()) 
-                for port, agents in ports.items()
-            }
-        }
-    
-    stats['domain_details'] = domain_details
-    return stats
+   """获取域名统计信息"""
+   stats = self.stats.copy()
+
+   # 详细统计
+   domain_details = {}
+   for domain, ports in self.domain_anp_users.items():
+      domain_details[domain] = {
+         'ports': list(ports.keys()),
+         'total_agents': sum(len(agents) for agents in ports.values()),
+         'agents_by_port': {
+            str(port): list(agents.keys())
+            for port, agents in ports.items()
+         }
+      }
+
+   stats['domain_details'] = domain_details
+   return stats
+
 
 def cleanup_domain(self, domain: str, port: int = None):
-    """清理指定域名的智能体"""
-    if domain not in self.domain_agents:
-        return
-    
-    if port:
-        # 清理指定端口
-        if port in self.domain_agents[domain]:
-            agents = self.domain_agents[domain][port]
-            for agent_id in list(agents.keys()):
-                self._unregister_agent(domain, port, agent_id)
-            del self.domain_agents[domain][port]
-    else:
-        # 清理整个域名
-        for port in list(self.domain_agents[domain].keys()):
-            self.cleanup_domain(domain, port)
-        del self.domain_agents[domain]
-        self.stats['domains_count'] -= 1
+   """清理指定域名的智能体"""
+   if domain not in self.domain_anp_users:
+      return
+
+   if port:
+      # 清理指定端口
+      if port in self.domain_anp_users[domain]:
+         agents = self.domain_anp_users[domain][port]
+         for agent_id in list(agents.keys()):
+            self._unregister_agent(domain, port, agent_id)
+         del self.domain_anp_users[domain][port]
+   else:
+      # 清理整个域名
+      for port in list(self.domain_anp_users[domain].keys()):
+         self.cleanup_domain(domain, port)
+      del self.domain_anp_users[domain]
+      self.stats['domains_count'] -= 1
+
 
 def _unregister_agent(self, domain: str, port: int, agent_id: str):
-    """注销智能体"""
-    # 从域名索引中移除
-    if (domain in self.domain_agents and 
-        port in self.domain_agents[domain] and 
-        agent_id in self.domain_agents[domain][port]):
-        del self.domain_agents[domain][port][agent_id]
-        self.stats['total_agents'] -= 1
-    
-    # 从全局索引中移除
-    global_key = f"{domain}:{port}:{agent_id}"
-    if global_key in self.global_agents:
-        del self.global_agents[global_key]
-    
-    # 如果没有其他域名使用，也从简单索引中移除
-    if agent_id in self.global_agents:
-        # 检查是否还有其他域名在使用
-        still_in_use = False
-        for d, ports in self.domain_agents.items():
-            for p, agents in ports.items():
-                if agent_id in agents:
-                    still_in_use = True
-                    break
-            if still_in_use:
-                break
-        
-        if not still_in_use:
-            del self.global_agents[agent_id]
+   """注销智能体"""
+   # 从域名索引中移除
+   if (domain in self.domain_anp_users and
+           port in self.domain_anp_users[domain] and
+           agent_id in self.domain_anp_users[domain][port]):
+      del self.domain_anp_users[domain][port][agent_id]
+      self.stats['total_agents'] -= 1
+
+   # 从全局索引中移除
+   global_key = f"{domain}:{port}:{agent_id}"
+   if global_key in self.global_agents:
+      del self.global_agents[global_key]
+
+   # 如果没有其他域名使用，也从简单索引中移除
+   if agent_id in self.global_agents:
+      # 检查是否还有其他域名在使用
+      still_in_use = False
+      for d, ports in self.domain_anp_users.items():
+         for p, agents in ports.items():
+            if agent_id in agents:
+               still_in_use = True
+               break
+         if still_in_use:
+            break
+
+      if not still_in_use:
+         del self.global_agents[agent_id]
 ```
 
 ### 4. 配置文件增强

@@ -1,10 +1,12 @@
 info:
-  title: 用户智能体安鹏Agent API
+  description: 所有与 DID did:wba:localhost%3A9527:wba:user:27c0b1d11180f973 关联的服务接口
+  title: DID did:wba:localhost%3A9527:wba:user:27c0b1d11180f973 API
   version: 1.0.0
 openapi: 3.0.0
 paths:
   /add:
     post:
+      description: 由 代码生成计算器 提供的服务
       requestBody:
         content:
           application/json:
@@ -20,8 +22,11 @@ paths:
                 type: object
           description: 返回结果
       summary: 加法计算API
+      tags:
+      - 代码生成计算器
   /multiply:
     post:
+      description: 由 代码生成计算器 提供的服务
       requestBody:
         content:
           application/json:
@@ -37,3 +42,5 @@ paths:
                 type: object
           description: 返回结果
       summary: 乘法计算API
+      tags:
+      - 代码生成计算器

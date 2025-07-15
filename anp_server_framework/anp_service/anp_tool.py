@@ -427,8 +427,6 @@ class ANPToolCrawler:
                 user_input=task_input,
                 initial_url=initial_url,
                 prompt_template=prompt_template,
-                did_document_path=caller_agent.did_document_path,
-                private_key_path=caller_agent.private_key_path,
                 task_type=task_type,
                 max_documents=max_documents,
                 agent_name=agent_name
@@ -847,7 +845,7 @@ class ANPToolCrawler:
             logger.error(f"ANPTool调用失败 {url}: {str(e)}")
             messages.append({
                 "role": "tool",
-                "tool_call_id": tool_call.id,
+                "tool_call_id": tool_call.anp_user_id,
                 "content": json.dumps({
                     "error": f"ANPTool调用失败: {url}",
                     "message": str(e),

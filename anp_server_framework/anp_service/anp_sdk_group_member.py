@@ -44,7 +44,7 @@ class GroupMemberSDK:
                 )
                 allowed = await runner.on_agent_join(agent)
                 if allowed:
-                    runner.agents[self.agent_id] = agent
+                    runner.anp_users[self.agent_id] = agent
                 return allowed
 
         # HTTP 请求路径

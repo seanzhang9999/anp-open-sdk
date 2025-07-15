@@ -18,7 +18,7 @@ caller = None
 # --- 模块级变量 ---
 my_agent_instance = None
 
-async def initialize_agent(agent, sdk_instance):
+async def initialize_agent(agent):
     """
     初始化钩子，创建和配置Agent实例，并附加特殊能力。
     """
@@ -26,7 +26,7 @@ async def initialize_agent(agent, sdk_instance):
     logger.debug(f" -> Self-initializing Orchestrator Agent from its own module...")
 
     my_agent_instance = agent
-    caller = LocalMethodsCaller(sdk_instance)
+    caller = LocalMethodsCaller()
 
     # 关键步骤：将函数作为方法动态地附加到创建的 Agent 实例上
     agent.discover_and_describe_agents = discover_and_describe_agents
@@ -73,7 +73,7 @@ async def discover_and_describe_agents(publisher_url):
 
                 logger.debug(f"    - Step 2: Fetching DID Document from {did_doc_url}")
                 status, did_doc_data, msg, success = await send_authenticated_request(
-                    caller_agent=my_agent_instance.id,  # 使用 self.id 作为调用者
+                    caller_agent=my_agent_instance.anp_user_id,  # 使用 self.id 作为调用者
                     target_agent=did,
                     request_url=did_doc_url
                 )
@@ -89,7 +89,7 @@ async def discover_and_describe_agents(publisher_url):
 
                 # 3. 从 DID Document 中提取 ad.json 的地址并获取内容
                 ad_endpoint = None
-                for service in did_document.get("anp_service", []):
+                for service in did_document.get("service", []):
                     if service.get("type") == "AgentDescription":
                         ad_endpoint = service.get("serviceEndpoint")
                         logger.info(f"\n   - ✅ get endpoint from did-doc{did}:{ad_endpoint}")
@@ -101,7 +101,7 @@ async def discover_and_describe_agents(publisher_url):
 
                 logger.debug(f"    - Step 3: Fetching Agent Description from {ad_endpoint}")
                 status, ad_data, msg, success = await send_authenticated_request(
-                    caller_agent=my_agent_instance.id,
+                    caller_agent=my_agent_instance.anp_user_id,
                     target_agent=did,
                     request_url=ad_endpoint
                 )
@@ -129,7 +129,7 @@ async def discover_and_describe_agents(publisher_url):
 async def run_calculator_add_demo():
 
     caculator_did = "did:wba:localhost%3A9527:wba:user:28cddee0fade0258"
-    calculator_agent = ANPUser.from_did(caculator_did)
+    calculator_anp_user = ANPUser.from_did(caculator_did)
     # 构造 JSON-RPC 请求参数
     params = {
         "a": 1.23,
@@ -137,7 +137,7 @@ async def run_calculator_add_demo():
     }
 
     result = await agent_api_call_post(
-    my_agent_instance.id, calculator_agent.id, "/calculator/add", params  )
+    my_agent_instance.anp_user_id, calculator_anp_user.id, "/calculator/add", params  )
 
     logger.info(f"计算api调用结果: {result}")
     return result
@@ -171,7 +171,7 @@ async def run_ai_crawler_demo():
     host,port = ANP_Server.get_did_host_port_from_did(target_did)
     try:
         result = await crawler.run_crawler_demo(
-            req_did=my_agent_instance.id,  # 请求方是协作智能体
+            req_did=my_agent_instance.anp_user_id,  # 请求方是协作智能体
             resp_did=target_did,  # 目标是组装后的智能体
             task_input=task_description,
             initial_url=f"http://{host}:{port}/wba/user/{target_did}/ad.json",

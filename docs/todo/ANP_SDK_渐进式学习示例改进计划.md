@@ -384,7 +384,7 @@ async def main():
     agent = create_calculator_agent()
 
     # 2. 启动服务器
-    sdk = ANP_Server(agents=[agent])
+    sdk = ANP_Server(anp_users=[agent])
     server_thread = threading.Thread(target=sdk.start_server, daemon=True)
     server_thread.start()
 
@@ -475,30 +475,31 @@ async def main():
 ### 示例05: 委托爬虫
 
 **main.py 核心代码**:
+
 ```python
 async def main():
     """委托爬虫示例"""
     print("🚀 启动委托爬虫示例")
-    
+
     # 1. 创建协调者和爬虫Agent
     orchestrator = create_orchestrator_agent()
     crawler = create_crawler_agent()
-    
+
     # 2. 启动服务器
     sdk = ANP_Server(agents=[orchestrator, crawler])
     await start_server_async(sdk)
-    
+
     # 3. 用户向协调者发送任务
     task = "爬取 https://agent-search.ai/ad.json 的数据"
-    
+
     # 4. 协调者委托给爬虫
-    result = await orchestrator.delegate_task(crawler.id, task)
-    
+    result = await orchestrator.delegate_task(crawler.anp_user_id, task)
+
     print(f"🎯 委托任务完成: {result}")
-    
+
     # 5. 展示委托链
     show_delegation_chain(orchestrator, crawler, task, result)
-    
+
     print("✅ 委托爬虫演示完成")
 ```
 

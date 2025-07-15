@@ -1,5 +1,6 @@
 import json
 import logging
+from contextlib import nullcontext
 from urllib.parse import unquote
 
 from agent_connect.authentication import resolve_did_wba_document
@@ -107,7 +108,9 @@ async def _execute_wba_auth_flow(
                 message = "双向和单向认证均返回401/403，认证失败"
                 return status_code, response_data , message, False
             else:
-                auth_value, token = _parse_token_from_response(response_auth_header)
+                token = None
+                if status_code != 404:
+                    auth_value, token = _parse_token_from_response(response_auth_header)
                 if token:
                     if auth_value == "单向认证":
                         caller_agent.contact_manager.store_token_from_remote(context.target_did, token)
@@ -137,7 +140,9 @@ async def _execute_wba_auth_flow(
                     message = f"返回200，无token，可能是无认证页面 状态: {status_code}\n响应: {response_data}"
                     return status_code, response_data, message, True
             else:
-                auth_value, token = _parse_token_from_response(response_auth_header)
+                token = None
+                if status_code != 404:
+                    auth_value, token = _parse_token_from_response(response_auth_header)
                 if token:
                     if await _verify_response_auth_header(response_auth_header):
                         caller_agent.contact_manager.store_token_from_remote(context.target_did, token)

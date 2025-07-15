@@ -44,7 +44,7 @@ class DemoAgentLoader:
             # 使用from_did方法确保使用缓存的实例
             agent = ANPUser.from_did(user_data.did)
             if agent.is_hosted_did:
-                logger.debug(f"hosted_did: {agent.id}")
+                logger.debug(f"hosted_did: {agent.anp_user_id}")
                 logger.debug(f"parent_did: {agent.parent_did}")
                 logger.debug(f"hosted_info: {agent.hosted_info}")
                 return agent

@@ -12,25 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import asyncio
-import inspect
 import json
 import logging
-from typing import Dict, Any, Callable, List, Tuple
-
-import httpx
-import nest_asyncio
-from fastapi import FastAPI, Request
+from typing import Dict, Any, List, Tuple, Optional
 
 from anp_sdk.anp_sdk_user_data import get_user_data_manager
 
 logger = logging.getLogger(__name__)
-from starlette.responses import JSONResponse
-
 
 from anp_sdk.config import get_global_config
 from anp_sdk.did.did_tool import parse_wba_did_host_port
 from anp_sdk.contact_manager import ContactManager
-from anp_server.server_mode import ServerMode
 
 class RemoteANPUser:
     def __init__(self, id: str, name: str = None, host: str = None, port: int = None, **kwargs):
@@ -53,8 +45,7 @@ class RemoteANPUser:
 
 class ANPUser:
     """本地智能体，代表当前用户的DID身份"""
-    api_config: List[Dict[str, Any]]  # 用于多智能体加载时 从agent_mappings.yaml加载api相关扩展描述
-    
+
     # 类级别的实例缓存，确保同一个DID只有一个ANPUser实例
     _instances = {}
 
@@ -81,9 +72,9 @@ class ANPUser:
         # 将实例添加到缓存中（如果还没有的话）
         if self.id not in self._instances:
             self._instances[self.id] = self
-            logger.info(f"🆕 缓存ANPUser实例 (直接构造): {self.id}")
+            logger.debug(f"🆕 缓存ANPUser实例 (直接构造): {self.id}")
         else:
-            logger.info(f"🔄 ANPUser实例已存在于缓存中: {self.id}")
+            logger.debug(f"🔄 ANPUser实例已存在于缓存中: {self.id}")
         config = get_global_config()
         self.key_id = config.anp_sdk.user_did_key_id
 
@@ -101,14 +92,6 @@ class ANPUser:
         self.hosted_info = self.user_data.hosted_info
         import requests
         self.requests = requests
-        # 新增: API与消息handler注册表
-        self.api_routes = {}  # path -> handler
-        self.message_handlers = {}  # type -> handler
-        # 新增: 群事件handler注册表
-        # {(group_id, event_type): [handlers]}
-        self._group_event_handlers = {}
-        # [(event_type, handler)] 全局handler
-        self._group_global_handlers = []
 
         # 群组相关属性
         self.group_queues = {}  # 群组消息队列: {group_id: {client_id: Queue}}
@@ -116,19 +99,23 @@ class ANPUser:
 
         # 新增：联系人管理器
         self.contact_manager = ContactManager(self.user_data)
+        
+        # 为了向后兼容，添加API路由和消息处理器属性
+        self.api_routes = {}  # path -> handler
+        self.message_handlers = {}  # type -> handler
 
     @classmethod
     def from_did(cls, did: str, name: str = "未命名", agent_type: str = "personal"):
         # 检查实例缓存
         if did in cls._instances:
-            logger.info(f"🔄 复用ANPUser实例: {did}")
+            logger.debug(f"🔄 复用ANPUser实例: {did}")
             return cls._instances[did]
         
         user_data_manager = get_user_data_manager()
         user_data = user_data_manager.get_user_data(did)
         if not user_data:
             # 尝试刷新用户数据
-            logger.info(f"用户 {did} 不在内存中，尝试刷新用户数据...")
+            logger.debug(f"用户 {did} 不在内存中，尝试刷新用户数据...")
             user_data_manager.scan_and_load_new_users()
             # 再次尝试获取
             user_data = user_data_manager.get_user_data(did)
@@ -143,7 +130,7 @@ class ANPUser:
         # 创建新实例并缓存
         instance = cls(user_data, name, agent_type)
         cls._instances[did] = instance
-        logger.info(f"🆕 创建并缓存ANPUser实例: {did}")
+        logger.debug(f"🆕 创建并缓存ANPUser实例: {did}")
         return instance
 
     @classmethod
@@ -152,7 +139,7 @@ class ANPUser:
         user_data = user_data_manager.get_user_data_by_name(name)
         if not user_data:
             # 尝试刷新用户数据
-            logger.info(f"用户 {name} 不在内存中，尝试刷新用户数据...")
+            logger.debug(f"用户 {name} 不在内存中，尝试刷新用户数据...")
             user_data_manager.scan_and_load_new_users()
 
             # 再次尝试获取
@@ -165,13 +152,13 @@ class ANPUser:
         # 获取到user_data后，使用DID进行缓存检查
         did = user_data.did
         if did in cls._instances:
-            logger.info(f"🔄 复用ANPUser实例 (通过name查找): {name} -> {did}")
+            logger.debug(f"🔄 复用ANPUser实例 (通过name查找): {name} -> {did}")
             return cls._instances[did]
         
         # 创建新实例并缓存
         instance = cls(user_data, name, agent_type)
         cls._instances[did] = instance
-        logger.info(f"🆕 创建并缓存ANPUser实例 (通过name查找): {name} -> {did}")
+        logger.debug(f"🆕 创建并缓存ANPUser实例 (通过name查找): {name} -> {did}")
         return instance
 
     def __del__(self):
@@ -189,174 +176,6 @@ class ANPUser:
         """获取用户目录"""
         return self.user_dir
 
-    # 支持装饰器和函数式注册API
-    def expose_api(self, path: str, func: Callable = None, methods=None):
-        methods = methods or ["GET", "POST"]
-        if func is None:
-            def decorator(f):
-                self.api_routes[path] = f
-                api_info = {
-                    "path": f"/agent/api/{self.id}{path}",
-                    "methods": methods,
-                    "summary": f.__doc__ or f"{self.name}的{path}接口",
-                    "agent_id": self.id,
-                    "agent_name": self.name
-                }
-                from anp_server.anp_server import ANP_Server
-                if hasattr(ANP_Server, 'instance') and ANP_Server.instance:
-                    if self.id not in ANP_Server.instance.api_registry:
-                        ANP_Server.instance.api_registry[self.id] = []
-                    ANP_Server.instance.api_registry[self.id].append(api_info)
-                    logger.debug(f"注册 API: {api_info}")
-                return f
-            return decorator
-        else:
-            self.api_routes[path] = func
-            api_info = {
-                "path": f"/agent/api/{self.id}{path}",
-                "methods": methods,
-                "summary": func.__doc__ or f"{self.name}的{path}接口",
-                "agent_id": self.id,
-                "agent_name": self.name
-            }
-            from anp_server.anp_server import ANP_Server
-            if hasattr(ANP_Server, 'instance') and ANP_Server.instance:
-                if self.id not in ANP_Server.instance.api_registry:
-                    ANP_Server.instance.api_registry[self.id] = []
-                ANP_Server.instance.api_registry[self.id].append(api_info)
-                logger.debug(f"注册 API: {api_info}")
-            return func
-
-    def register_message_handler(self, msg_type: str, func: Callable = None, agent_name: str = None):
-        """注册消息处理器，支持冲突检测"""
-        if func is None:
-            def decorator(f):
-                self._register_message_handler_internal(msg_type, f, agent_name)
-                return f
-            return decorator
-        else:
-            self._register_message_handler_internal(msg_type, func, agent_name)
-            return func
-    
-    def _register_message_handler_internal(self, msg_type: str, handler: Callable, agent_name: str = None):
-        """内部消息处理器注册方法，包含冲突检测"""
-        # 检查是否已有消息处理器
-        if msg_type in self.message_handlers:
-            existing_handler = self.message_handlers[msg_type]
-            self.logger.warning(f"⚠️  DID {self.id} 的消息类型 '{msg_type}' 已有处理器")
-            self.logger.warning(f"   现有处理器: {getattr(existing_handler, '__name__', 'unknown')}")
-            self.logger.warning(f"   新处理器: {getattr(handler, '__name__', 'unknown')} (来自 {agent_name or 'unknown'})")
-            self.logger.warning(f"   🔧 使用第一个注册的处理器，忽略后续注册")
-            return  # 使用第一个，忽略后续的
-        
-        self.message_handlers[msg_type] = handler
-        self.logger.info(f"✅ 注册消息处理器: DID {self.id}, 类型 '{msg_type}', 来自 {agent_name or 'unknown'}")
-
-    def register_group_event_handler(self, handler: Callable, group_id: str = None, event_type: str = None):
-        if group_id is None and event_type is None:
-            self._group_global_handlers.append((None, handler))
-        elif group_id is None:
-            self._group_global_handlers.append((event_type, handler))
-        else:
-            key = (group_id, event_type)
-            self._group_event_handlers.setdefault(key, []).append(handler)
-
-    def _get_group_event_handlers(self, group_id: str, event_type: str):
-        handlers = []
-        for et, h in self._group_global_handlers:
-            if et is None or et == event_type:
-                handlers.append(h)
-        for (gid, et), hs in self._group_event_handlers.items():
-            if gid == group_id and (et is None or et == event_type):
-                handlers.extend(hs)
-        return handlers
-
-    async def _dispatch_group_event(self, group_id: str, event_type: str, event_data: dict):
-        handlers = self._get_group_event_handlers(group_id, event_type)
-        for handler in handlers:
-            try:
-                ret = handler(group_id, event_type, event_data)
-                if inspect.isawaitable(ret):
-                    await ret
-            except Exception as e:
-                self.logger.error(f"群事件处理器出错: {e}")
-
-    async def handle_request(self, req_did: str, request_data: Dict[str, Any], request: Request):
-        req_type = request_data.get("type")
-        if req_type in ("group_message", "group_connect", "group_members"):
-            handler = self.message_handlers.get(req_type)
-            if handler:
-                try:
-                    nest_asyncio.apply()
-                    if asyncio.iscoroutinefunction(handler):
-                        loop = asyncio.get_event_loop()
-                        if loop.is_running():
-                            future = asyncio.ensure_future(handler(request_data))
-                            return loop.run_until_complete(future)
-                        else:
-                            return loop.run_until_complete(handler(request_data))
-                    else:
-                        result = handler(request_data)
-                    if isinstance(result, dict) and "anp_result" in result:
-                        return result
-                    return {"anp_result": result}
-                except Exception as e:
-                    self.logger.error(f"Group message handling error: {e}")
-                    return {"anp_result": {"status": "error", "message": str(e)}}
-            else:
-                return {"anp_result": {"status": "error", "message": f"No handler for group type: {req_type}"}}
-        if req_type == "api_call":
-            api_path = request_data.get("path")
-            
-            # 调试信息：显示当前ANPUser的所有API路由
-            self.logger.info(f"🔍 ANPUser {self.id} 查找API路径: {api_path}")
-            self.logger.info(f"🔍 ANPUser {self.id} 当前所有API路由:")
-            for route_path, route_handler in self.api_routes.items():
-                self.logger.info(f"   - {route_path}: {getattr(route_handler, '__name__', 'unknown')}")
-            
-            handler = self.api_routes.get(api_path)
-            if handler:
-                try:
-                    result = await handler(request_data, request)
-                    if isinstance(result, dict):
-                        status_code = result.pop('status_code', 200)
-                        return JSONResponse(
-                            status_code=status_code,
-                            content=result
-                        )
-                    else:
-                        return result
-                except Exception as e:
-                    self.logger.debug(
-                        f"发送到 handler的请求数据{request_data}\n"                        
-                        f"完整请求为 url: {request.url} \n"
-                        f"body: {await request.body()}")
-                    self.logger.error(f"API调用错误: {e}")
-                    return JSONResponse(
-                        status_code=500,
-                        content={"status": "error", "error_message": str(e)}
-                    )
-            else:
-                return JSONResponse(
-                    status_code=404,
-                    content={"status": "error", "message": f"未找到API: {api_path}"}
-                )
-        elif req_type == "message":
-            msg_type = request_data.get("message_type", "*")
-            handler = self.message_handlers.get(msg_type) or self.message_handlers.get("*")
-            if handler:
-                try:
-                    result = await handler(request_data)
-                    if isinstance(result, dict) and "anp_result" in result:
-                        return result
-                    return {"anp_result": result}
-                except Exception as e:
-                    self.logger.error(f"消息处理错误: {e}")
-                    return {"anp_result": {"status": "error", "message": str(e)}}
-            else:
-                return {"anp_result": {"status": "error", "message": f"未找到消息处理器: {msg_type}"}}
-        else:
-            return {"anp_result": {"status": "error", "message": "未知的请求类型"}}
 
 
     def get_token_to_remote(self, remote_did, hosted_did=None):
@@ -414,7 +233,7 @@ class ANPUser:
             # 发送申请请求
             target_url = f"http://{target_host}:{target_port}/wba/hosted-did/request"
             
-
+            import httpx
             async with httpx.AsyncClient() as client:
                 response = await client.post(
                     target_url,
@@ -426,7 +245,7 @@ class ANPUser:
                     result = response.json()
                     if result.get('success'):
                         request_id = result.get('request_id')
-                        logger.info(f"托管DID申请已提交: {request_id}")
+                        logger.debug(f"托管DID申请已提交: {request_id}")
                         return True, request_id, ""
                     else:
                         error_msg = result.get('message', '申请失败')
@@ -523,8 +342,8 @@ class ANPUser:
                             result.get('result_id', ''), source_host, source_port
                         )
                         
-                        logger.info(f"托管DID已保存: {hosted_result}")
-                        logger.info(f"托管DID ID: {hosted_did_doc.get('id')}")
+                        logger.debug(f"托管DID已保存: {hosted_result}")
+                        logger.debug(f"托管DID ID: {hosted_did_doc.get('id')}")
                         processed_count += 1
                     else:
                         logger.error(f"保存托管DID失败: {hosted_result}")
@@ -577,7 +396,7 @@ class ANPUser:
                     total_processed += processed
                     
                     if processed > 0:
-                        logger.info(f"轮询第{i+1}次: 处理了{processed}个托管DID结果")
+                        logger.debug(f"轮询第{i+1}次: 处理了{processed}个托管DID结果")
                 
                 if i < max_polls - 1:  # 不是最后一次
                     await asyncio.sleep(interval)
@@ -603,68 +422,63 @@ class ANPUser:
             # 使用缓存机制创建ANPUser实例
             hosted_did = new_user_data.did
             if hosted_did in self._instances:
-                logger.info(f"🔄 复用ANPUser实例 (托管DID): {hosted_did}")
+                logger.debug(f"🔄 复用ANPUser实例 (托管DID): {hosted_did}")
                 return True, self._instances[hosted_did]
             
             # 创建新实例并缓存
             instance = ANPUser(user_data=new_user_data)
             self._instances[hosted_did] = instance
-            logger.info(f"🆕 创建并缓存ANPUser实例 (托管DID): {hosted_did}")
+            logger.debug(f"🆕 创建并缓存ANPUser实例 (托管DID): {hosted_did}")
             return True, instance
         return False, None
 
-
-    def start(self, mode: ServerMode, ws_proxy_url=None, host="0.0.0.0", port=8000):
-        if mode == ServerMode.AGENT_SELF_SERVICE:
-            self._start_self_service(host, port)
-        elif mode == ServerMode.AGENT_WS_PROXY_CLIENT:
-            self._start_self_service(host, port)
-            asyncio.create_task(self._start_ws_proxy_client(ws_proxy_url))
-        # 其他模式由ANPSDK主导
-
-    def _start_self_service(self, host, port):
-        self.app = FastAPI(title=f"{self.name} LocalAgent", description="LocalAgent Self-Service API", version="1.0.0")
-        self._register_self_routes()
-        import uvicorn
-        uvicorn.run(self.app, host=host, port=port)
-
-    def _register_self_routes(self):
-        from fastapi import Request
-
-        @self.app.post("/agent/api/{agent_id}/{path:path}")
-        async def agent_api(agent_id: str, path: str, request: Request):
-            if agent_id != self.id:
-                return JSONResponse(status_code=404, content={"status": "error", "message": "Agent ID not found"})
-            request_data = await request.json()
-            return await self.handle_request(agent_id, request_data, request)
-
-        # 可扩展更多自服务API
-
-    async def _start_ws_proxy_client(self, ws_proxy_url):
-        import websockets
-        while True:
+    def get_or_create_agent(self, name: Optional[str] = None, shared: bool = False, 
+                           prefix: Optional[str] = None, primary_agent: bool = False):
+        """获取或创建与此ANPUser关联的Agent实例
+        
+        Args:
+            name: Agent名称，默认使用ANPUser的name
+            shared: 是否共享DID模式
+            prefix: 共享模式下的API前缀
+            primary_agent: 是否为主Agent
+            
+        Returns:
+            Agent: 关联的Agent实例
+        """
+        from anp_server_framework.agent_manager import AgentManager
+        from anp_server_framework.agent import Agent
+        
+        # 查找与此ANPUser关联的Agent实例
+        agent = AgentManager.get_agent_by_anp_user(self)
+        if agent:
+            logger.debug(f"🔄 复用已存在的Agent: {agent.name}")
+            return agent
+        
+        # 如果没有找到，创建新的Agent实例
+        agent_name = name or self.name
+        agent = Agent(self, agent_name, shared, prefix, primary_agent)
+        
+        # 迁移API路由到新Agent
+        for path, handler in list(self.api_routes.items()):
+            agent.api(path)(handler)
+            logger.debug(f"🔄 迁移API到新Agent: {path}")
+        
+        # 迁移消息处理器到新Agent
+        for msg_type, handler in list(self.message_handlers.items()):
             try:
-                async with websockets.connect(ws_proxy_url) as ws:
-                    await self._ws_proxy_loop(ws)
-            except Exception as e:
-                self.logger.error(f"WebSocket代理连接失败: {e}")
-                await asyncio.sleep(5)
-
-    async def _ws_proxy_loop(self, ws):
-        await ws.send(json.dumps({"type": "register", "did": self.id}))
-        async for msg in ws:
-            data = json.loads(msg)
-            # 处理来自中心的请求
-            # 这里可以根据data内容调用self.handle_request等
-            # 例如:
-            req_type = data.get("type")
-            if req_type == "api_call":
-                # 伪造一个Request对象
-                class DummyRequest:
-                    def __init__(self, json_data):
-                        self._json = json_data
-                    async def json(self):
-                        return self._json
-                response = await self.handle_request(self.id, data, DummyRequest(data))
-                await ws.send(json.dumps({"type": "response", "data": response}))
-            # 可扩展其他消息类型
+                agent.message_handler(msg_type)(handler)
+                logger.debug(f"🔄 迁移消息处理器到新Agent: {msg_type}")
+            except PermissionError as e:
+                logger.warning(f"⚠️ 消息处理器迁移失败: {e}")
+        
+        logger.debug(f"✅ 为ANPUser创建新Agent: {agent_name}")
+        return agent
+    
+    async def handle_request(self, req_did: str, request_data: Dict[str, Any], request):
+        """向后兼容的请求处理方法 - 桥接到新Agent系统"""
+        # 获取或创建Agent实例
+        agent = self.get_or_create_agent()
+        
+        # 使用Agent处理请求
+        logger.debug(f"🔄 ANPUser.handle_request 桥接到 Agent: {agent.name}")
+        return await agent.handle_request(req_did, request_data, request)

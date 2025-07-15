@@ -11,15 +11,18 @@ def register(agent):
     from .agent_handlers import hello_handler, info_handler
 
     # 注册 /hello POST,GET
-    agent.expose_api("/hello", wrap_business_handler(hello_handler), methods=["POST","GET"])
 
-    # 注册 /info POST
-    agent.expose_api("/info", info_handler, methods=["POST"])
+    agent.api("/hello")(wrap_business_handler(hello_handler))
+    agent.api("/info")(info_handler)
+
+
+    ###
 
     # 注册一个自定义消息处理器
-    @agent.register_message_handler("text")
     async def custom_text_handler(msg):
         return {"reply": f"自定义注册收到消息: {msg.get('content')}"}
+    
+    agent.message_handlers["text"] = custom_text_handler
 
     # 你还可以注册事件、定时任务、权限校验等
     # agent.register_group_event_handler(...)
@@ -46,6 +49,3 @@ def register(agent):
     register_local_methods_to_agent(agent, locals())
 
     return agent
-
-
-
