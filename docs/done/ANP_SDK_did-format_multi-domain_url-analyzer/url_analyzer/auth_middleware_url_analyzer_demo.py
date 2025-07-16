@@ -86,8 +86,8 @@ async def demo_url_analyzer_inference():
         },
         {
             "name": "测试用户路径",
-            "path": "/wba/test/test_agent_001/ad.json",
-            "expected_did": "did:wba:localhost%3A9527:wba:test:test_agent_001"
+            "path": "/wba/tests/test_agent_001/ad.json",
+            "expected_did": "did:wba:localhost%3A9527:wba:tests:test_agent_001"
         },
         {
             "name": "托管用户路径",

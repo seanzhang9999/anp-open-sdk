@@ -7,7 +7,7 @@ from agent_connect.authentication import resolve_did_wba_document
 
 from anp_sdk.did.agent_connect_hotpatch.authentication.did_wba import extract_auth_header_parts_two_way, \
     verify_auth_header_signature_two_way
-from ..anp_sdk_user_data import get_user_data_manager
+from ..anp_user_local_data import get_user_data_manager
 
 from anp_sdk.did.did_tool import AuthenticationContext, verify_timestamp, \
      create_did_auth_header_from_user_data
@@ -262,6 +262,27 @@ async def _verify_response_auth_header(auth_value: str) -> bool:
         bool: 验证是否成功
     """
     try:
+        # 处理CIMultiDictProxy类型的headers
+        if hasattr(auth_value, 'get') and callable(auth_value.get):
+            # 如果auth_value是headers对象，尝试获取Authorization头
+            auth_header = auth_value.get('Authorization')
+            if auth_header:
+                auth_value = auth_header
+            else:
+                logger.error("在headers中未找到Authorization头")
+                return False
+
+        # 尝试解析JSON格式的auth_value
+        if isinstance(auth_value, str) and auth_value.startswith('{') and auth_value.endswith('}'):
+            try:
+                auth_json = json.loads(auth_value)
+                # 检查是否有嵌套的Authorization头
+                if 'resp_did_auth_header' in auth_json and 'Authorization' in auth_json['resp_did_auth_header']:
+                    auth_value = auth_json['resp_did_auth_header']['Authorization']
+            except json.JSONDecodeError:
+                # 如果不是有效的JSON，保持原样
+                pass
+
         # 确保auth_value是字符串
         if not isinstance(auth_value, str):
             auth_value = str(auth_value)

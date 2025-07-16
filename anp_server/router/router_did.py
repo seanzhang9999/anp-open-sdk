@@ -18,12 +18,11 @@ DID document API router with multi-domain support.
 import os
 import sys
 import urllib.parse
-from urllib.parse import quote
 
 from fastapi.responses import JSONResponse
 
-from anp_sdk.did.did_tool import find_user_by_did, get_agent_cfg_by_user_dir
-from anp_server.domain.domain_manager import get_domain_manager
+from anp_sdk.did.did_tool import find_user_by_did
+from anp_sdk.domain.domain_manager import get_domain_manager
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..","..")))
 import json

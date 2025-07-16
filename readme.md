@@ -62,7 +62,7 @@ pip install agent-connect
 运行单元测试和官方 Demo，验证核心 SDK 是否安装并能正常工作：
 
 ```bash
-python test/test_anpsdk_all.py
+python tests/test_anpsdk_all.py
 python demo_anp_sdk/anp_demo_main.py
 ```
 

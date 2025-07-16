@@ -12,7 +12,7 @@
   },
   "description": "Services provided by DID did:wba:localhost%3A9527:wba:user:5fea49e183c6c211",
   "version": "0.1.0",
-  "created_at": "2025-07-15T22:39:14.142576",
+  "created_at": "2025-07-16T21:56:30.838872",
   "security_definitions": {
     "didwba_sc": {
       "scheme": "didwba",
@@ -72,14 +72,14 @@
       "protocol": "HTTP",
       "name": "calculator_weather_current",
       "url": "/agent/api/did:wba:localhost%3A9527:wba:user:5fea49e183c6c211/calculator/weather/current",
-      "description": "我的小本田 API 路径 /calculator/weather/current 的端点 (处理器: weather_current_api)"
+      "description": "我的小本田 API 路径 /calculator/weather/current 的端点 (处理器: bound_method)"
     },
     {
       "@type": "ad:StructuredInterface",
       "protocol": "HTTP",
       "name": "calculator_weather_forecast",
       "url": "/agent/api/did:wba:localhost%3A9527:wba:user:5fea49e183c6c211/calculator/weather/forecast",
-      "description": "我的小本田 API 路径 /calculator/weather/forecast 的端点 (处理器: weather_forecast_api)"
+      "description": "我的小本田 API 路径 /calculator/weather/forecast 的端点 (处理器: bound_method)"
     },
     {
       "@type": "ad:StructuredInterface",
@@ -93,14 +93,14 @@
       "protocol": "HTTP",
       "name": "weather_weather_current",
       "url": "/agent/api/did:wba:localhost%3A9527:wba:user:5fea49e183c6c211/weather/weather/current",
-      "description": "代码生成天气 API 路径 /weather/weather/current 的端点 (处理器: weather_current_api)"
+      "description": "代码生成天气 API 路径 /weather/weather/current 的端点 (处理器: bound_method)"
     },
     {
       "@type": "ad:StructuredInterface",
       "protocol": "HTTP",
       "name": "weather_weather_forecast",
       "url": "/agent/api/did:wba:localhost%3A9527:wba:user:5fea49e183c6c211/weather/weather/forecast",
-      "description": "代码生成天气 API 路径 /weather/weather/forecast 的端点 (处理器: weather_forecast_api)"
+      "description": "代码生成天气 API 路径 /weather/weather/forecast 的端点 (处理器: bound_method)"
     },
     {
       "@type": "ad:StructuredInterface",
@@ -121,14 +121,14 @@
       "protocol": "HTTP",
       "name": "weather_weather_current",
       "url": "/agent/api/did:wba:localhost%3A9527:wba:user:5fea49e183c6c211/weather/weather/current",
-      "description": "代码生成天气 API 路径 /weather/weather/current 的端点 (处理器: weather_current_api)"
+      "description": "代码生成天气 API 路径 /weather/weather/current 的端点 (处理器: bound_method)"
     },
     {
       "@type": "ad:StructuredInterface",
       "protocol": "HTTP",
       "name": "weather_weather_forecast",
       "url": "/agent/api/did:wba:localhost%3A9527:wba:user:5fea49e183c6c211/weather/weather/forecast",
-      "description": "代码生成天气 API 路径 /weather/weather/forecast 的端点 (处理器: weather_forecast_api)"
+      "description": "代码生成天气 API 路径 /weather/weather/forecast 的端点 (处理器: bound_method)"
     },
     {
       "@type": "ad:StructuredInterface",
@@ -163,14 +163,14 @@
       "protocol": "HTTP",
       "name": "assistant_weather_current",
       "url": "/agent/api/did:wba:localhost%3A9527:wba:user:5fea49e183c6c211/assistant/weather/current",
-      "description": "代码生成助手 API 路径 /assistant/weather/current 的端点 (处理器: weather_current_api)"
+      "description": "代码生成助手 API 路径 /assistant/weather/current 的端点 (处理器: bound_method)"
     },
     {
       "@type": "ad:StructuredInterface",
       "protocol": "HTTP",
       "name": "assistant_weather_forecast",
       "url": "/agent/api/did:wba:localhost%3A9527:wba:user:5fea49e183c6c211/assistant/weather/forecast",
-      "description": "代码生成助手 API 路径 /assistant/weather/forecast 的端点 (处理器: weather_forecast_api)"
+      "description": "代码生成助手 API 路径 /assistant/weather/forecast 的端点 (处理器: bound_method)"
     },
     {
       "@type": "ad:StructuredInterface",

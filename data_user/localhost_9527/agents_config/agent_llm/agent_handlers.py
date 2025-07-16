@@ -112,18 +112,15 @@ async def chat_completion(request_data, request):
 
 
 # 新增：消息处理器
-async def handle_message(msg):
+async def handle_message(content):
     """
     通用消息处理器，处理所有类型的消息
     """
     global my_llm_client
     
-    print(f"  -> LLM Agent收到消息: {msg}")
+    print(f"  -> LLM Agent收到消息: {content}")
     
-    # 提取消息内容
-    content = msg.get('content', '')
-    message_type = msg.get('message_type', 'text')
-    
+
     if not content:
         return {"reply": "LLM Agent: 消息内容为空"}
     
@@ -145,16 +142,13 @@ async def handle_message(msg):
         return {"reply": f"LLM Agent: 处理消息时出错: {str(e)}"}
 
 
-async def handle_text_message(msg):
+async def handle_text_message(content):
     """
     专门处理text类型消息的处理器
     """
     global my_llm_client
     
-    print(f"  -> LLM Agent收到text消息: {msg}")
-    
-    # 提取消息内容
-    content = msg.get('content', '')
+    print(f"  -> LLM Agent收到text消息: {content}")
     
     if not content:
         return {"reply": "LLM Agent: text消息内容为空"}

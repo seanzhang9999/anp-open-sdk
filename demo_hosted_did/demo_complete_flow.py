@@ -21,8 +21,8 @@ from anp_sdk.anp_user import ANPUser
 from anp_server.anp_server import ANP_Server
 from anp_server.server_mode import ServerMode
 from anp_sdk.config.unified_config import UnifiedConfig, set_global_config
-from anp_sdk.anp_sdk_user_data import LocalUserDataManager
-from anp_server.domain import get_domain_manager
+from anp_sdk.anp_user_local_data import LocalUserDataManager
+from anp_sdk.domain import get_domain_manager
 
 # 配置日志
 logging.basicConfig(

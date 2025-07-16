@@ -1,5 +1,6 @@
 import asyncio
 
+from anp_server_framework.agent_decorator import agent_message_handler, agent_api
 from anp_server_framework.anp_service.anp_tool import wrap_business_handler
 from anp_server_framework.local_service.local_methods_decorators import local_method, register_local_methods_to_agent
 
@@ -12,23 +13,23 @@ def register(agent):
 
     # 注册 /hello POST,GET
 
-    agent.api("/hello")(wrap_business_handler(hello_handler))
-    agent.api("/info")(info_handler)
+    agent_api(agent,"/hello")(wrap_business_handler(hello_handler))
+    agent_api(agent,"/info")(info_handler)
 
 
     ###
 
     # 注册一个自定义消息处理器
-    async def custom_text_handler(msg):
-        return {"reply": f"自定义注册收到消息: {msg.get('content')}"}
+    async def custom_text_handler(content):
+        return {"reply": f"自定义注册收到消息: {content}"}
     
-    agent.message_handlers["text"] = custom_text_handler
+    # 使用新的装饰器方式注册消息处理器
+    agent_message_handler(agent,"text")(custom_text_handler)
+    # 注册群组事件处理器（如果需要）
+    async def handle_group_join(group_id, event_type, event_data):
+        return {"status": "success", "message": f"处理群组 {group_id} 的 {event_type} 事件"}
+    
 
-    # 你还可以注册事件、定时任务、权限校验等
-    # agent.register_group_event_handler(...)
-    # agent.add_permission_check(...)
-    # ...
-    
     
     # 注册一个本地自定义方法
     # 使用装饰器注册本地方法

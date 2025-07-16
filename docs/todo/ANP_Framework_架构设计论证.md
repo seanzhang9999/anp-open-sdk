@@ -303,7 +303,7 @@ async def mcp_unified_caller(target: str, **params):
 - **授权（Authorization）**：在anp_server层的router解决"你能做什么"
 
 ```python
-# anp_server/anp_server_auth_middleware.py：只负责身份认证
+# anp_server/anp_auth_middleware.py：只负责身份认证
 async def auth_middleware(request: Request, call_next):
     """验证身份，不做授权判断"""
     auth_passed, msg, response_auth = await _authenticate_request(request)

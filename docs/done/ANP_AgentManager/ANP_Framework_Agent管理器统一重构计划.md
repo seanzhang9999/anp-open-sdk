@@ -242,18 +242,20 @@ def from_did(cls, did: str, **kwargs):
 # 创建独占DID的Agent
 anp_user = ANPUser.from_did("did:wba:localhost:9527:user:calculator")
 agent = AgentManager.create_agent(
-    anp_user=anp_user,
-    name="Calculator Agent",
-    shared=False  # 独占模式
+   anp_user=anp_user,
+   name="Calculator Agent",
+   shared=False  # 独占模式
 )
 
-@agent.api("/add")
-def add_numbers(a: int, b: int):
-    return {"result": a + b}
 
-@agent.message_handler("text")  # ✅ 独占模式自动有消息权限
+@agent._api("/add")
+def add_numbers(a: int, b: int):
+   return {"result": a + b}
+
+
+@agent._message_handler("text")  # ✅ 独占模式自动有消息权限
 def handle_text(message):
-    return f"Calculator: {message['content']}"
+   return f"Calculator: {message['content']}"
 ```
 
 ### 共享DID模式示例
@@ -262,29 +264,32 @@ def handle_text(message):
 # 主Agent
 anp_user = ANPUser.from_did("did:wba:localhost:9527:user:shared")
 main_agent = AgentManager.create_agent(
-    anp_user=anp_user,
-    name="Main Agent",
-    shared=True,
-    prefix="/main",
-    primary_agent=True  # 主Agent，可处理消息
+   anp_user=anp_user,
+   name="Main Agent",
+   shared=True,
+   prefix="/main",
+   primary_agent=True  # 主Agent，可处理消息
 )
 
-@main_agent.message_handler("text")  # ✅ 主Agent可以处理消息
+
+@main_agent._message_handler("text")  # ✅ 主Agent可以处理消息
 def handle_text(message):
-    return f"Main: {message['content']}"
+   return f"Main: {message['content']}"
+
 
 # 辅助Agent
 calc_agent = AgentManager.create_agent(
-    anp_user=anp_user,
-    name="Calculator Agent", 
-    shared=True,
-    prefix="/calc",
-    primary_agent=False  # 辅助Agent，只提供API
+   anp_user=anp_user,
+   name="Calculator Agent",
+   shared=True,
+   prefix="/calc",
+   primary_agent=False  # 辅助Agent，只提供API
 )
 
-@calc_agent.api("/add")  # ✅ 辅助Agent可以提供API
+
+@calc_agent._api("/add")  # ✅ 辅助Agent可以提供API
 def add_numbers(a: int, b: int):
-    return {"result": a + b}
+   return {"result": a + b}
 ```
 
 ### 配置文件示例

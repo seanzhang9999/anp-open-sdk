@@ -3,7 +3,7 @@ import time
 from enum import Enum
 from typing import Dict, Any, List, Optional
 
-from anp_server.domain import get_domain_manager
+from anp_sdk.domain import get_domain_manager
 from anp_sdk.utils.log_base import logging as logger
 
 

@@ -24,7 +24,7 @@ class DIDHostManager:
         """
         if host is not None and port is not None:
             # 多域名模式：使用指定的主机和端口
-            from anp_server.domain import get_domain_manager
+            from anp_sdk.domain import get_domain_manager
             domain_manager = get_domain_manager()
             paths = domain_manager.get_all_data_paths(host, port)
             self.hosted_dir = paths['user_hosted_path']

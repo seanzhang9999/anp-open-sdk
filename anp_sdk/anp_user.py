@@ -16,7 +16,7 @@ import json
 import logging
 from typing import Dict, Any, List, Tuple, Optional
 
-from anp_sdk.anp_sdk_user_data import get_user_data_manager
+from anp_sdk.anp_user_local_data import get_user_data_manager
 
 logger = logging.getLogger(__name__)
 
@@ -131,34 +131,6 @@ class ANPUser:
         instance = cls(user_data, name, agent_type)
         cls._instances[did] = instance
         logger.debug(f"🆕 创建并缓存ANPUser实例: {did}")
-        return instance
-
-    @classmethod
-    def from_name(cls, name: str, agent_type: str = "personal"):
-        user_data_manager = get_user_data_manager()
-        user_data = user_data_manager.get_user_data_by_name(name)
-        if not user_data:
-            # 尝试刷新用户数据
-            logger.debug(f"用户 {name} 不在内存中，尝试刷新用户数据...")
-            user_data_manager.scan_and_load_new_users()
-
-            # 再次尝试获取
-            user_data = user_data_manager.get_user_data_by_name(name)
-            if not user_data:
-                # 如果还是找不到，抛出异常
-                logger.error(f"未找到 name 为 {name} 的用户数据")
-                raise ValueError(f"未找到 name 为 '{name}' 的用户数据。请检查您的用户目录和配置文件。")
-        
-        # 获取到user_data后，使用DID进行缓存检查
-        did = user_data.did
-        if did in cls._instances:
-            logger.debug(f"🔄 复用ANPUser实例 (通过name查找): {name} -> {did}")
-            return cls._instances[did]
-        
-        # 创建新实例并缓存
-        instance = cls(user_data, name, agent_type)
-        cls._instances[did] = instance
-        logger.debug(f"🆕 创建并缓存ANPUser实例 (通过name查找): {name} -> {did}")
         return instance
 
     def __del__(self):
@@ -460,13 +432,13 @@ class ANPUser:
         
         # 迁移API路由到新Agent
         for path, handler in list(self.api_routes.items()):
-            agent.api(path)(handler)
+            agent._api(path)(handler)
             logger.debug(f"🔄 迁移API到新Agent: {path}")
         
         # 迁移消息处理器到新Agent
         for msg_type, handler in list(self.message_handlers.items()):
             try:
-                agent.message_handler(msg_type)(handler)
+                agent._message_handler(msg_type)(handler)
                 logger.debug(f"🔄 迁移消息处理器到新Agent: {msg_type}")
             except PermissionError as e:
                 logger.warning(f"⚠️ 消息处理器迁移失败: {e}")

@@ -75,13 +75,13 @@ class TestUrlAnalyzer(unittest.TestCase):
     
     def test_parse_wba_test_pattern(self):
         """测试解析测试用户模式"""
-        path = "/wba/test/test_agent_001/ad.json"
+        path = "/wba/tests/test_agent_001/ad.json"
         result = self.analyzer.parse_url_pattern(path)
         
         self.assertIsNotNone(result)
         if result:  # 类型检查
             self.assertEqual(result['pattern_type'], 'wba_test')
-            self.assertEqual(result['user_type'], 'test')
+            self.assertEqual(result['user_type'], 'tests')
             self.assertEqual(result['user_info'], 'test_agent_001')
             self.assertEqual(result['info_type'], 'test_name')
     
@@ -157,14 +157,14 @@ class TestUrlAnalyzer(unittest.TestCase):
     
     def test_infer_did_from_test_path(self):
         """测试从测试用户路径推断DID"""
-        self.mock_request.url.path = "/wba/test/test_agent_001/ad.json"
+        self.mock_request.url.path = "/wba/tests/test_agent_001/ad.json"
         
         result = self.analyzer.infer_resp_did_from_url(self.mock_request)
         
         self.assertIsNotNone(result)
         if result:  # 类型检查
             self.assertTrue(result.startswith('did:wba:'))
-            self.assertIn('test', result)
+            self.assertIn('tests', result)
             self.assertIn('test_agent_001', result)
     
     def test_multi_domain_inference(self):
@@ -235,7 +235,7 @@ class TestUrlAnalyzer(unittest.TestCase):
         test_cases = [
             ("/wba/user/3ea884878ea5fbb1/did.json", "user", "3ea884878ea5fbb1"),
             ("/wba/hostuser/abc123def456789a/did.json", "hostuser", "abc123def456789a"),
-            ("/wba/test/test_agent_001/ad.json", "test", "test_agent_001"),
+            ("/wba/tests/test_agent_001/ad.json", "tests", "test_agent_001"),
             ("/invalid/path", None, None)
         ]
         

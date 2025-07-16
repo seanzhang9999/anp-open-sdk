@@ -95,7 +95,7 @@ class GlobalMessageManager:
         """注册到ANPUser的message_handlers（保持兼容性）"""
         try:
             from anp_sdk.anp_user import ANPUser
-            from anp_sdk.anp_sdk_user_data import get_user_data_manager
+            from anp_sdk.anp_user_local_data import get_user_data_manager
             
             user_data_manager = get_user_data_manager()
             user_data = user_data_manager.get_user_data(did)

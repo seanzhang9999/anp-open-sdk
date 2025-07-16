@@ -1068,7 +1068,7 @@ did_config:
         - "did:wba:*:wba:user:*"
   
   insecure_patterns:
-    - "*.test.com:*"
+    - "*.tests.com:*"
     - "localhost:*"
 ```
 

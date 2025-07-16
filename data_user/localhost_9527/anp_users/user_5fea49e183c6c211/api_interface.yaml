@@ -81,7 +81,7 @@ paths:
               schema:
                 type: object
           description: 返回结果
-      summary: 获取当前天气API
+      summary: 代码生成助手的/weather/current接口
       tags:
       - 代码生成助手
   /assistant/weather/forecast:
@@ -101,7 +101,7 @@ paths:
               schema:
                 type: object
           description: 返回结果
-      summary: 获取天气预报API
+      summary: 代码生成助手的/weather/forecast接口
       tags:
       - 代码生成助手
   /calculator/assistant/help:
@@ -181,7 +181,7 @@ paths:
               schema:
                 type: object
           description: 返回结果
-      summary: 获取当前天气API
+      summary: 我的小本田的/weather/current接口
       tags:
       - 我的小本田
   /calculator/weather/forecast:
@@ -201,7 +201,7 @@ paths:
               schema:
                 type: object
           description: 返回结果
-      summary: 获取天气预报API
+      summary: 我的小本田的/weather/forecast接口
       tags:
       - 我的小本田
   /weather/assistant/help:
@@ -281,7 +281,7 @@ paths:
               schema:
                 type: object
           description: 返回结果
-      summary: 获取当前天气API
+      summary: 代码生成天气的/weather/current接口
       tags:
       - 代码生成天气
   /weather/weather/forecast:
@@ -301,6 +301,6 @@ paths:
               schema:
                 type: object
           description: 返回结果
-      summary: 获取天气预报API
+      summary: 代码生成天气的/weather/forecast接口
       tags:
       - 代码生成天气

@@ -9,7 +9,7 @@ import logging
 from typing import Dict, Optional, Tuple, Any, List
 from datetime import datetime
 
-from anp_sdk.anp_sdk_user_data import get_user_data_manager
+from anp_sdk.anp_user_local_data import get_user_data_manager
 from anp_sdk.anp_user import ANPUser
 from anp_sdk.config import UnifiedConfig
 from anp_sdk.did.did_tool import parse_wba_did_host_port
@@ -183,6 +183,7 @@ class LocalAgentManager:
 
     @staticmethod
     async def load_agent_from_module(yaml_path: str) -> Tuple[Optional[Any], Optional[Any], Optional[Dict]]:
+        from anp_server_framework.agent_decorator import agent_api, agent_message_handler
         """从模块路径加载 Agent 实例，返回 (agent_or_new_agent, handler_module, share_did_config)"""
         logger.debug(f"\n🔎 Loading agent module from path: {yaml_path}")
         plugin_dir = os.path.dirname(yaml_path)
@@ -252,7 +253,12 @@ class LocalAgentManager:
             logger.debug(f"  -> self register agent : {anp_user.name}")
             # 调用register函数注册agent
             if hasattr(register_module, "register"):
-                register_module.register(anp_agent)
+                try:
+                    register_module.register(anp_agent)
+                    logger.debug(f"  -> 执行register函数注册agent: {anp_user.name}")
+                except Exception as e:
+                    logger.error(f"❌ register函数执行失败: {anp_user.name}, 错误: {e}")
+                    # 可以选择继续或者抛出异常
                 logger.debug(f"  -> 执行register函数注册agent: {anp_user.name}")
 
             # 如果同时存在initialize_agent，要返回
@@ -275,13 +281,9 @@ class LocalAgentManager:
         # 使用新Agent系统注册API
         for api in cfg.get("api", []):
             handler_func = getattr(handlers_module, api["handler"])
-            sig = inspect.signature(handler_func)
-            params = list(sig.parameters.keys())
-            if params != ["request", "request_data"]:
-                handler_func = wrap_business_handler(handler_func)
             
             # 使用装饰器方式注册API
-            anp_agent.api(api["path"])(handler_func)
+            agent_api(anp_agent, api["path"], auto_wrap=True)(handler_func)
             logger.debug(f"  - config register agent: {anp_user.name}，api:{api}")
         
         # 注册消息处理器（如果存在）
@@ -289,49 +291,35 @@ class LocalAgentManager:
         
         return anp_agent, None, share_did_config
 
-    @staticmethod
-    def _register_message_handlers(agent: ANPUser, handlers_module, cfg: Dict, share_did_config: Optional[Dict]):
-        """注册消息处理器（旧版本，保持兼容性）"""
-        # 确保agent有message_handlers属性
-        if not hasattr(agent, 'message_handlers'):
-            agent.message_handlers = {}
-            
-        # 检查是否有消息处理器
-        if hasattr(handlers_module, "handle_message"):
-            # 检查是否已有消息处理器
-            if "*" in agent.message_handlers:
-                logger.warning(f"⚠️  DID {agent.id} 的消息类型 '*' 已有处理器，忽略后续注册")
-            else:
-                # 直接注册到message_handlers字典中
-                agent.message_handlers["*"] = handlers_module.handle_message
-                logger.debug(f"  -> 注册消息处理器: {cfg.get('name')} -> DID {agent.id}")
-        
-        # 检查是否有特定类型的消息处理器
-        for msg_type in ["text", "command", "query", "notification"]:
-            handler_name = f"handle_{msg_type}_message"
-            if hasattr(handlers_module, handler_name):
-                handler_func = getattr(handlers_module, handler_name)
-                
-                # 检查是否已有该类型的消息处理器
-                if msg_type in agent.message_handlers:
-                    logger.warning(f"⚠️  DID {agent.id} 的消息类型 '{msg_type}' 已有处理器，忽略后续注册")
-                else:
-                    # 直接注册到message_handlers字典中
-                    agent.message_handlers[msg_type] = handler_func
-                    logger.debug(f"  -> 注册{msg_type}消息处理器: {cfg.get('name')} -> DID {agent.id}")
 
     @staticmethod
     def _register_message_handlers_new(new_agent: Agent, handlers_module, cfg: Dict, share_did_config: Optional[Dict]):
         """注册消息处理器（新Agent系统）"""
+        # 在函数内部导入
+        from anp_server_framework.agent_decorator import agent_message_handler
+
+        # 检查是否是共享DID模式但不是主Agent
+        is_shared_non_primary = False
+        if share_did_config:  # 只检查share_did_config是否存在
+            is_primary = share_did_config.get('primary_agent', False)
+            if not is_primary:
+                is_shared_non_primary = True
+                logger.info(f"ℹ️ 注意: {cfg.get('name')} 是共享DID的非主Agent，将跳过消息处理器注册 (这是预期行为)")
+
+        # 如果已知是共享DID的非主Agent，直接跳过注册尝试
+        if is_shared_non_primary:
+            logger.info(f"✅ 已跳过 {cfg.get('name')} 的消息处理器注册 (共享DID非主Agent)")
+            return
+
         # 检查是否有消息处理器
         if hasattr(handlers_module, "handle_message"):
             try:
                 # 使用装饰器方式注册消息处理器
-                new_agent.message_handler("*")(handlers_module.handle_message)
+                agent_message_handler(new_agent, "*")(handlers_module.handle_message)
                 logger.debug(f"  -> 注册消息处理器: {cfg.get('name')} -> DID {new_agent.anp_user.id}")
             except PermissionError as e:
-                logger.warning(f"⚠️  消息处理器注册失败: {e}")
-        
+                logger.warning(f"⚠️ 预期行为: {e}")
+
         # 检查是否有特定类型的消息处理器
         for msg_type in ["text", "command", "query", "notification"]:
             handler_name = f"handle_{msg_type}_message"
@@ -339,10 +327,10 @@ class LocalAgentManager:
                 handler_func = getattr(handlers_module, handler_name)
                 try:
                     # 使用装饰器方式注册消息处理器
-                    new_agent.message_handler(msg_type)(handler_func)
+                    agent_message_handler(new_agent, msg_type)(handler_func)
                     logger.debug(f"  -> 注册{msg_type}消息处理器: {cfg.get('name')} -> DID {new_agent.anp_user.id}")
                 except PermissionError as e:
-                    logger.warning(f"⚠️  {msg_type}消息处理器注册失败: {e}")
+                    logger.warning(f"⚠️ 预期行为: {e}")
 
     @staticmethod
     def generate_custom_openapi_from_router(agent: Agent) -> Dict:

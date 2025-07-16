@@ -334,7 +334,7 @@ class DIDHostManager:
     """
     if host and port:
       # 多域名模式：使用指定的主机和端口
-      from anp_server.domain import get_domain_manager
+      from anp_sdk.domain import get_domain_manager
       domain_manager = get_domain_manager()
       paths = domain_manager.get_all_data_paths(host, port)
       self.hosted_dir = paths['user_hosted_path']
@@ -762,7 +762,7 @@ import time
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 
-from anp_server.domain import get_domain_manager
+from anp_sdk.domain import get_domain_manager
 from anp_sdk.utils.log_base import logging as logger
 
 

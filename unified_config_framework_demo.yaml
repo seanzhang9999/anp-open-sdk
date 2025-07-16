@@ -12,11 +12,11 @@ did_config:
   router_prefix: /wba
   user_path_template: /{method}/user/{user_id}/did.json
   hostuser_path_template: /{method}/hostuser/{user_id}/did.json
-  testuser_path_template: /{method}/test/{user_name}/did.json
+  testuser_path_template: /{method}/tests/{user_name}/did.json
   user_types:
     user: user
     hostuser: hostuser
-    test: test
+    test: tests
   creatable_user_types:
     - user
   hosts:
@@ -35,7 +35,7 @@ did_config:
   insecure_patterns:
     - did:wba:localhost:*
     - did:wba:127.0.0.1:*
-    - did:wba:*:test:*
+    - did:wba:*:tests:*
   parsing:
     strict_validation: true
     allow_insecure: true
@@ -46,7 +46,7 @@ did_config:
 
 
 log_settings:
-  log_level: INFO
+  log_level: Info
   detail:
     file: "{APP_ROOT}/data_log/app.log"
     max_size: 100

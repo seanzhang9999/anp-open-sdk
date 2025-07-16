@@ -34,7 +34,7 @@ def demo_url_pattern_parsing():
         "/wba/user/3ea884878ea5fbb1/did.json",
         "/wba/user/did%3Awba%3Alocalhost%253A9527%3Awba%3Auser%3A3ea884878ea5fbb1/ad.json",
         "/wba/hostuser/abc123def456789a/did.json",
-        "/wba/test/test_agent_001/ad.json",
+        "/wba/tests/test_agent_001/ad.json",
         "/agent/api/did%3Awba%3Alocalhost%253A9527%3Awba%3Auser%3A3ea884878ea5fbb1/status",
         "/invalid/path"
     ]
@@ -81,7 +81,7 @@ def demo_did_inference():
             "description": "托管用户访问"
         },
         {
-            "path": "/wba/test/test_agent_001/ad.json",
+            "path": "/wba/tests/test_agent_001/ad.json",
             "hostname": "localhost",
             "port": 9527,
             "description": "测试用户访问"
@@ -215,7 +215,7 @@ def demo_extract_user_info():
     test_paths = [
         "/wba/user/3ea884878ea5fbb1/did.json",
         "/wba/hostuser/abc123def456789a/did.json",
-        "/wba/test/test_agent_001/ad.json",
+        "/wba/tests/test_agent_001/ad.json",
         "/invalid/path"
     ]
     

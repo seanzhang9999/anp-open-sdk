@@ -155,13 +155,13 @@ did_config:
   router_prefix: "/wba"
   user_path_template: "/{method}/user/{user_id}/did.json"
   hostuser_path_template: "/{method}/hostuser/{user_id}/did.json"
-  testuser_path_template: "/{method}/test/{user_name}/did.json"
+  testuser_path_template: "/{method}/tests/{user_name}/did.json"
   
   # 用户类型配置
   user_types:
     user: "user"
     hostuser: "hostuser"
-    test: "test"
+    test: "tests"
   
   # 用户创建权限
   creatable_user_types:
@@ -192,7 +192,7 @@ did_config:
   insecure_patterns:
     - "did:wba:localhost:*"
     - "did:wba:127.0.0.1:*"
-    - "did:wba:*:test:*"
+    - "did:wba:*:tests:*"
   
   # 解析配置
   parsing:

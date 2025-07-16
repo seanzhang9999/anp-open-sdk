@@ -27,8 +27,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
 from anp_sdk.anp_user import ANPUser
-from anp_sdk.anp_sdk_user_data import get_user_data_manager
-from anp_server.anp_server_auth_middleware import auth_middleware
+from anp_sdk.anp_user_local_data import get_user_data_manager
+from anp_server.anp_auth_middleware import auth_middleware
 from anp_sdk.config import get_global_config
 from anp_server.server_mode import ServerMode
 from anp_server_framework.anp_service.anp_sdk_group_runner import GroupManager, GroupRunner, Message, MessageType, Agent as GroupAgent

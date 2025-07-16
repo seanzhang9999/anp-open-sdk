@@ -19,7 +19,7 @@ import logging
 logger = logging.getLogger(__name__)
 from typing import Dict
 from fastapi import APIRouter, Request, HTTPException
-from anp_server.domain.domain_manager import get_domain_manager
+from anp_sdk.domain.domain_manager import get_domain_manager
 
 
 router = APIRouter(tags=["did_host"])

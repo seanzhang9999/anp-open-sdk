@@ -4,9 +4,8 @@ from typing import Dict, Optional, Tuple
 
 from ..core.config import USERS_CREDENTIALS_FILE
 from ..models.schemas import UserCreate
-from anp_sdk.anp_sdk_user_data import (
-    get_user_data_manager)
-from anp_sdk.did.did_tool import create_did_user
+from anp_sdk.anp_user_local_data import (
+    get_user_data_manager, create_did_user)
 
 USER_DATA_MANAGER = get_user_data_manager()
 

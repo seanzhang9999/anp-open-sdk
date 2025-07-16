@@ -3,7 +3,7 @@ import time
 import uuid
 from typing import Dict, Any, List
 
-from anp_server.domain import get_domain_manager
+from anp_sdk.domain import get_domain_manager
 from anp_sdk.utils.log_base import logging as logger
 
 

@@ -17,6 +17,8 @@ from anp_sdk.config import UnifiedConfig, set_global_config, get_global_config
 from anp_sdk.utils.log_base import setup_logging
 from anp_server.anp_server import ANP_Server
 
+
+
 import logging
 
 # 导入新的Agent系统
@@ -55,11 +57,19 @@ async def create_agents_with_cfg_path():
         try:
             anp_agent, handler_module, share_did_config = await LocalAgentManager.load_agent_from_module(agent_file)
             if anp_agent:
-               created_agents.append(anp_agent)
+                created_agents.append(anp_agent)
             if handler_module:
-               lifecycle_modules[anp_agent.name] = handler_module
+                lifecycle_modules[anp_agent.name] = handler_module
             if share_did_config:
-               shared_did_configs[anp_agent.name] = share_did_config
+                shared_did_configs[anp_agent.name] = share_did_config
+        except PermissionError as e:
+            if "共享DID模式下，只有主Agent可以处理消息" in str(e):
+                logger.info(f"ℹ️ 预期行为: {agent_file} - {e}")
+                # 不要尝试重新加载Agent，直接继续使用已经创建的Agent
+                # Agent已经创建成功，只是消息处理器注册失败了
+                # 这里不需要做任何事情，因为Agent已经在created_agents中
+            else:
+                logger.error(f"❌ 转换Agent失败 {agent_file}: {e}")
         except Exception as e:
             logger.error(f"❌ 转换Agent失败 {agent_file}: {e}")
 
@@ -69,134 +79,144 @@ async def create_agents_with_cfg_path():
 async def create_agents_with_code():
     """创建代码生成的Agent"""
     logger.debug("🤖 创建代码生成的Agent...")
-    
-    from anp_sdk.anp_user import ANPUser
-    
+
+    # 导入新的装饰器和函数
+    from anp_server_framework.agent_decorator import (
+        agent_class, class_api, class_message_handler, agent_api,agent_message_handler ,
+        create_agent, create_shared_agent, get_user_by_name
+    )
+        
     code_agents = []
     
     try:
-        # 创建一个代码生成的计算器Agent - 使用不同的DID避免冲突
-        calc_user = ANPUser.from_did("did:wba:localhost%3A9527:wba:user:27c0b1d11180f973")
-        calc_agent = AgentManager.create_agent(calc_user, "代码生成计算器", shared=False)
-        
-        # 注册API
-        @calc_agent.api("/add")
-        async def add_api(request_data, request):
-            """加法计算API"""
-            # 从params中获取参数
-            params = request_data.get('params', {})
-            a = params.get('a', 0)
-            b = params.get('b', 0)
-            result = a + b
-            logger.debug(f"🔢 计算: {a} + {b} = {result}")
-            return {"result": result, "operation": "add", "inputs": [a, b]}
-        
-        @calc_agent.api("/multiply")
-        async def multiply_api(request_data, request):
-            """乘法计算API"""
-            # 从params中获取参数
-            params = request_data.get('params', {})
-            a = params.get('a', 1)
-            b = params.get('b', 1)
-            result = a * b
-            logger.debug(f"🔢 计算: {a} × {b} = {result}")
-            return {"result": result, "operation": "multiply", "inputs": [a, b]}
-        
-        # 注册消息处理器
-        @calc_agent.message_handler("text")
-        async def handle_calc_message(msg_data):
-            content = msg_data.get('content', '')
-            logger.debug(f"💬 代码生成计算器收到消息: {content}")
+        # 使用装饰器创建计算器Agent
+        @agent_class(
+            name="代码生成计算器",
+            description="提供基本的计算功能",
+            did="did:wba:localhost%3A9527:wba:user:27c0b1d11180f973",
+            shared=False
+        )
+        class CalculatorAgent:
+            @class_api("/add",auto_wrap=True)
+            async def add_api(self, request_data, request):
+                """加法计算API"""
+                # 从params中获取参数
+                params = request_data.get('params', {})
+                a = params.get('a', 0)
+                b = params.get('b', 0)
+                result = a + b
+                logger.debug(f"🔢 计算: {a} + {b} = {result}")
+                return {"result": result, "operation": "add", "inputs": [a, b]}
             
-            # 简单的计算解析
-            if '+' in content:
-                try:
-                    parts = content.split('+')
-                    if len(parts) == 2:
-                        a = float(parts[0].strip())
-                        b = float(parts[1].strip())
-                        result = a + b
-                        return {"reply": f"计算结果: {a} + {b} = {result}"}
-                except:
-                    pass
+            @class_api("/multiply")
+            async def multiply_api(self, request_data, request):
+                """乘法计算API"""
+                # 从params中获取参数
+                params = request_data.get('params', {})
+                a = params.get('a', 1)
+                b = params.get('b', 1)
+                result = a * b
+                logger.debug(f"🔢 计算: {a} × {b} = {result}")
+                return {"result": result, "operation": "multiply", "inputs": [a, b]}
             
-            return {"reply": f"代码生成计算器收到: {content}。支持格式如 '5 + 3'"}
+            @class_message_handler("text")
+            async def handle_calc_message(self, msg_data):
+                content = msg_data.get('content', '')
+                logger.debug(f"💬 代码生成计算器收到消息: {content}")
+                
+                # 简单的计算解析
+                if '+' in content:
+                    try:
+                        parts = content.split('+')
+                        if len(parts) == 2:
+                            a = float(parts[0].strip())
+                            b = float(parts[1].strip())
+                            result = a + b
+                            return {"reply": f"计算结果: {a} + {b} = {result}"}
+                    except:
+                        pass
+                
+                return {"reply": f"代码生成计算器收到: {content}。支持格式如 '5 + 3'"}
         
+        # 实例化计算器Agent
+        calc_agent = CalculatorAgent().agent
         code_agents.append(calc_agent)
         logger.debug("✅ 创建代码生成计算器Agent成功")
         
-        # 创建一个代码生成的天气Agent（共享DID）
-        weather_user = ANPUser.from_did("did:wba:localhost%3A9527:wba:user:5fea49e183c6c211")
-        weather_agent = AgentManager.create_agent(
-            weather_user, 
-            "代码生成天气", 
-            shared=True, 
+        # 使用装饰器创建天气Agent
+        @agent_class(
+            name="代码生成天气",
+            description="提供天气信息服务",
+            did="did:wba:localhost%3A9527:wba:user:5fea49e183c6c211",
+            shared=True,
             prefix="/weather",
             primary_agent=True
         )
-        
-        @weather_agent.api("/current")
-        async def weather_current_api(request_data, request):
-            """获取当前天气API"""
-            # 从params中获取参数
-            params = request_data.get('params', {})
-            city = params.get('city', '北京')
-            # 模拟天气数据
-            weather_data = {
-                "city": city,
-                "temperature": "22°C",
-                "condition": "晴天",
-                "humidity": "65%",
-                "wind": "微风"
-            }
-            logger.debug(f"🌤️ 查询天气: {city} - {weather_data['condition']}")
-            return weather_data
-        
-        @weather_agent.api("/forecast")
-        async def weather_forecast_api(request_data, request):
-            """获取天气预报API"""
-            # 从params中获取参数
-            params = request_data.get('params', {})
-            city = params.get('city', '北京')
-            days = params.get('days', 3)
+        class WeatherAgent:
+            @class_api("/current")
+            async def weather_current_api(self, request_data, request):
+                """获取当前天气API"""
+                # 从params中获取参数
+                params = request_data.get('params', {})
+                city = params.get('city', '北京')
+                # 模拟天气数据
+                weather_data = {
+                    "city": city,
+                    "temperature": "22°C",
+                    "condition": "晴天",
+                    "humidity": "65%",
+                    "wind": "微风"
+                }
+                logger.debug(f"🌤️ 查询天气: {city} - {weather_data['condition']}")
+                return weather_data
             
-            forecast = []
-            conditions = ["晴天", "多云", "小雨"]
-            for i in range(days):
-                forecast.append({
-                    "date": f"2024-01-{15+i:02d}",
-                    "condition": conditions[i % len(conditions)],
-                    "high": f"{20+i}°C",
-                    "low": f"{10+i}°C"
-                })
+            @class_api("/forecast")
+            async def weather_forecast_api(self, request_data, request):
+                """获取天气预报API"""
+                # 从params中获取参数
+                params = request_data.get('params', {})
+                city = params.get('city', '北京')
+                days = params.get('days', 3)
+                
+                forecast = []
+                conditions = ["晴天", "多云", "小雨"]
+                for i in range(days):
+                    forecast.append({
+                        "date": f"2024-01-{15+i:02d}",
+                        "condition": conditions[i % len(conditions)],
+                        "high": f"{20+i}°C",
+                        "low": f"{10+i}°C"
+                    })
+                
+                result = {"city": city, "forecast": forecast}
+                logger.debug(f"🌤️ 查询{days}天预报: {city}")
+                return result
             
-            result = {"city": city, "forecast": forecast}
-            logger.debug(f"🌤️ 查询{days}天预报: {city}")
-            return result
+            @class_message_handler("text")
+            async def handle_weather_message(self, msg_data):
+                content = msg_data.get('content', '')
+                logger.debug(f"💬 代码生成天气Agent收到消息: {content}")
+                
+                if '天气' in content:
+                    return {"reply": f"天气查询服务已收到: {content}。可以查询任何城市的天气信息。"}
+                
+                return {"reply": f"代码生成天气Agent收到: {content}"}
         
-        @weather_agent.message_handler("text")
-        async def handle_weather_message(msg_data):
-            content = msg_data.get('content', '')
-            logger.debug(f"💬 代码生成天气Agent收到消息: {content}")
-            
-            if '天气' in content:
-                return {"reply": f"天气查询服务已收到: {content}。可以查询任何城市的天气信息。"}
-            
-            return {"reply": f"代码生成天气Agent收到: {content}"}
-        
+        # 实例化天气Agent
+        weather_agent = WeatherAgent().agent
         code_agents.append(weather_agent)
         logger.debug("✅ 创建代码生成天气Agent成功")
         
-        # 创建一个助手Agent（共享DID，非主Agent）
-        assistant_agent = AgentManager.create_agent(
-            weather_user,  # 使用相同的DID
-            "代码生成助手", 
-            shared=True, 
+        # 使用函数式方法创建助手Agent（共享DID，非主Agent）
+        assistant_agent = create_shared_agent(
+            did_str="did:wba:localhost%3A9527:wba:user:5fea49e183c6c211",  # 使用相同的DID
+            name="代码生成助手",
             prefix="/assistant",
-            primary_agent=False  # 非主Agent
+            primary_agent=False
         )
-        
-        @assistant_agent.api("/help")
+
+        # 注册API
+        @agent_api(assistant_agent,"/help")
         async def help_api(request_data, request):
             """帮助信息API"""
             # 从params中获取参数
@@ -217,9 +237,13 @@ async def create_agents_with_code():
             
             logger.debug(f"❓ 提供帮助: {topic}")
             return response
-        
+
         code_agents.append(assistant_agent)
         logger.debug("✅ 创建代码生成助手Agent成功")
+
+
+
+        
         
     except Exception as e:
         logger.error(f"❌ 创建代码生成Agent失败: {e}")
@@ -227,6 +251,8 @@ async def create_agents_with_code():
         traceback.print_exc()
     
     return code_agents
+
+
 
 
 async def main():
@@ -245,15 +271,15 @@ async def main():
 
     # 从配置目录动态加载Agent
     all_agents,lifecycle_agents,shared_did_configs = await create_agents_with_cfg_path()
-    # 用代码直接生成Agent
-    code_generated_agents = await create_agents_with_code()
-    all_agents.extend(code_generated_agents)
     # --- 后期初始化循环 ---
     for agent in all_agents:
         module = lifecycle_agents.get(agent.name)
         if module and hasattr(module, "initialize_agent"):
             logger.debug(f"  - 调用 initialize_agent: {agent.name}...")
             await module.initialize_agent(agent)  # 传入agent实例
+    # 用代码直接生成Agent
+    code_generated_agents = await create_agents_with_code()
+    all_agents.extend(code_generated_agents)
     # 生成接口文档
     processed_dids = set()  # 用于跟踪已处理的 DID
     for agent in all_agents:
@@ -318,8 +344,16 @@ async def main():
                 logger.debug(f"    - {path}: {handler_name}")
 
     # 测试新Agent系统功能
-    #await test_new_agent_system(all_agents)
+    await test_new_agent_system(all_agents)
 
+    #await test_discovery_agent(all_agents)
+
+    input("\n🔥 Demo completed. Press anykey to stop.")
+
+    await stop_server(svr, all_agents, lifecycle_agents)
+
+
+async def test_discovery_agent(all_agents):
     logger.debug("\n🔍 Searching for an agent with discovery capabilities...")
     discovery_agent = None
     for agent in all_agents:
@@ -331,7 +365,7 @@ async def main():
         # 直接调用 agent 实例上的方法
         publisher_url = "http://localhost:9527/publisher/agents"
         # agent中的自动抓取函数，自动从主地址搜寻所有did/ad/yaml文档
-        #result = await discovery_agent.discover_and_describe_agents(publisher_url)
+        # result = await discovery_agent.discover_and_describe_agents(publisher_url)
         # agent中的联网调用函数，调用计算器
         result = await discovery_agent.run_calculator_add_demo()
         # agent中的联网调用函数，相当于发送消息
@@ -347,11 +381,6 @@ async def main():
 
     else:
         logger.debug("⚠️ No agent with discovery capabilities was found.")
-
-    input("\n🔥 Demo completed. Press anykey to stop.")
-
-    await stop_server(svr, all_agents, lifecycle_agents)
-
 
 
 async def launch_anp_server(host, port,svr):
@@ -503,19 +532,19 @@ async def test_new_agent_system(agents):
     
     # 测试结果总结
     logger.debug(f"\n📊 共享DID测试结果总结:")
-    logger.debug(f"  🔧 Calculator共享DID API: {'✅ 成功' if calc_api_success else '❌ 失败'}")
-    logger.debug(f"  🤖 LLM共享DID API: {'✅ 成功' if llm_api_success else '❌ 失败'}")
-    logger.debug(f"  📨 共享DID消息发送: {'✅ 成功' if msg_success else '❌ 失败'}")
-    logger.debug(f"  🔗 共享DID API调用: {'✅ 成功' if shared_api_success else '❌ 失败'}")
-    logger.debug(f"  ⚠️  冲突检测: {'✅ 成功' if conflict_test_success else '❌ 失败'}")
+    logger.info(f"  🔧 Calculator共享DID API: {'✅ 成功' if calc_api_success else '❌ 失败'}")
+    logger.info(f"  🤖 LLM共享DID API: {'✅ 成功' if llm_api_success else '❌ 失败'}")
+    logger.info(f"  📨 共享DID消息发送: {'✅ 成功' if msg_success else '❌ 失败'}")
+    logger.info(f"  🔗 共享DID API调用: {'✅ 成功' if shared_api_success else '❌ 失败'}")
+    logger.info(f"  ⚠️  冲突检测: {'✅ 成功' if conflict_test_success else '❌ 失败'}")
     
     success_count = sum([calc_api_success, llm_api_success, msg_success, shared_api_success, conflict_test_success])
     total_count = 5
     
     if success_count == total_count:
-        logger.debug(f"\n🎉 所有共享DID测试通过! ({success_count}/{total_count}) 架构重构验证成功!")
+        logger.info(f"\n🎉 所有共享DID测试通过! ({success_count}/{total_count}) 架构重构验证成功!")
     else:
-        logger.debug(f"\n⚠️  部分共享DID测试失败 ({success_count}/{total_count})，需要进一步调试")
+        logger.info(f"\n⚠️  部分共享DID测试失败 ({success_count}/{total_count})，需要进一步调试")
     
     logger.debug(f"\n🎉 新Agent系统测试完成!")
 

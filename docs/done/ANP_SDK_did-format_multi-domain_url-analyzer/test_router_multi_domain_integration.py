@@ -16,7 +16,7 @@ from unittest.mock import Mock
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from anp_sdk.config.unified_config import UnifiedConfig, set_global_config
-from anp_server.domain import get_domain_manager
+from anp_sdk.domain import get_domain_manager
 
 # 设置日志
 logging.basicConfig(
@@ -94,7 +94,7 @@ class TestRouterMultiDomainIntegration:
         logger.info("=== 测试 router_did.py 多域名访问 ===")
         
         from anp_server.router.router_did import get_did_document
-        from anp_server.domain import get_domain_manager
+        from anp_sdk.domain import get_domain_manager
         
         domain_manager = get_domain_manager()
         
@@ -178,7 +178,7 @@ class TestRouterMultiDomainIntegration:
         
         from anp_server import get_agent_publishers
         from anp_server.router.router_host import get_hosted_did_document
-        from anp_server.domain import get_domain_manager
+        from anp_sdk.domain import get_domain_manager
         
         domain_manager = get_domain_manager()
         
@@ -273,7 +273,7 @@ class TestRouterMultiDomainIntegration:
         """测试域名数据隔离"""
         logger.info("=== 测试域名数据隔离 ===")
         
-        from anp_server.domain import get_domain_manager
+        from anp_sdk.domain import get_domain_manager
         
         domain_manager = get_domain_manager()
         

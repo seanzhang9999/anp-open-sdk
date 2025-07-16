@@ -328,7 +328,7 @@ async def main():
 
     # 获取公共智能体数据
     user_data_manager = LocalUserDataManager()
-    user_data = user_data_manager.get_user_data_by_name("公共智能体_did:wba:agent-did.com:test:public")
+    user_data = user_data_manager.get_user_data_by_name("公共智能体_did:wba:agent-did.com:tests:public")
 
     # 创建ANPTool
     anp_tool = ANPTool(user_data=user_data)

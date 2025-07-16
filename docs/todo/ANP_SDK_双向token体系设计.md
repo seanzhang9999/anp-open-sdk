@@ -602,7 +602,7 @@ class AuthenticationVerifier:
 ### 4.5 中间件集成
 
 ```python
-# 在 anp_server_auth_middleware.py 中集成
+# 在 anp_auth_middleware.py 中集成
 async def auth_middleware(request: Request, call_next, auth_method: str = "wba"):
     # ... 现有代码 ...
 

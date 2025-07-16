@@ -11,7 +11,7 @@ import aiohttp
 import yaml
 
 from anp_sdk.anp_user import ANPUser
-from anp_sdk.anp_sdk_user_data import get_user_data_manager
+from anp_sdk.anp_user_local_data import get_user_data_manager
 
 logger = logging.getLogger(__name__)
 
@@ -442,7 +442,7 @@ class ANPToolCrawler:
         """获取调用者智能体"""
         if req_did is None:
             user_data_manager = get_user_data_manager()
-            user_data = user_data_manager.get_user_data_by_name("托管智能体_did:wba:agent-did.com:test:public")
+            user_data = user_data_manager.get_user_data_by_name("托管智能体_did:wba:agent-did.com:tests:public")
             if user_data:
                 agent = ANPUser.from_did(user_data.did)
                 logger.debug(f"使用托管身份智能体进行爬取: {agent.name}")
@@ -868,29 +868,43 @@ class ANPToolCrawler:
                     return result
         return None
 
+def wrap_business_handler(func):
+    """
+    包装业务处理函数，使其符合标准接口
+    注意：此时传入的func应该已经是绑定了实例的方法（如果是类方法的话）
+    """
+    import inspect
 
-def wrap_business_handler(business_func):
-    sig = inspect.signature(business_func)
-    param_names = list(sig.parameters.keys())
-    @functools.wraps(business_func)
-    async def api_handler(request_data, request):
-        import json
-        try:
-            kwargs = {k: request_data.get(k) for k in param_names if k in request_data}
-            if "params" in request_data:
-                params = request_data["params"]
-                if isinstance(params, str):
-                    params = json.loads(params)
-                for k in param_names:
-                    if k in params:
-                        kwargs[k] = params[k]
-            kwargs_str = json.dumps(kwargs, ensure_ascii=False)
-            logger.info(f"api封装器发送参数 {kwargs_str}到{business_func.__name__}")
-            if 'request' in sig.parameters:
-                return await business_func(request, **kwargs)
-            else:
-                return await business_func(**kwargs)
-        except Exception as e :
-            logger.error(f"wrap error {e}")
-            return f"wrap error {e}"
-    return api_handler
+    @functools.wraps(func)
+    async def wrapper(*args, **kwargs):
+        sig = inspect.signature(func)
+        param_names = list(sig.parameters.keys())
+
+        # 检查是否已经符合标准接口
+        if (len(param_names) >= 2 and 
+            param_names[0] == 'request_data' and 
+            param_names[1] == 'request'):
+            # 已经符合标准接口，直接调用
+            return await func(*args, **kwargs)
+
+        # 处理非标准接口
+        request_data = args[0] if args else kwargs.get('request_data', {})
+        request = args[1] if len(args) > 1 else kwargs.get('request', None)
+
+        # 从request_data中提取参数
+        func_kwargs = {}
+        for param_name in param_names:
+            if param_name in ['request_data', 'request']:
+                continue
+                
+            params = request_data.get('params', {}) if isinstance(request_data, dict) else {}
+            if param_name in params:
+                func_kwargs[param_name] = params[param_name]
+            elif param_name in request_data:
+                func_kwargs[param_name] = request_data[param_name]
+
+        # 调用函数（此时不需要考虑self，因为已经绑定）
+        return await func(**func_kwargs)
+
+    wrapper._is_wrapped = True
+    return wrapper

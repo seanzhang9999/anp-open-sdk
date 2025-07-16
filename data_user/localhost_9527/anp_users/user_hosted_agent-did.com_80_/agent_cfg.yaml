@@ -1,5 +1,5 @@
-name: 公共智能体_did:wba:agent-did.com:test:public
-did: did:wba:agent-did.com:test:public
+name: 公共智能体_did:wba:agent-did.com:tests:public
+did: did:wba:agent-did.com:tests:public
 type: user
 owner:
   name: anpsdk 创造用户

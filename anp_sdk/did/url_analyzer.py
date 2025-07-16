@@ -23,7 +23,7 @@ import re
 from typing import Dict, Optional, Tuple
 from urllib.parse import unquote
 
-from anp_server.domain import get_domain_manager
+from anp_sdk.domain import get_domain_manager
 from .did_format_manager import get_did_format_manager
 
 logger = logging.getLogger(__name__)
@@ -110,8 +110,8 @@ class UrlAnalyzer:
         elif path.startswith("/agent/api/"):
             result = self._parse_agent_api_pattern(path)
         
-        # 模式4: /wba/test/{test_name}/{file} (测试用户)
-        elif path.startswith("/wba/test/"):
+        # 模式4: /wba/tests/{test_name}/{file} (测试用户)
+        elif path.startswith("/wba/tests/"):
             result = self._parse_wba_test_pattern(path)
         
         # 缓存结果
@@ -177,9 +177,9 @@ class UrlAnalyzer:
         return None
     
     def _parse_wba_test_pattern(self, path: str) -> Optional[Dict[str, str]]:
-        """解析 /wba/test/ 模式"""
-        # 匹配: /wba/test/{test_name}/{file}
-        pattern = r"^/wba/test/([^/]+)/(.+)$"
+        """解析 /wba/tests/ 模式"""
+        # 匹配: /wba/tests/{test_name}/{file}
+        pattern = r"^/wba/tests/([^/]+)/(.+)$"
         match = re.match(pattern, path)
         
         if not match:
@@ -189,7 +189,7 @@ class UrlAnalyzer:
         
         return {
             'pattern_type': 'wba_test',
-            'user_type': 'test',
+            'user_type': 'tests',
             'user_info': test_name,
             'file_part': file_part,
             'info_type': 'test_name'
@@ -263,7 +263,7 @@ class UrlAnalyzer:
         elif info_type == 'test_name':
             # 测试用户名，构造测试DID
             try:
-                return self.did_manager.format_did(host, port, 'test', user_info)
+                return self.did_manager.format_did(host, port, 'tests', user_info)
             except Exception as e:
                 logger.warning(f"构造测试DID失败: {user_info}, 错误: {e}")
                 return None
@@ -377,7 +377,7 @@ class UrlAnalyzer:
             'wba_user_id': '/wba/user/{16位hex用户ID}/{文件名} - 通过用户ID访问',
             'wba_user_encoded_did': '/wba/user/{编码的DID}/{文件名} - 通过完整DID访问',
             'wba_hostuser': '/wba/hostuser/{用户ID}/{文件名} - 访问托管用户',
-            'wba_test': '/wba/test/{测试名称}/{文件名} - 访问测试用户',
+            'wba_test': '/wba/tests/{测试名称}/{文件名} - 访问测试用户',
             'agent_api': '/agent/api/{编码的DID}/{端点} - Agent API访问'
         }
     

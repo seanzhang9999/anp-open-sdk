@@ -17,7 +17,7 @@ set_global_config(config)
 setup_logging()
 
 # 初始化用户数据管理器
-from anp_sdk.anp_sdk_user_data import get_user_data_manager
+from anp_sdk.anp_user_local_data import get_user_data_manager
 user_data_manager = get_user_data_manager()
 
 from anp_server_framework.anp_service.agent_api_call import agent_api_call_post

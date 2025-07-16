@@ -7,7 +7,7 @@ from fastapi import HTTPException, APIRouter
 from starlette.requests import Request
 from pydantic import BaseModel
 
-from anp_server.domain import get_domain_manager
+from anp_sdk.domain import get_domain_manager
 
 import logging
 logger = logging.getLogger(__name__)

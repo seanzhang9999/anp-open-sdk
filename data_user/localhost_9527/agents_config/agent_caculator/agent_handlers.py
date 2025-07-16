@@ -20,9 +20,8 @@ async def add(request_data, request):
         }
 
 # 消息处理器
-async def handle_text_message(msg):
-    logger.info(f"Calculator Agent 收到text消息: {msg}")
-    content = msg.get('content', '未知内容')
+async def handle_text_message(content):
+    logger.info(f"Calculator Agent 收到text消息: {content}")
     return {"reply": f"Calculator Agent 回复: 确认收到消息 '{content}'，我是计算器智能体，可以帮您进行数学计算！"}
 
 # 这个简单的Agent不需要初始化或清理，所以我们省略了这些函数

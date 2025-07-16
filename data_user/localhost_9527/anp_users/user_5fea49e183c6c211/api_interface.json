@@ -44,7 +44,7 @@
     },
     {
       "name": "calculator.weather.current",
-      "summary": "获取当前天气API",
+      "summary": "我的小本田的/weather/current接口",
       "description": "由 我的小本田 提供的服务",
       "params": {},
       "tags": [
@@ -62,7 +62,7 @@
     },
     {
       "name": "calculator.weather.forecast",
-      "summary": "获取天气预报API",
+      "summary": "我的小本田的/weather/forecast接口",
       "description": "由 我的小本田 提供的服务",
       "params": {},
       "tags": [
@@ -98,7 +98,7 @@
     },
     {
       "name": "weather.weather.current",
-      "summary": "获取当前天气API",
+      "summary": "代码生成天气的/weather/current接口",
       "description": "由 代码生成天气 提供的服务",
       "params": {},
       "tags": [
@@ -116,7 +116,7 @@
     },
     {
       "name": "weather.weather.forecast",
-      "summary": "获取天气预报API",
+      "summary": "代码生成天气的/weather/forecast接口",
       "description": "由 代码生成天气 提供的服务",
       "params": {},
       "tags": [
@@ -242,7 +242,7 @@
     },
     {
       "name": "assistant.weather.current",
-      "summary": "获取当前天气API",
+      "summary": "代码生成助手的/weather/current接口",
       "description": "由 代码生成助手 提供的服务",
       "params": {},
       "tags": [
@@ -260,7 +260,7 @@
     },
     {
       "name": "assistant.weather.forecast",
-      "summary": "获取天气预报API",
+      "summary": "代码生成助手的/weather/forecast接口",
       "description": "由 代码生成助手 提供的服务",
       "params": {},
       "tags": [

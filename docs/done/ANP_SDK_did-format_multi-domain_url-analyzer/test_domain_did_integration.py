@@ -21,7 +21,7 @@ app_root = str(Path(__file__).parent.parent)
 config = UnifiedConfig(app_root=app_root)
 set_global_config(config)
 
-from anp_server.domain import get_domain_manager
+from anp_sdk.domain import get_domain_manager
 from anp_sdk.did import get_did_format_manager
 
 # 设置日志
@@ -92,7 +92,7 @@ def test_did_format_manager():
     test_cases = [
         ("user.localhost", 9527, "user", "abc123"),
         ("service.localhost", 9527, "user", "def456"),
-        ("localhost", 9527, "test", "test123")
+        ("localhost", 9527, "tests", "test123")
     ]
     
     formatted_dids = []

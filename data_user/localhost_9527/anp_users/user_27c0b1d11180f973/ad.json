@@ -12,7 +12,7 @@
   },
   "description": "Services provided by DID did:wba:localhost%3A9527:wba:user:27c0b1d11180f973",
   "version": "0.1.0",
-  "created_at": "2025-07-15T22:39:14.154905",
+  "created_at": "2025-07-16T21:56:30.841253",
   "security_definitions": {
     "didwba_sc": {
       "scheme": "didwba",
@@ -44,28 +44,28 @@
       "protocol": "HTTP",
       "name": "add",
       "url": "/agent/api/did:wba:localhost%3A9527:wba:user:27c0b1d11180f973/add",
-      "description": "代码生成计算器 API 路径 /add 的端点 (处理器: add_api)"
+      "description": "代码生成计算器 API 路径 /add 的端点 (处理器: bound_method)"
     },
     {
       "@type": "ad:StructuredInterface",
       "protocol": "HTTP",
       "name": "multiply",
       "url": "/agent/api/did:wba:localhost%3A9527:wba:user:27c0b1d11180f973/multiply",
-      "description": "代码生成计算器 API 路径 /multiply 的端点 (处理器: multiply_api)"
+      "description": "代码生成计算器 API 路径 /multiply 的端点 (处理器: bound_method)"
     },
     {
       "@type": "ad:StructuredInterface",
       "protocol": "HTTP",
       "name": "add",
       "url": "/agent/api/did:wba:localhost%3A9527:wba:user:27c0b1d11180f973/add",
-      "description": "代码生成计算器 API 路径 /add 的端点 (处理器: add_api)"
+      "description": "代码生成计算器 API 路径 /add 的端点 (处理器: bound_method)"
     },
     {
       "@type": "ad:StructuredInterface",
       "protocol": "HTTP",
       "name": "multiply",
       "url": "/agent/api/did:wba:localhost%3A9527:wba:user:27c0b1d11180f973/multiply",
-      "description": "代码生成计算器 API 路径 /multiply 的端点 (处理器: multiply_api)"
+      "description": "代码生成计算器 API 路径 /multiply 的端点 (处理器: bound_method)"
     }
   ]
 }

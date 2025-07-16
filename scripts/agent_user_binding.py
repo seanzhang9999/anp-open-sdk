@@ -168,11 +168,157 @@ class AgentUserBindingManager:
         
         return invalid_agents
     
+
+    def check_username_conflicts(self):
+        """检查用户名冲突"""
+        print("\n🔍 检查用户名冲突...")
+
+        # 按域名端口分组用户
+        users_by_host_port = {}
+        for did, user_info in self.user_dids.items():
+            # 从DID中提取域名和端口
+            from anp_sdk.did.did_tool import parse_wba_did_host_port
+            host, port = parse_wba_did_host_port(did)
+
+            if host and port:
+                host_port_key = (host, port)
+                if host_port_key not in users_by_host_port:
+                    users_by_host_port[host_port_key] = {}
+
+                # 从agent_cfg.yaml中获取用户名
+                cfg_path = user_info['user_dir'] / 'agent_cfg.yaml'
+                if cfg_path.exists():
+                    try:
+                        with open(cfg_path, 'r', encoding='utf-8') as f:
+                            cfg = yaml.safe_load(f)
+                            name = cfg.get('name')
+                            if name:
+                                if name in users_by_host_port[host_port_key]:
+                                    # 发现冲突
+                                    existing_did = users_by_host_port[host_port_key][name]
+                                    print(f"⚠️  发现用户名冲突: '{name}' 在 {host}:{port}")
+                                    print(f"   - DID 1: {existing_did}")
+                                    print(f"   - DID 2: {did}")
+
+                                    # 记录冲突
+                                    if not hasattr(self, 'name_conflicts'):
+                                        self.name_conflicts = []
+                                    self.name_conflicts.append({
+                                        'name': name,
+                                        'host': host,
+                                        'port': port,
+                                        'dids': [existing_did, did]
+                                    })
+                                else:
+                                    users_by_host_port[host_port_key][name] = did
+                    except Exception as e:
+                        print(f"⚠️  读取配置文件失败 {cfg_path}: {e}")
+
+        # 返回冲突列表
+        conflicts = getattr(self, 'name_conflicts', [])
+        if conflicts:
+            print(f"⚠️  发现 {len(conflicts)} 个用户名冲突")
+        else:
+            print("✅ 未发现用户名冲突")
+
+        return conflicts
+
+    def fix_username_conflict(self, conflict, interactive=True):
+        """修复用户名冲突"""
+        name = conflict['name']
+        host = conflict['host']
+        port = conflict['port']
+        dids = conflict['dids']
+
+        print(f"\n🔧 修复用户名冲突: '{name}' 在 {host}:{port}")
+
+        # 导入必要的模块
+        from anp_sdk.anp_user_local_data import get_user_data_manager
+
+        # 获取用户数据管理器
+        manager = get_user_data_manager()
+
+        # 为每个冲突的DID显示信息
+        for idx, did in enumerate(dids, 1):
+            user_info = self.user_dids[did]
+            user_dir = user_info['user_dir']
+            print(f"   [{idx}] DID: {did}")
+            print(f"       目录: {user_dir}")
+
+        if interactive:
+            # 交互式修复
+            print("\n   选项:")
+            print("   [1-N] 选择要重命名的DID")
+            print("   [S] 跳过此冲突")
+
+            choice = input("   请选择操作: ").strip().upper()
+
+            if choice == 'S':
+                print("   ⏭️  跳过此冲突")
+                return False
+
+            try:
+                idx = int(choice) - 1
+                if 0 <= idx < len(dids):
+                    did_to_rename = dids[idx]
+
+                    # 请求新名称
+                    new_name = input(f"   请输入 {did_to_rename} 的新名称: ").strip()
+                    if not new_name:
+                        print("   ❌ 名称不能为空")
+                        return False
+
+                    # 检查新名称是否可用
+                    if manager.is_username_taken(new_name, host, int(port)):
+                        print(f"   ❌ 新名称 '{new_name}' 已被使用")
+                        return False
+
+                    # 使用resolve_username_conflict解决冲突
+                    success = manager.resolve_username_conflict(did_to_rename, new_name)
+
+                    if success:
+                        print(f"   ✅ 成功将 {did_to_rename} 重命名为 '{new_name}'")
+                        return True
+                    else:
+                        print(f"   ❌ 重命名失败")
+                        return False
+                else:
+                    print(f"   ❌ 无效选择")
+                    return False
+            except ValueError:
+                print(f"   ❌ 无效输入")
+                return False
+        else:
+            # 自动修复模式：为第二个DID添加时间戳后缀
+            from datetime import datetime
+
+            did_to_rename = dids[1]  # 选择第二个DID进行重命名
+            date_suffix = datetime.now().strftime('%Y%m%d')
+            new_name = f"{name}_{date_suffix}"
+
+            # 检查新名称是否可用
+            if manager.is_username_taken(new_name, host, int(port)):
+                # 如果还是被使用，添加随机后缀
+                import secrets
+                random_suffix = secrets.token_hex(4)
+                new_name = f"{name}_{date_suffix}_{random_suffix}"
+
+            # 使用resolve_username_conflict解决冲突
+            success = manager.resolve_username_conflict(did_to_rename, new_name)
+
+            if success:
+                print(f"   ✅ 自动将 {did_to_rename} 重命名为 '{new_name}'")
+                return True
+            else:
+                print(f"   ❌ 自动重命名失败")
+                return False
+        
+
     def create_new_user_did(self, anp_users_dir: Path, agent_name: str) -> Optional[str]:
         """为 agent 创建新的用户 DID"""
         try:
             # 导入必要的模块（延迟导入避免配置依赖）
-            from anp_sdk.did.did_tool import create_did_user
+            from anp_sdk.anp_user_local_data import create_did_user
             import uuid
             
             # 生成用户ID
@@ -512,6 +658,17 @@ class AgentUserBindingManager:
             if auto_fix or interactive:
                 print(f"\n🔧 修复完成: {fixed_count}/{len(invalid_agents)} 个 Agent")
         
+
+        # 检查用户名冲突
+        name_conflicts = self.check_username_conflicts()
+        if name_conflicts and (auto_fix or interactive):
+            print("\n🔧 开始修复用户名冲突...")
+            fixed_count = 0
+            for conflict in name_conflicts:
+                if self.fix_username_conflict(conflict, interactive):
+                    fixed_count += 1
+            print(f"\n🔧 修复完成: {fixed_count}/{len(name_conflicts)} 个用户名冲突")
+            
         # 6. 总结检查结果
         total_issues = len(consistency_errors) + len(path_conflicts) + len(duplicates) + len(invalid_agents)
         if total_issues == 0:
@@ -522,7 +679,7 @@ class AgentUserBindingManager:
             print(f"   - 共享DID路径冲突: {len(path_conflicts)}")
             print(f"   - 重复DID: {len(duplicates)}")
             print(f"   - 无效DID绑定: {len(invalid_agents)}")
-            print(f"   - DID格式修复: {format_fixed_count}")
+            print(f"   - 用户名冲突: {len(name_conflicts)}")
         
         # 7. 生成最终报告
         self.generate_report()

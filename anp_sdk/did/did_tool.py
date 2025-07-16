@@ -1,13 +1,10 @@
 import base64
 import re
-import secrets
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Optional, Any, Tuple
 
 import jcs
 import jwt
-import yaml
-from Crypto.PublicKey import RSA
 from agent_connect.authentication import extract_auth_header_parts
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec, rsa
@@ -17,172 +14,9 @@ from pydantic import BaseModel, Field
 from anp_sdk.did.agent_connect_hotpatch.authentication.did_wba_auth_header_memory import DIDWbaAuthHeaderMemory
 import logging
 
-from anp_sdk.anp_sdk_user_data import LocalUserData, get_user_data_manager
-from anp_sdk.config import get_global_config, UnifiedConfig
+from anp_sdk.config import get_global_config
 
 logger = logging.getLogger(__name__)
-
-
-
-def create_did_user(user_iput: dict, *, did_hex: bool = True, did_check_unique: bool = True):
-    from agent_connect.authentication.did_wba import create_did_wba_document
-    import json
-    import os
-    from datetime import datetime
-    import re
-    import urllib.parse
-
-
-
-    required_fields = ['name', 'host', 'port', 'dir', 'type']
-    if not all(field in user_iput for field in required_fields):
-        logger.error("缺少必需的参数字段")
-        return None
-    config=get_global_config()
-
-    userdid_filepath = config.anp_sdk.user_did_path
-    userdid_filepath = UnifiedConfig.resolve_path(userdid_filepath)
-
-    def get_existing_usernames(userdid_filepath):
-        if not os.path.exists(userdid_filepath):
-            return []
-        usernames = []
-        for d in os.listdir(userdid_filepath):
-            if os.path.isdir(os.path.join(userdid_filepath, d)):
-                cfg_path = os.path.join(userdid_filepath, d, 'agent_cfg.yaml')
-                if os.path.exists(cfg_path):
-                    with open(cfg_path, 'r') as f:
-                        try:
-                            cfg = yaml.safe_load(f)
-                            if cfg and 'name' in cfg:
-                                usernames.append(cfg['name'])
-                        except:
-                            pass
-        return usernames
-
-    base_name = user_iput['name']
-    existing_names = get_existing_usernames(userdid_filepath)
-
-    if base_name in existing_names:
-        date_suffix = datetime.now().strftime('%Y%m%d')
-        new_name = f"{base_name}_{date_suffix}"
-        if new_name in existing_names:
-            pattern = f"{re.escape(new_name)}_?(\\d+)?"
-            matches = [re.match(pattern, name) for name in existing_names]
-            numbers = [int(m.group(1)) if m and m.group(1) else 0 for m in matches if m]
-            next_number = max(numbers + [0]) + 1
-            new_name = f"{new_name}_{next_number}"
-        user_iput['name'] = new_name
-        logger.debug(f"用户名 {base_name} 已存在，使用新名称：{new_name}")
-
-    userdid_hostname = user_iput['host']
-    userdid_port = int(user_iput['port'])
-    unique_id = secrets.token_hex(8) if did_hex else None
-
-
-    if userdid_port not in (80, 443):
-        userdid_host_port = f"{userdid_hostname}%3A{userdid_port}"
-    did_parts = ['did', 'wba', userdid_host_port]
-    if user_iput['dir']:
-        did_parts.append(urllib.parse.quote(user_iput['dir'], safe=''))
-    if user_iput['type']:
-        did_parts.append(urllib.parse.quote(user_iput['type'], safe=''))
-    if did_hex:
-        did_parts.append(unique_id)
-    did_id = ':'.join(did_parts)
-
-    if not did_hex and did_check_unique:
-        for d in os.listdir(userdid_filepath):
-            did_path = os.path.join(userdid_filepath, d, 'did_document.json')
-            if os.path.exists(did_path):
-                with open(did_path, 'r', encoding='utf-8') as f:
-                    did_dict = json.load(f)
-                    if did_dict.get('id') == did_id:
-                        logger.error(f"DID已存在: {did_id}")
-        return None
-
-    user_dir_name = f"user_{unique_id}" if did_hex else f"user_{user_iput['name']}"
-    userdid_filepath = os.path.join(userdid_filepath, user_dir_name)
-
-    path_segments = [user_iput['dir'], user_iput['type']]
-    if did_hex:
-        path_segments.append(unique_id)
-    agent_description_url = f"http://{userdid_hostname}:{userdid_port}/{user_iput['dir']}/{user_iput['type']}/{unique_id if did_hex else ''}/ad.json"
-
-    did_document, keys = create_did_wba_document(
-        hostname=userdid_hostname,
-        port=userdid_port,
-        path_segments=path_segments,
-        agent_description_url=agent_description_url
-        )
-    did_document['id'] = did_id
-    if keys:
-        did_document['key_id'] = list(keys.keys())[0]
-
-    os.makedirs(userdid_filepath, exist_ok=True)
-    with open(f"{userdid_filepath}/did_document.json", "w") as f:
-        json.dump(did_document, f, indent=4)
-
-    for key_id, (private_key_pem, public_key_pem) in keys.items():
-        with open(f"{userdid_filepath}/{key_id}_private.pem", "wb") as f:
-            f.write(private_key_pem)
-        with open(f"{userdid_filepath}/{key_id}_public.pem", "wb") as f:
-            f.write(public_key_pem)
-
-    time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    agent_cfg = {
-        "name": user_iput['name'],
-        "unique_id": unique_id,
-        "did": did_document["id"],
-        "type": user_iput['type'],
-        "owner": {"name": "anpsdk 创造用户", "@id": "https://localhost"},
-        "description": "anpsdk的测试用户",
-        "version": "0.1.0",
-        "created_at": time
-    }
-    with open(f"{userdid_filepath}/agent_cfg.yaml", "w", encoding='utf-8') as f:
-        yaml.dump(agent_cfg, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
-
-    private_key = RSA.generate(2048).export_key()
-    public_key = RSA.import_key(private_key).publickey().export_key()
-    testcontent = {"user_id": 123}
-    token = create_jwt(testcontent, private_key)
-    token = verify_jwt(token, public_key)
-    if testcontent["user_id"] == token["user_id"]:
-        with open(f"{userdid_filepath}/private_key.pem", "wb") as f:
-            f.write(private_key)
-        with open(f"{userdid_filepath}/public_key.pem", "wb") as f:
-            f.write(public_key)
-
-    logger.debug(f"DID创建成功: {did_document['id']}")
-    logger.debug(f"DID文档已保存到: {userdid_filepath}")
-    logger.debug(f"密钥已保存到: {userdid_filepath}")
-    logger.debug(f"用户文件已保存到: {userdid_filepath}")
-    logger.debug(f"jwt密钥已保存到: {userdid_filepath}")
-
-    try:
-        # 创建成功后，立即加载到内存
-        user_data_manager = get_user_data_manager()
-        new_user_data = user_data_manager.load_single_user(userdid_filepath)
-
-    except Exception as e:
-        logger.error(f"创建用户后加载到用户管理器失败，报错: {e}")
-        return None
-
-    if new_user_data:
-        logger.info(f"新用户已创建并加载到内存: {new_user_data.did}")
-    else:
-        logger.warning(f"用户创建成功但加载到内存失败: {userdid_filepath}")
-
-    return did_document
-
-
-
-
-
-
-
-
 
 
 class AuthenticationContext(BaseModel):
@@ -197,10 +31,14 @@ class AuthenticationContext(BaseModel):
     json_data: Optional[Dict[str, Any]] = None
     use_two_way_auth: bool = True
     domain: Optional[str] = None  # 新增 domain 字段
-def create_did_auth_header_from_user_data(user_data: 'LocalUserData') -> DIDWbaAuthHeaderMemory:
+
+def create_did_auth_header_from_user_data(user_data) -> DIDWbaAuthHeaderMemory:
     """
     [新] 从内存中的 LocalUserData 对象创建 DIDWbaAuthHeaderMemory 实例。
     """
+    from anp_sdk.anp_user_local_data import LocalUserData
+    user_data: LocalUserData
+
     if not user_data.did_document or not user_data.did_private_key:
         raise ValueError("User data is missing DID document or private key in memory.")
     return DIDWbaAuthHeaderMemory(
@@ -293,6 +131,7 @@ def parse_wba_did_host_port(did: str) -> Tuple[Optional[str], Optional[int]]:
         return m.group(1), 80
     return None, None
 def find_user_by_did(did):
+    from anp_sdk.anp_user_local_data import get_user_data_manager
     manager = get_user_data_manager()
     user_data = manager.get_user_data(did)
 
@@ -303,6 +142,7 @@ def find_user_by_did(did):
         logger.error(f"未在内存中找到DID为 {did} 的用户数据")
         return False, None, None
 def get_agent_cfg_by_user_dir(user_dir: str) -> dict:
+    from anp_sdk.anp_user_local_data import get_user_data_manager
     manager = get_user_data_manager()
     all_users = manager.get_all_users()
 

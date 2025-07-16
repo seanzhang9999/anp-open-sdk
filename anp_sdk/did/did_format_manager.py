@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import Dict, Optional, Tuple, List
 
 from ..config import get_global_config
-from anp_server.domain import get_domain_manager
+from anp_sdk.domain import get_domain_manager
 
 logger = logging.getLogger(__name__)
 
@@ -370,14 +370,14 @@ class DidFormatManager:
                 except:
                     # 如果转换失败，尝试获取属性
                     result = []
-                    for attr in ['user', 'hostuser', 'test']:
+                    for attr in ['user', 'hostuser', 'tests']:
                         if hasattr(user_types, attr):
                             result.append(getattr(user_types, attr))
-                    return result if result else ["user", "hostuser", "test"]
+                    return result if result else ["user", "hostuser", "tests"]
             else:
-                return ["user", "hostuser", "test"]
+                return ["user", "hostuser", "tests"]
         except AttributeError:
-            return ["user", "hostuser", "test"]
+            return ["user", "hostuser", "tests"]
     
     def get_creatable_user_types(self) -> List[str]:
         """

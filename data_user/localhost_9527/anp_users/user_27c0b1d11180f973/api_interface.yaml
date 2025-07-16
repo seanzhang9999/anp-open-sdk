@@ -21,7 +21,7 @@ paths:
               schema:
                 type: object
           description: 返回结果
-      summary: 加法计算API
+      summary: 代码生成计算器的/add接口
       tags:
       - 代码生成计算器
   /multiply:
@@ -41,6 +41,6 @@ paths:
               schema:
                 type: object
           description: 返回结果
-      summary: 乘法计算API
+      summary: 代码生成计算器的/multiply接口
       tags:
       - 代码生成计算器
