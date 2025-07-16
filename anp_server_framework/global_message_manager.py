@@ -90,24 +90,7 @@ class GlobalMessageManager:
         logger.debug(f"💬 全局消息处理器注册: {did}:{msg_type} <- {agent_name}")
         return True
     
-    @classmethod
-    def _register_to_anp_user(cls, did: str, msg_type: str, handler: Callable, agent_name: str):
-        """注册到ANPUser的message_handlers（保持兼容性）"""
-        try:
-            from anp_sdk.anp_user import ANPUser
-            from anp_sdk.anp_user_local_data import get_user_data_manager
-            
-            user_data_manager = get_user_data_manager()
-            user_data = user_data_manager.get_user_data(did)
-            
-            if user_data:
-                # 使用from_did方法确保使用缓存的实例
-                anp_user = ANPUser.from_did(did)
-                # 使用ANPUser的内部注册方法，包含冲突检测
-                anp_user._register_message_handler_internal(msg_type, handler, agent_name)
-        except Exception as e:
-            logger.warning(f"注册到ANPUser失败: {e}")
-    
+
     @classmethod
     def get_handler(cls, did: str, msg_type: str) -> Optional[Callable]:
         """获取消息处理器"""

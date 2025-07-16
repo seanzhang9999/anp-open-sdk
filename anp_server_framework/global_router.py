@@ -48,87 +48,8 @@ class GlobalRouter:
     _routes: Dict[str, Dict[str, APIRoute]] = {}  # {did: {path: APIRoute}}
     _route_conflicts: List[Dict[str, Any]] = []  # 冲突记录
     
-    @classmethod
-    def register_api(cls, did: str, path: str, handler: Callable, 
-                    agent_name: str, methods: Optional[List[str]] = None) -> bool:
-        """注册API路由
-        
-        Args:
-            did: DID标识
-            path: API路径
-            handler: 处理函数
-            agent_name: Agent名称
-            methods: HTTP方法列表
-            
-        Returns:
-            bool: 注册是否成功
-        """
-        methods = methods or ["GET", "POST"]
-        
-        # 初始化DID的路由表
-        if did not in cls._routes:
-            cls._routes[did] = {}
-        
-        # 检查路径冲突
-        if path in cls._routes[did]:
-            existing_route = cls._routes[did][path]
-            conflict_info = {
-                "did": did,
-                "path": path,
-                "existing_agent": existing_route.agent_name,
-                "new_agent": agent_name,
-                "conflict_time": datetime.now().isoformat(),
-                "action": "ignored"  # 忽略新的注册
-            }
-            cls._route_conflicts.append(conflict_info)
-            
-            logger.warning(f"⚠️  API路径冲突: {did}{path}")
-            logger.warning(f"   现有Agent: {existing_route.agent_name}")
-            logger.warning(f"   新Agent: {agent_name}")
-            logger.warning(f"   🔧 使用第一个注册的路由，忽略后续注册")
-            return False
-        
-        # 注册新路由
-        route = APIRoute(did, path, handler, agent_name, methods)
-        cls._routes[did][path] = route
-        
-        # 同时注册到ANPUser的api_routes（保持兼容性）
-        cls._register_to_anp_user(did, path, handler)
-        
-        logger.debug(f"🔗 全局路由注册: {did}{path} <- {agent_name}")
-        return True
-    
-    @classmethod
-    def _register_to_anp_user(cls, did: str, path: str, handler: Callable):
-        """注册到ANPUser的api_routes（保持兼容性）"""
-        try:
-            from anp_sdk.anp_user import ANPUser
-            from anp_sdk.anp_user_local_data import get_user_data_manager
-            
-            user_data_manager = get_user_data_manager()
-            user_data = user_data_manager.get_user_data(did)
-            
-            if user_data:
-                # 使用from_did方法确保使用缓存的实例
-                anp_user = ANPUser.from_did(did)
-                anp_user.api_routes[path] = handler
-                
-                # 注册到ANP_Server的api_registry
-                from anp_server.anp_server import ANP_Server
-                if hasattr(ANP_Server, 'instance') and ANP_Server.instance:
-                    if did not in ANP_Server.instance.api_registry:
-                        ANP_Server.instance.api_registry[did] = []
-                    
-                    api_info = {
-                        "path": f"/agent/api/{did}{path}",
-                        "methods": ["GET", "POST"],
-                        "summary": handler.__doc__ or f"API接口{path}",
-                        "agent_id": did,
-                        "agent_name": "unknown"
-                    }
-                    ANP_Server.instance.api_registry[did].append(api_info)
-        except Exception as e:
-            logger.warning(f"注册到ANPUser失败: {e}")
+
+
     
     @classmethod
     def get_handler(cls, did: str, path: str) -> Optional[Callable]:

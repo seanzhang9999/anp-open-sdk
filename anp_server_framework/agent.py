@@ -115,15 +115,7 @@ class Agent:
                     logger.warning(f"   🔧 覆盖现有处理器")
                 self.anp_user.api_routes[full_path] = func
             
-            # 注册到全局路由（通过GlobalRouter）
-            from anp_server_framework.global_router import GlobalRouter
-            GlobalRouter.register_api(
-                did=self.anp_user.id,
-                path=full_path,
-                handler=func,
-                agent_name=self.name,
-                methods=methods
-            )
+
             
             logger.debug(f"🔗 API注册成功: {self.anp_user.id}{full_path} <- {self.name}")
             return func

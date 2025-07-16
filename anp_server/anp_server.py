@@ -63,7 +63,6 @@ class ANP_Server:
         self.port = ws_port
         self.server_running = False
         self.api_routes = {}
-        self.api_registry = {}
         self.message_handlers = {}
         self.ws_connections = {}
         self.sse_clients = set()
@@ -775,8 +774,7 @@ class ANP_Server:
             # 从全局索引中移除
             anp_user = all_agents.pop(agent_id, None)
 
-            if agent_id in self.api_registry:
-                del self.api_registry[agent_id]
+
 
             for group_id in self.list_groups():
                 runner = self.get_group_runner(group_id)
