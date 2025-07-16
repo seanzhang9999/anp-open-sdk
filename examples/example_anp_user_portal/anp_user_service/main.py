@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from demo_anp_user_portal.anp_user_service.app.routers import chat, auth
+from example_anp_user_portal.anp_user_service.app.routers import chat, auth
 
 app = FastAPI(title="MCP Chat Extension Backend")
 

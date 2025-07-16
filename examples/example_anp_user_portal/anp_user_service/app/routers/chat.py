@@ -2,9 +2,9 @@ import logging
 logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, HTTPException, status
-from demo_anp_user_portal.anp_user_service.app.models.schemas import ChatAgentRequest, ChatResponse, LLMConfig
-from demo_anp_user_portal.anp_user_service.app.services.user_service import get_user_personal_data_path
-from demo_anp_user_portal.anp_user_service.app.services.llm_service import get_llm_response_with_rag
+from example_anp_user_portal.anp_user_service.app.models.schemas import ChatAgentRequest, ChatResponse, LLMConfig
+from example_anp_user_portal.anp_user_service.app.services.user_service import get_user_personal_data_path
+from example_anp_user_portal.anp_user_service.app.services.llm_service import get_llm_response_with_rag
 from anp_sdk.config import config
 router = APIRouter()
 
