@@ -48,7 +48,7 @@ did_config:
 log_settings:
   log_level: Info
   detail:
-    file: "{APP_ROOT}/data_log/app.log"
+    file: "{APP_ROOT}/tmp_log/app.log"
     max_size: 100
 
 anp_sdk:
