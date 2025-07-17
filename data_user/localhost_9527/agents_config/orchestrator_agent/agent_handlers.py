@@ -220,7 +220,7 @@ async def run_agent_002_demo(sdk, **kwargs):
     """调用 agent_002 上的自定义演示方法"""
     try:
         # 通过 sdk 获取 agent_002 实例
-        target_agent = sdk.get_agent("did:wba:localhost%3A9527:wba:user:5fea49e183c6c211")
+        target_agent = sdk.get_agent("did:wba:localhost%3A9527:wba:user:3ea884878ea5fbb1")
         if not target_agent:
             return "错误：未找到 agent_002"
 
@@ -245,7 +245,7 @@ async def run_agent_002_demo_new():
 
         # 方式2：通过方法键直接调用
         result2 = await caller.call_method_by_key(
-            "did:wba:localhost%3A9527:wba:user:5fea49e183c6c211::calculate_sum",
+            "did:wba:localhost%3A9527:wba:user:3ea884878ea5fbb1::calculate_sum",
             10.5, 20.3
         )
         logger.info(f"直接调用结果: {result2}")
