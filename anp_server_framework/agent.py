@@ -353,14 +353,7 @@ class Agent:
         # 消息处理
         elif req_type == "message":
             msg_type = request_data.get("message_type", "*")
-           
             handler = self.message_handlers.get(msg_type) or self.message_handlers.get("*")
-            # 🔧 修复：从GlobalMessageManager查找处理器，而不是从self.message_handlers
-            if not handler:
-                from anp_server_framework.global_message_manager import GlobalMessageManager
-                handler = GlobalMessageManager.get_handler(self.anp_user.id, msg_type)
-                if not handler:
-                    handler = GlobalMessageManager.get_handler(self.anp_user.id, "*")
             if handler:
                 try:
                     # 使用智能参数适配
@@ -396,7 +389,9 @@ class Agent:
                 'timestamp': request_data.get('timestamp', ''),
                 # 可以根据需要添加更多字段
             }
-
+            # 新增：特殊处理 msg_data 参数名的情况
+            if len(param_names) == 1 and param_names[0] == 'msg_data':
+                return await handler(msg_content)
             # 检查处理器期望的参数名
             if len(param_names) == 1:
                 param_name = param_names[0]

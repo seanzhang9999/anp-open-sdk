@@ -519,7 +519,7 @@ class AgentRouter:
         # 消息类型请求不使用共享DID路由，直接路由到Agent
         if request_type == "message" or api_path.startswith("/message/"):
             self.logger.debug(f"📨 消息路由: 直接路由到 {resp_did}")
-            agent = self.find_agent_with_domain_priority(resp_did, domain, port)
+            agent = self._find_message_capable_agent(resp_did, domain, port)
         else:
             # 尝试从AgentManager获取共享DID信息
             try:
@@ -668,7 +668,51 @@ class AgentRouter:
             full_path = f"{path_prefix.rstrip('/')}{api_path}"
             self.shared_did_registry[shared_did]['path_mappings'][full_path] = (agent_name, api_path)
             self.logger.debug(f"📝 注册共享DID路径映射: {shared_did}{full_path} -> {agent_name}{api_path}")
-    
+
+    def _find_message_capable_agent(self, did: str, domain: str = None, port: int = None):
+        """查找具有消息处理能力的Agent，优先选择主Agent"""
+        try:
+            from anp_server_framework.agent_manager import AgentManager
+
+            # 从AgentManager获取该DID的所有Agent信息
+            agent_info = AgentManager.get_agent_info(did)
+            if agent_info:
+                # 优先查找主Agent（有消息处理权限）
+                primary_agent = None
+                fallback_agent = None
+
+                for agent_name, info in agent_info.items():
+                    agent_obj = info.get('agent')
+                    if agent_obj:
+                        # 检查是否为主Agent
+                        if info.get('primary_agent', False):
+                            primary_agent = agent_obj
+                            self.logger.debug(f"✅ 找到主Agent用于消息处理: {agent_name}")
+                            break
+                        # 保存第一个Agent作为备选
+                        elif fallback_agent is None:
+                            fallback_agent = agent_obj
+
+                # 返回主Agent或备选Agent
+                selected_agent = primary_agent or fallback_agent
+                if selected_agent:
+                    # 注册到router_agent以便后续使用
+                    self.register_agent_with_domain(selected_agent, domain, port)
+
+                    # 验证Agent是否有消息处理能力
+                    if hasattr(selected_agent, 'message_handlers') and selected_agent.message_handlers:
+                        self.logger.debug(f"✅ Agent {selected_agent.name} 具有消息处理能力")
+                        return selected_agent
+                    else:
+                        self.logger.warning(f"⚠️ Agent {selected_agent.name} 没有消息处理器")
+                        # 继续使用该Agent，让它返回相应的错误信息
+                        return selected_agent
+
+        except (ImportError, Exception) as e:
+            self.logger.warning(f"从AgentManager查找消息处理Agent失败: {e}")
+
+        # 回退到原有逻辑
+        return self.find_agent_with_domain_priority(did, domain, port)
     def _resolve_shared_did(self, shared_did: str, api_path: str):
         """解析共享DID，返回(target_agent_id, original_path)"""
         if shared_did not in self.shared_did_registry:

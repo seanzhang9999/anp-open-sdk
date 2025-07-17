@@ -8,7 +8,7 @@
   "methods": [
     {
       "name": "hello",
-      "summary": "\n这是一个打招呼的API，传入message参数即可返回问候语。\n",
+      "summary": "\n    这是一个打招呼的API，传入message参数即可返回问候语。\n    ",
       "description": "由 我的小铃木 提供的服务",
       "params": {
         "message": {

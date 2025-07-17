@@ -170,14 +170,23 @@ def agent_class(
                         else:
                             return await method(request_data, request)
                 return api_wrapper
+
             # 定义消息包装器函数
             def create_msg_wrapper(method):
                 @functools.wraps(method)
                 async def msg_wrapper(msg_data):  # 🔧 只接受1个参数
-                    if hasattr(method, '_capability_meta') or hasattr(method, '_is_wrapped'):
+                    # 🔧 优先检查是否需要实例绑定（类似API的处理）
+                    if hasattr(method, '_needs_instance_binding') and method._needs_instance_binding:
+                        logger.debug(f"🔧 调用需要实例绑定的消息方法: {method.__name__}")
+                        bound_wrapper = method._create_bound_wrapper(self)
+                        return await bound_wrapper(msg_data)
+                    elif hasattr(method, '_capability_meta') or hasattr(method, '_is_wrapped'):
+                        logger.debug(f"🔧 调用已包装的消息方法: {method.__name__}")
                         return await method(msg_data)
                     else:
+                        logger.debug(f"🔧 调用未包装的消息方法: {method.__name__}")
                         return await method(self, msg_data)
+
                 return msg_wrapper
             
                 # 定义事件包装器函数
@@ -222,9 +231,18 @@ def agent_class(
                     # 消息处理器的处理...
                     msg_type = getattr(attr, '_message_type')
                     logger.debug(f"  - 注册消息处理器: {msg_type} -> {attr_name}")
-                    
-                    wrapped_handler = create_msg_wrapper(attr)
-                    self._agent._message_handler(msg_type)(wrapped_handler)
+
+                    # 🔧 检查是否需要实例绑定（类似API的处理）
+                    if hasattr(attr, '_needs_instance_binding') and attr._needs_instance_binding:
+                        logger.debug(f"🔧 创建实例绑定消息包装器: {attr_name}")
+                        # 创建绑定到当前实例的包装器
+                        bound_wrapper = attr._create_bound_wrapper(self)
+                        # 注册绑定后的包装器
+                        self._agent._message_handler(msg_type)(bound_wrapper)
+                    else:
+                        # 创建并注册包装函数
+                        wrapped_handler = create_msg_wrapper(attr)
+                        self._agent._message_handler(msg_type)(wrapped_handler)
                 
                 # 检查是否有群组事件信息
                 elif hasattr(attr, '_group_event_info'):
@@ -326,19 +344,21 @@ def class_message_handler(msg_type, description=None, auto_wrap=True):
                 'publish_as': "message_handler"
             }
             setattr(method, '_capability_meta', capability_meta)
-        
+
         # 如果需要自动包装，应用wrap_business_handler
         if auto_wrap:
-            from anp_server_framework.anp_service.anp_tool import wrap_business_handler
-            
-            @functools.wraps(method)
-            async def wrapped_method(self, msg_data):
-                # 调用wrap_business_handler并传入self
-                wrapped_func = wrap_business_handler(lambda **kwargs: method(self, **kwargs))
-                return await wrapped_func(msg_data)
-            
-            return wrapped_method
-        
+            def create_bound_wrapper(instance):
+                async def bound_method(msg_data):
+                    return await method(instance, msg_data)
+
+                # 🔧 不使用 wrap_business_handler，直接返回绑定方法
+                return bound_method
+
+            setattr(method, '_needs_instance_binding', True)
+            setattr(method, '_create_bound_wrapper', create_bound_wrapper)
+            setattr(method, '_is_wrapped', True)
+
+            return method
         return method
     return decorator
 
