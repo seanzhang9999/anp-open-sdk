@@ -344,7 +344,7 @@ async def main():
                 logger.debug(f"    - {path}: {handler_name}")
 
     # 测试新Agent系统功能
-    #await test_new_agent_system(all_agents)
+    await test_new_agent_system(all_agents)
 
     await test_discovery_agent(all_agents,svr)
 
@@ -365,13 +365,13 @@ async def test_discovery_agent(all_agents,svr):
         # 直接调用 agent 实例上的方法
         publisher_url = "http://localhost:9527/publisher/agents"
         # agent中的自动抓取函数，自动从主地址搜寻所有did/ad/yaml文档
-        # result = await discovery_agent.discover_and_describe_agents(publisher_url)
+        result = await discovery_agent.discover_and_describe_agents(publisher_url)
         # agent中的联网调用函数，调用计算器
-        #result = await discovery_agent.run_calculator_add_demo()
+        result = await discovery_agent.run_calculator_add_demo()
         # agent中的联网调用函数，相当于发送消息
         # result = await discovery_agent.run_hello_demo()
         # agent中的AI联网爬取函数，从一个did地址开始爬取
-        #result = await discovery_agent.run_ai_crawler_demo()
+        result = await discovery_agent.run_ai_crawler_demo()
         # agent中的AI联网爬取函数，从多个did汇总地址开始爬取
         # result = await discovery_agent.run_ai_root_crawler_demo()
         # agent中的本地api去调用另一个agent的本地api
