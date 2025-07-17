@@ -353,7 +353,14 @@ class Agent:
         # 消息处理
         elif req_type == "message":
             msg_type = request_data.get("message_type", "*")
+           
             handler = self.message_handlers.get(msg_type) or self.message_handlers.get("*")
+            # 🔧 修复：从GlobalMessageManager查找处理器，而不是从self.message_handlers
+            if not handler:
+                from anp_server_framework.global_message_manager import GlobalMessageManager
+                handler = GlobalMessageManager.get_handler(self.anp_user.id, msg_type)
+                if not handler:
+                    handler = GlobalMessageManager.get_handler(self.anp_user.id, "*")
             if handler:
                 try:
                     # 使用智能参数适配

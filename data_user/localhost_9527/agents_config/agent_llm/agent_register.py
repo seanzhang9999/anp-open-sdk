@@ -17,7 +17,7 @@ def register(agent):
     
     # 检查是否已有消息处理器，避免冲突
     if "*" not in agent.message_handlers:
-        agent_message_handler(agent,"*")(handle_message)
+        agent_message_handler(agent,"*")(handle_text_message)
     else:
         logger.warning(f"⚠️  消息类型 '*' 已有处理器，跳过注册")
     

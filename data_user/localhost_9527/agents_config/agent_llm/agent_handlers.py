@@ -128,7 +128,7 @@ async def handle_message(content):
         return {"reply": "LLM Agent: LLM客户端未初始化"}
     
     try:
-        print(f"  -> LLM Agent: 处理{message_type}类型消息: {content}")
+        print(f"  -> LLM Agent: 处理消息: {content}")
         response = await my_llm_client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": content}],

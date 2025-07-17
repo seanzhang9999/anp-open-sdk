@@ -23,7 +23,11 @@ paths:
               schema:
                 type: object
           description: 返回结果
-      summary: "\n    这是一个打招呼的API，传入message参数即可返回问候语。\n    "
+      summary: '
+
+        这是一个打招呼的API，传入message参数即可返回问候语。
+
+        '
       tags:
       - 我的小铃木
   /info:
