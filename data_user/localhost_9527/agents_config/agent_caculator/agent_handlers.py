@@ -10,7 +10,7 @@ async def add(request_data, request):
         b = float(params.get('b', 0))
         
         result = a + b
-        logger.info(f"  -> Calculator Agent: Performed {a} + {b} = {result}")
+        logger.info(f"  -> Calculator Agent: Performed {a} + {b} = {result} from {params}")
         return {"result": result}
     except (ValueError, TypeError) as e:
         logger.error(f"Calculator Agent: 参数错误 - {e}")

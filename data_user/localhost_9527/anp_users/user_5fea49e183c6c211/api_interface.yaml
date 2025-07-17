@@ -4,7 +4,7 @@ info:
   version: 1.0.0
 openapi: 3.0.0
 paths:
-  /assistant/assistant/help:
+  /assistant/help:
     post:
       description: 由 代码生成助手 提供的服务
       requestBody:
@@ -24,107 +24,7 @@ paths:
       summary: 帮助信息API
       tags:
       - 代码生成助手
-  /assistant/calculator/hello:
-    post:
-      description: 由 代码生成助手 提供的服务
-      requestBody:
-        content:
-          application/json:
-            schema:
-              properties: {}
-              type: object
-        required: true
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: object
-          description: 返回结果
-      summary: 代码生成助手的/calculator/hello接口
-      tags:
-      - 代码生成助手
-  /assistant/calculator/info:
-    post:
-      description: 由 代码生成助手 提供的服务
-      requestBody:
-        content:
-          application/json:
-            schema:
-              properties: {}
-              type: object
-        required: true
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: object
-          description: 返回结果
-      summary: 代码生成助手的/calculator/info接口
-      tags:
-      - 代码生成助手
-  /assistant/weather/current:
-    post:
-      description: 由 代码生成助手 提供的服务
-      requestBody:
-        content:
-          application/json:
-            schema:
-              properties: {}
-              type: object
-        required: true
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: object
-          description: 返回结果
-      summary: 代码生成助手的/weather/current接口
-      tags:
-      - 代码生成助手
-  /assistant/weather/forecast:
-    post:
-      description: 由 代码生成助手 提供的服务
-      requestBody:
-        content:
-          application/json:
-            schema:
-              properties: {}
-              type: object
-        required: true
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: object
-          description: 返回结果
-      summary: 代码生成助手的/weather/forecast接口
-      tags:
-      - 代码生成助手
-  /calculator/assistant/help:
-    post:
-      description: 由 我的小本田 提供的服务
-      requestBody:
-        content:
-          application/json:
-            schema:
-              properties: {}
-              type: object
-        required: true
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: object
-          description: 返回结果
-      summary: 帮助信息API
-      tags:
-      - 我的小本田
-  /calculator/calculator/hello:
+  /calculator/hello:
     post:
       description: 由 我的小本田 提供的服务
       requestBody:
@@ -144,7 +44,7 @@ paths:
       summary: 我的小本田的/calculator/hello接口
       tags:
       - 我的小本田
-  /calculator/calculator/info:
+  /calculator/info:
     post:
       description: 由 我的小本田 提供的服务
       requestBody:
@@ -164,107 +64,7 @@ paths:
       summary: 我的小本田的/calculator/info接口
       tags:
       - 我的小本田
-  /calculator/weather/current:
-    post:
-      description: 由 我的小本田 提供的服务
-      requestBody:
-        content:
-          application/json:
-            schema:
-              properties: {}
-              type: object
-        required: true
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: object
-          description: 返回结果
-      summary: 我的小本田的/weather/current接口
-      tags:
-      - 我的小本田
-  /calculator/weather/forecast:
-    post:
-      description: 由 我的小本田 提供的服务
-      requestBody:
-        content:
-          application/json:
-            schema:
-              properties: {}
-              type: object
-        required: true
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: object
-          description: 返回结果
-      summary: 我的小本田的/weather/forecast接口
-      tags:
-      - 我的小本田
-  /weather/assistant/help:
-    post:
-      description: 由 代码生成天气 提供的服务
-      requestBody:
-        content:
-          application/json:
-            schema:
-              properties: {}
-              type: object
-        required: true
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: object
-          description: 返回结果
-      summary: 帮助信息API
-      tags:
-      - 代码生成天气
-  /weather/calculator/hello:
-    post:
-      description: 由 代码生成天气 提供的服务
-      requestBody:
-        content:
-          application/json:
-            schema:
-              properties: {}
-              type: object
-        required: true
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: object
-          description: 返回结果
-      summary: 代码生成天气的/calculator/hello接口
-      tags:
-      - 代码生成天气
-  /weather/calculator/info:
-    post:
-      description: 由 代码生成天气 提供的服务
-      requestBody:
-        content:
-          application/json:
-            schema:
-              properties: {}
-              type: object
-        required: true
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: object
-          description: 返回结果
-      summary: 代码生成天气的/calculator/info接口
-      tags:
-      - 代码生成天气
-  /weather/weather/current:
+  /weather/current:
     post:
       description: 由 代码生成天气 提供的服务
       requestBody:
@@ -284,7 +84,7 @@ paths:
       summary: 代码生成天气的/weather/current接口
       tags:
       - 代码生成天气
-  /weather/weather/forecast:
+  /weather/forecast:
     post:
       description: 由 代码生成天气 提供的服务
       requestBody:

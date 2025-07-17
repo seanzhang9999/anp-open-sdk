@@ -4,7 +4,7 @@ info:
   version: 1.0.0
 openapi: 3.0.0
 paths:
-  /calculator/calculator/add:
+  /calculator/add:
     post:
       description: 由 Calculator Agent 提供的服务
       requestBody:
@@ -24,48 +24,7 @@ paths:
       summary: 计算两个数的和
       tags:
       - Calculator Agent
-  /calculator/llm/chat:
-    post:
-      description: 由 Calculator Agent 提供的服务
-      requestBody:
-        content:
-          application/json:
-            schema:
-              properties: {}
-              type: object
-        required: true
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: object
-          description: 返回结果
-      summary: "\n    API处理函数，现在直接使用模块内的 my_llm_client。\n    它不再需要从request中获取agent实例。\n\
-        \    "
-      tags:
-      - Calculator Agent
-  /llm/calculator/add:
-    post:
-      description: 由 Large Language Model Agent 提供的服务
-      requestBody:
-        content:
-          application/json:
-            schema:
-              properties: {}
-              type: object
-        required: true
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: object
-          description: 返回结果
-      summary: 计算两个数的和
-      tags:
-      - Large Language Model Agent
-  /llm/llm/chat:
+  /llm/chat:
     post:
       description: 由 Large Language Model Agent 提供的服务
       requestBody:

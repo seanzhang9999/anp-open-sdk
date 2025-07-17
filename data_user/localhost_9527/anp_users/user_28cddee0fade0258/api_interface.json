@@ -7,7 +7,7 @@
   },
   "methods": [
     {
-      "name": "llm.llm.chat",
+      "name": "llm.chat",
       "summary": "\n    API处理函数，现在直接使用模块内的 my_llm_client。\n    它不再需要从request中获取agent实例。\n    ",
       "description": "由 Large Language Model Agent 提供的服务",
       "params": {},
@@ -21,29 +21,11 @@
           "version": "1.0.0"
         },
         "httpMethod": "POST",
-        "endpoint": "/llm/llm/chat"
+        "endpoint": "/llm/chat"
       }
     },
     {
-      "name": "llm.calculator.add",
-      "summary": "计算两个数的和",
-      "description": "由 Large Language Model Agent 提供的服务",
-      "params": {},
-      "tags": [
-        "Large Language Model Agent"
-      ],
-      "meta": {
-        "openapi": "3.0.0",
-        "info": {
-          "title": "Large Language Model Agent API",
-          "version": "1.0.0"
-        },
-        "httpMethod": "POST",
-        "endpoint": "/llm/calculator/add"
-      }
-    },
-    {
-      "name": "calculator.calculator.add",
+      "name": "calculator.add",
       "summary": "计算两个数的和",
       "description": "由 Calculator Agent 提供的服务",
       "params": {},
@@ -57,25 +39,7 @@
           "version": "1.0.0"
         },
         "httpMethod": "POST",
-        "endpoint": "/calculator/calculator/add"
-      }
-    },
-    {
-      "name": "calculator.llm.chat",
-      "summary": "\n    API处理函数，现在直接使用模块内的 my_llm_client。\n    它不再需要从request中获取agent实例。\n    ",
-      "description": "由 Calculator Agent 提供的服务",
-      "params": {},
-      "tags": [
-        "Calculator Agent"
-      ],
-      "meta": {
-        "openapi": "3.0.0",
-        "info": {
-          "title": "Calculator Agent API",
-          "version": "1.0.0"
-        },
-        "httpMethod": "POST",
-        "endpoint": "/calculator/llm/chat"
+        "endpoint": "/calculator/add"
       }
     }
   ]

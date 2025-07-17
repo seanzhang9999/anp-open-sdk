@@ -481,20 +481,38 @@ class LocalAgentManager:
                     agent_obj = agent_info['agent']
                     prefix = agent_info.get('prefix', '')
 
+                    # 收集所有其他Agent的prefix，用于独占模式判断
+                    other_prefixes = [info.get('prefix', '') for name, info in agents_info.items()
+                                      if name != agent_name and info.get('prefix')]
+
                     # 获取该 Agent 的 API 路由
                     api_routes = {}
 
                     # 从 agent.api_routes 获取路由
                     if hasattr(agent_obj, 'api_routes'):
-                        api_routes.update(agent_obj.api_routes)
+                        for path, handler in agent_obj.api_routes.items():
+                            # 检查路径是否属于当前Agent（通过prefix匹配）
+                            if prefix and path.startswith(prefix):
+                                # 这才是属于当前Agent的路由
+                                api_routes[path] = handler
+                            elif not prefix and not any(path.startswith(p) for p in other_prefixes if p):
+                                # 独占模式的路由，且不以其他Agent的prefix开头
+                                api_routes[path] = handler
 
                     # 从 agent.anp_user.api_routes 获取路由（如果存在）
                     if hasattr(agent_obj, 'anp_user') and hasattr(agent_obj.anp_user, 'api_routes'):
-                        api_routes.update(agent_obj.anp_user.api_routes)
+                        for path, handler in agent_obj.anp_user.api_routes.items():
+                            # 检查路径是否属于当前Agent（通过prefix匹配）
+                            if prefix and path.startswith(prefix):
+                                # 这才是属于当前Agent的路由
+                                api_routes[path] = handler
+                            elif not prefix and not any(path.startswith(p) for p in other_prefixes if p):
+                                # 独占模式的路由，且不以其他Agent的prefix开头
+                                api_routes[path] = handler
 
                     for path, handler in api_routes.items():
-                        # 构建完整路径
-                        full_path = f"{prefix}{path}" if prefix else path
+                        # 路径已经是完整路径，不需要再添加prefix
+                        full_path = path
 
                         # 从路径生成方法名
                         method_name = full_path.strip('/').replace('/', '.')
@@ -576,20 +594,38 @@ class LocalAgentManager:
             agent = agent_info['agent']
             prefix = agent_info.get('prefix', '')
 
+            # 收集所有其他Agent的prefix，用于独占模式判断
+            other_prefixes = [info.get('prefix', '') for name, info in agents_info.items()
+                              if name != agent_name and info.get('prefix')]
+
             # 获取该 Agent 的 API 路由
             api_routes = {}
 
             # 从 agent.api_routes 获取路由
             if hasattr(agent, 'api_routes'):
-                api_routes.update(agent.api_routes)
+                for path, handler in agent.api_routes.items():
+                    # 检查路径是否属于当前Agent（通过prefix匹配）
+                    if prefix and path.startswith(prefix):
+                        # 这才是属于当前Agent的路由
+                        api_routes[path] = handler
+                    elif not prefix and not any(path.startswith(p) for p in other_prefixes if p):
+                        # 独占模式的路由，且不以其他Agent的prefix开头
+                        api_routes[path] = handler
 
             # 从 agent.anp_user.api_routes 获取路由（如果存在）
             if hasattr(agent, 'anp_user') and hasattr(agent.anp_user, 'api_routes'):
-                api_routes.update(agent.anp_user.api_routes)
+                for path, handler in agent.anp_user.api_routes.items():
+                    # 检查路径是否属于当前Agent（通过prefix匹配）
+                    if prefix and path.startswith(prefix):
+                        # 这才是属于当前Agent的路由
+                        api_routes[path] = handler
+                    elif not prefix and not any(path.startswith(p) for p in other_prefixes if p):
+                        # 独占模式的路由，且不以其他Agent的prefix开头
+                        api_routes[path] = handler
 
             for path, handler in api_routes.items():
-                # 构建完整路径
-                full_path = f"{prefix}{path}" if prefix else path
+                # 路径已经是完整路径，不需要再添加prefix
+                full_path = path
 
                 # 从处理函数获取参数信息
                 sig = inspect.signature(handler)
@@ -726,31 +762,63 @@ class LocalAgentManager:
             agent = agent_info['agent']
             prefix = agent_info.get('prefix', '')
 
+            # 收集所有其他Agent的prefix，用于独占模式判断
+            other_prefixes = [info.get('prefix', '') for name, info in agents_info.items()
+                              if name != agent_name and info.get('prefix')]
+
             # 获取该 Agent 的 API 路由
             if hasattr(agent, 'api_routes'):
                 for path, handler in agent.api_routes.items():
-                    full_path = f"{prefix}{path}" if prefix else path
-                    handler_name = handler.__name__ if hasattr(handler, '__name__') else 'unknown'
-                    interfaces.append({
-                        "@type": "ad:StructuredInterface",
-                        "protocol": "HTTP",
-                        "name": full_path.replace('/', '_').strip('_'),
-                        "url": f"/agent/api/{did}{full_path}",
-                        "description": f"{agent.name} API 路径 {full_path} 的端点 (处理器: {handler_name})"
-                    })
+                    # 检查路径是否属于当前Agent（通过prefix匹配）
+                    if prefix and path.startswith(prefix):
+                        # 这才是属于当前Agent的路由
+                        full_path = path  # 路径已经包含prefix，不需要再添加
+                        handler_name = handler.__name__ if hasattr(handler, '__name__') else 'unknown'
+                        interfaces.append({
+                            "@type": "ad:StructuredInterface",
+                            "protocol": "HTTP",
+                            "name": full_path.replace('/', '_').strip('_'),
+                            "url": f"/agent/api/{did}{full_path}",
+                            "description": f"{agent.name} API 路径 {full_path} 的端点 (处理器: {handler_name})"
+                        })
+                    elif not prefix and not any(path.startswith(p) for p in other_prefixes if p):
+                        # 独占模式的路由，且不以其他Agent的prefix开头
+                        full_path = path
+                        handler_name = handler.__name__ if hasattr(handler, '__name__') else 'unknown'
+                        interfaces.append({
+                            "@type": "ad:StructuredInterface",
+                            "protocol": "HTTP",
+                            "name": full_path.replace('/', '_').strip('_'),
+                            "url": f"/agent/api/{did}{full_path}",
+                            "description": f"{agent.name} API 路径 {full_path} 的端点 (处理器: {handler_name})"
+                        })
 
             # 如果 agent 有 anp_user 属性，也获取其 API 路由
             if hasattr(agent, 'anp_user') and hasattr(agent.anp_user, 'api_routes'):
                 for path, handler in agent.anp_user.api_routes.items():
-                    full_path = f"{prefix}{path}" if prefix else path
-                    handler_name = handler.__name__ if hasattr(handler, '__name__') else 'unknown'
-                    interfaces.append({
-                        "@type": "ad:StructuredInterface",
-                        "protocol": "HTTP",
-                        "name": full_path.replace('/', '_').strip('_'),
-                        "url": f"/agent/api/{did}{full_path}",
-                        "description": f"{agent.name} API 路径 {full_path} 的端点 (处理器: {handler_name})"
-                    })
+                    # 检查路径是否属于当前Agent（通过prefix匹配）
+                    if prefix and path.startswith(prefix):
+                        # 这才是属于当前Agent的路由
+                        full_path = path  # 路径已经包含prefix，不需要再添加
+                        handler_name = handler.__name__ if hasattr(handler, '__name__') else 'unknown'
+                        interfaces.append({
+                            "@type": "ad:StructuredInterface",
+                            "protocol": "HTTP",
+                            "name": full_path.replace('/', '_').strip('_'),
+                            "url": f"/agent/api/{did}{full_path}",
+                            "description": f"{agent.name} API 路径 {full_path} 的端点 (处理器: {handler_name})"
+                        })
+                    elif not prefix and not any(path.startswith(p) for p in other_prefixes if p):
+                        # 独占模式的路由，且不以其他Agent的prefix开头
+                        full_path = path
+                        handler_name = handler.__name__ if hasattr(handler, '__name__') else 'unknown'
+                        interfaces.append({
+                            "@type": "ad:StructuredInterface",
+                            "protocol": "HTTP",
+                            "name": full_path.replace('/', '_').strip('_'),
+                            "url": f"/agent/api/{did}{full_path}",
+                            "description": f"{agent.name} API 路径 {full_path} 的端点 (处理器: {handler_name})"
+                        })
 
         ad_json["ad:interfaces"] = interfaces
 

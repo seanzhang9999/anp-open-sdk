@@ -7,7 +7,7 @@
   },
   "methods": [
     {
-      "name": "calculator.calculator.hello",
+      "name": "calculator.hello",
       "summary": "我的小本田的/calculator/hello接口",
       "description": "由 我的小本田 提供的服务",
       "params": {},
@@ -21,11 +21,11 @@
           "version": "1.0.0"
         },
         "httpMethod": "POST",
-        "endpoint": "/calculator/calculator/hello"
+        "endpoint": "/calculator/hello"
       }
     },
     {
-      "name": "calculator.calculator.info",
+      "name": "calculator.info",
       "summary": "我的小本田的/calculator/info接口",
       "description": "由 我的小本田 提供的服务",
       "params": {},
@@ -39,65 +39,11 @@
           "version": "1.0.0"
         },
         "httpMethod": "POST",
-        "endpoint": "/calculator/calculator/info"
+        "endpoint": "/calculator/info"
       }
     },
     {
-      "name": "calculator.weather.current",
-      "summary": "我的小本田的/weather/current接口",
-      "description": "由 我的小本田 提供的服务",
-      "params": {},
-      "tags": [
-        "我的小本田"
-      ],
-      "meta": {
-        "openapi": "3.0.0",
-        "info": {
-          "title": "我的小本田 API",
-          "version": "1.0.0"
-        },
-        "httpMethod": "POST",
-        "endpoint": "/calculator/weather/current"
-      }
-    },
-    {
-      "name": "calculator.weather.forecast",
-      "summary": "我的小本田的/weather/forecast接口",
-      "description": "由 我的小本田 提供的服务",
-      "params": {},
-      "tags": [
-        "我的小本田"
-      ],
-      "meta": {
-        "openapi": "3.0.0",
-        "info": {
-          "title": "我的小本田 API",
-          "version": "1.0.0"
-        },
-        "httpMethod": "POST",
-        "endpoint": "/calculator/weather/forecast"
-      }
-    },
-    {
-      "name": "calculator.assistant.help",
-      "summary": "帮助信息API",
-      "description": "由 我的小本田 提供的服务",
-      "params": {},
-      "tags": [
-        "我的小本田"
-      ],
-      "meta": {
-        "openapi": "3.0.0",
-        "info": {
-          "title": "我的小本田 API",
-          "version": "1.0.0"
-        },
-        "httpMethod": "POST",
-        "endpoint": "/calculator/assistant/help"
-      }
-    },
-    {
-      "name": "weather.weather.current",
+      "name": "weather.current",
       "summary": "代码生成天气的/weather/current接口",
       "description": "由 代码生成天气 提供的服务",
       "params": {},
@@ -111,11 +57,11 @@
           "version": "1.0.0"
         },
         "httpMethod": "POST",
-        "endpoint": "/weather/weather/current"
+        "endpoint": "/weather/current"
       }
     },
     {
-      "name": "weather.weather.forecast",
+      "name": "weather.forecast",
       "summary": "代码生成天气的/weather/forecast接口",
       "description": "由 代码生成天气 提供的服务",
       "params": {},
@@ -129,65 +75,11 @@
           "version": "1.0.0"
         },
         "httpMethod": "POST",
-        "endpoint": "/weather/weather/forecast"
+        "endpoint": "/weather/forecast"
       }
     },
     {
-      "name": "weather.calculator.hello",
-      "summary": "代码生成天气的/calculator/hello接口",
-      "description": "由 代码生成天气 提供的服务",
-      "params": {},
-      "tags": [
-        "代码生成天气"
-      ],
-      "meta": {
-        "openapi": "3.0.0",
-        "info": {
-          "title": "代码生成天气 API",
-          "version": "1.0.0"
-        },
-        "httpMethod": "POST",
-        "endpoint": "/weather/calculator/hello"
-      }
-    },
-    {
-      "name": "weather.calculator.info",
-      "summary": "代码生成天气的/calculator/info接口",
-      "description": "由 代码生成天气 提供的服务",
-      "params": {},
-      "tags": [
-        "代码生成天气"
-      ],
-      "meta": {
-        "openapi": "3.0.0",
-        "info": {
-          "title": "代码生成天气 API",
-          "version": "1.0.0"
-        },
-        "httpMethod": "POST",
-        "endpoint": "/weather/calculator/info"
-      }
-    },
-    {
-      "name": "weather.assistant.help",
-      "summary": "帮助信息API",
-      "description": "由 代码生成天气 提供的服务",
-      "params": {},
-      "tags": [
-        "代码生成天气"
-      ],
-      "meta": {
-        "openapi": "3.0.0",
-        "info": {
-          "title": "代码生成天气 API",
-          "version": "1.0.0"
-        },
-        "httpMethod": "POST",
-        "endpoint": "/weather/assistant/help"
-      }
-    },
-    {
-      "name": "assistant.assistant.help",
+      "name": "assistant.help",
       "summary": "帮助信息API",
       "description": "由 代码生成助手 提供的服务",
       "params": {},
@@ -201,79 +93,7 @@
           "version": "1.0.0"
         },
         "httpMethod": "POST",
-        "endpoint": "/assistant/assistant/help"
-      }
-    },
-    {
-      "name": "assistant.calculator.hello",
-      "summary": "代码生成助手的/calculator/hello接口",
-      "description": "由 代码生成助手 提供的服务",
-      "params": {},
-      "tags": [
-        "代码生成助手"
-      ],
-      "meta": {
-        "openapi": "3.0.0",
-        "info": {
-          "title": "代码生成助手 API",
-          "version": "1.0.0"
-        },
-        "httpMethod": "POST",
-        "endpoint": "/assistant/calculator/hello"
-      }
-    },
-    {
-      "name": "assistant.calculator.info",
-      "summary": "代码生成助手的/calculator/info接口",
-      "description": "由 代码生成助手 提供的服务",
-      "params": {},
-      "tags": [
-        "代码生成助手"
-      ],
-      "meta": {
-        "openapi": "3.0.0",
-        "info": {
-          "title": "代码生成助手 API",
-          "version": "1.0.0"
-        },
-        "httpMethod": "POST",
-        "endpoint": "/assistant/calculator/info"
-      }
-    },
-    {
-      "name": "assistant.weather.current",
-      "summary": "代码生成助手的/weather/current接口",
-      "description": "由 代码生成助手 提供的服务",
-      "params": {},
-      "tags": [
-        "代码生成助手"
-      ],
-      "meta": {
-        "openapi": "3.0.0",
-        "info": {
-          "title": "代码生成助手 API",
-          "version": "1.0.0"
-        },
-        "httpMethod": "POST",
-        "endpoint": "/assistant/weather/current"
-      }
-    },
-    {
-      "name": "assistant.weather.forecast",
-      "summary": "代码生成助手的/weather/forecast接口",
-      "description": "由 代码生成助手 提供的服务",
-      "params": {},
-      "tags": [
-        "代码生成助手"
-      ],
-      "meta": {
-        "openapi": "3.0.0",
-        "info": {
-          "title": "代码生成助手 API",
-          "version": "1.0.0"
-        },
-        "httpMethod": "POST",
-        "endpoint": "/assistant/weather/forecast"
+        "endpoint": "/assistant/help"
       }
     }
   ]
