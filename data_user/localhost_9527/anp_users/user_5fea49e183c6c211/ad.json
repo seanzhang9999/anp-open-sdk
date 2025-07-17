@@ -12,7 +12,7 @@
   },
   "description": "Services provided by DID did:wba:localhost%3A9527:wba:user:5fea49e183c6c211",
   "version": "0.1.0",
-  "created_at": "2025-07-16T22:42:21.359477",
+  "created_at": "2025-07-17T08:23:19.077501",
   "security_definitions": {
     "didwba_sc": {
       "scheme": "didwba",

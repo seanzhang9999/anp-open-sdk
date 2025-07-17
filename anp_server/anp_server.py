@@ -112,16 +112,14 @@ class ANP_Server:
         from anp_server.router.router_agent import AgentRouter
         self.router_agent = AgentRouter()
         if mode == ServerMode.MULTI_AGENT_ROUTER:
-            for anp_user in self.anp_users:
-                self.register_anp_user(anp_user)
+
             self._register_default_routes()
         elif mode == ServerMode.DID_REG_PUB_SERVER:
             self._register_default_routes()
         elif mode == ServerMode.SDK_WS_PROXY_SERVER:
             self._register_default_routes()
         elif mode == ServerMode.AGENT_SELF_SERVICE:
-            for anp_user in self.anp_users:
-                self.register_anp_user(anp_user)
+
             self._register_default_routes()
 
 
@@ -142,71 +140,6 @@ class ANP_Server:
         return self.group_manager.list_groups()
 
 
-    def register_anp_user(self, anp_user: ANPUser):
-        # 从anp_user的DID中解析域名和端口
-        domain, port = self.get_did_host_port_from_did(anp_user.id)
-
-        # 标准化域名
-        if domain in ['127.0.0.1', '0.0.0.0']:
-            domain = 'localhost'
-        
-        # 确保ANPUser有正确的名称
-        if not hasattr(anp_user, 'name') or not anp_user.name or anp_user.name == "未命名":
-            # 如果没有名称，使用DID的最后一部分作为默认名称
-            anp_user.name = anp_user.id.split(':')[-1] if ':' in anp_user.id else anp_user.id
-            self.logger.debug(f"为ANPUser设置默认名称: {anp_user.name}")
-        
-        self.logger.info(f"🔧 注册ANPUser到SDK: {anp_user.name} (DID: {anp_user.id}) @ {domain}:{port}")
-        
-        # 创建Agent实例
-        agent = anp_user.get_or_create_agent(anp_user.name)
-        
-        # 使用解析出的域名和端口注册
-        self.router_agent.register_agent_with_domain(
-            agent,
-            domain=domain,
-            port=port
-        )
-        self.logger.info(f"✅ 已注册智能体到SDK: {anp_user.id} @ {domain}:{port}")
-        
-        # 手动注册Agent名称索引到全局索引（确保共享DID路由能找到）
-        if agent.name and agent.name != anp_user.id:
-            agent_key = f"{anp_user.id}#{agent.name}"
-            if hasattr(self.router_agent, 'global_agents'):
-                self.router_agent.global_agents[agent_key] = agent
-                self.logger.info(f"✅ 手动注册Agent名称索引: {agent_key}")
-    
-    def register_agent(self, agent: Agent):
-        # 从agent的DID中解析域名和端口
-        anp_user = agent.anp_user
-        domain, port = self.get_did_host_port_from_did(anp_user.id)
-
-        # 标准化域名
-        if domain in ['127.0.0.1', '0.0.0.0']:
-            domain = 'localhost'
-        
-        # 确保Agent有正确的名称
-        if not agent.name or agent.name == "未命名":
-            # 如果没有名称，使用DID的最后一部分作为默认名称
-            agent.name = anp_user.id.split(':')[-1] if ':' in anp_user.id else anp_user.id
-            self.logger.debug(f"为Agent设置默认名称: {agent.name}")
-        
-        self.logger.info(f"🔧 注册Agent到SDK: {agent.name} (DID: {anp_user.id}) @ {domain}:{port}")
-        
-        # 使用解析出的域名和端口注册
-        self.router_agent.register_agent_with_domain(
-            agent,
-            domain=domain,
-            port=port
-        )
-        self.logger.info(f"✅ 已注册智能体到SDK: {anp_user.id} @ {domain}:{port}")
-        
-        # 手动注册Agent名称索引到全局索引（确保共享DID路由能找到）
-        if agent.name and agent.name != anp_user.id:
-            agent_key = f"{anp_user.id}#{agent.name}"
-            if hasattr(self.router_agent, 'global_agents'):
-                self.router_agent.global_agents[agent_key] = agent
-                self.logger.info(f"✅ 手动注册Agent名称索引: {agent_key}")
     
     def ensure_all_anp_user_registered(self):
         """确保所有Agent都被正确注册到全局索引中"""
