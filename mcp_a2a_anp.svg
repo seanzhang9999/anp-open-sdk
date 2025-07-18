@@ -210,13 +210,13 @@
   
   <!-- 说明文字 -->
   <g font-family="Arial, sans-serif" fill="#2c3e50">
-    <text x="150" y="1140" font-size="16" font-weight="bold">🤝 A2A横向协作:</text>
-    <text x="300" y="1140" font-size="14">Agent A和Agent B通过A2A协议进行横向协作，Task通过OTT传输</text>
+    <text x="150" y="1040" font-size="16" font-weight="bold">🤝 A2A横向协作:</text>
+    <text x="300" y="1040" font-size="14">Agent A和Agent B通过A2A协议进行横向协作，Task通过OTT传输</text>
     
-    <text x="950" y="1140" font-size="16" font-weight="bold">🔌 MCP垂直调用:</text>
-    <text x="1100" y="1140" font-size="14">Agent通过MCP协议调用可信计算资源</text>
+    <text x="950" y="1040" font-size="16" font-weight="bold">🔌 MCP垂直调用:</text>
+    <text x="1100" y="1040" font-size="14">Agent通过MCP协议调用可信计算资源</text>
     
-    <text x="150" y="1170" font-size="16" font-weight="bold">🌐 ANP统一网络:</text>
-    <text x="300" y="1170" font-size="14">横向为Agent间提供可信认证连接；垂直为资源提供可信链路</text>
+    <text x="150" y="1070" font-size="16" font-weight="bold">🌐 ANP统一网络:</text>
+    <text x="300" y="1070" font-size="14">横向为Agent间提供可信认证连接；垂直为资源提供可信链路</text>
   </g>
 </svg>
