@@ -135,6 +135,19 @@
     <!-- MCP到底层资源箭头 -->
     <polygon points="394,855 400,867 406,855" fill="#fed6e3"/>
     <polygon points="1194,855 1200,867 1206,855" fill="#fed6e3"/>
+
+    <!-- 新增：Agent A和Agent B指向ANP网络横向认证的箭头 -->
+    <!-- Agent A到ANP网络的连接线 -->
+    <line x1="400" y1="350" x2="720" y2="500" stroke="url(#connectionGradient2)" stroke-width="3"/>
+
+    <!-- Agent B到ANP网络的连接线 -->
+    <line x1="1200" y1="350" x2="880" y2="500" stroke="url(#connectionGradient2)" stroke-width="3"/>
+
+    <!-- Agent A到ANP网络的箭头头部 -->
+    <polygon points="715,495 725,500 715,505" fill="#00f2fe"/>
+
+    <!-- Agent B到ANP网络的箭头头部 -->
+    <polygon points="885,495 875,500 885,505" fill="#00f2fe"/>
   </g>
   
   <!-- Agent 节点 -->
@@ -155,9 +168,8 @@
   
   <!-- ANP 统一网络 (横向和垂直) -->
   <rect x="650" y="500" width="300" height="75" rx="10" fill="url(#anpGradient)" stroke="#5a67d8" stroke-width="2" filter="url(#shadow)"/>
-  <text x="800" y="520" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="white">ANP网络</text>
-  <text x="800" y="540" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="white" opacity="0.9">横向可信认证</text>
-  <text x="800" y="560" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="white" opacity="0.9">垂直可信链路</text>
+  <text x="800" y="520" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="white">ANP横向可信认证</text>
+  <text x="800" y="540" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="white" opacity="0.9">动态可信链路</text>
   
   <!-- ANP垂直连接 -->
   <rect x="320" y="500" width="160" height="80" rx="10" fill="url(#anpGradient)" stroke="#5a67d8" stroke-width="2" filter="url(#shadow)"/>
@@ -197,15 +209,15 @@
     <text x="800" y="369" text-anchor="middle" font-size="12" fill="white">A2A横向协作 (OTT传输)</text>
     
     <!-- ANP标签 -->
-    <rect x="720" y="430" width="160" height="25" rx="8" fill="url(#anpGradient)" filter="url(#shadow)"/>
-    <text x="800" y="446" text-anchor="middle" font-size="12" fill="white">ANP统一网络</text>
+    <rect x="480" y="600" width="660" height="25" rx="8" fill="url(#anpGradient)" filter="url(#shadow)"/>
+    <text x="800" y="616" text-anchor="middle" font-size="12" fill="white">ANP统一网络</text>
     
     <!-- MCP标签 -->
-    <rect x="220" y="640" width="120" height="30" rx="8" fill="rgba(255, 255, 255, 0.95)" stroke="#bdc3c7" filter="url(#shadow)"/>
-    <text x="280" y="659" text-anchor="middle" font-size="12" fill="#2c3e50">MCP垂直调用</text>
+    <rect x="340" y="620" width="120" height="30" rx="8" fill="rgba(255, 255, 255, 0.95)" stroke="#bdc3c7" filter="url(#shadow)"/>
+    <text x="400" y="639" text-anchor="middle" font-size="12" fill="#2c3e50">MCP垂直调用</text>
     
-    <rect x="1260" y="640" width="120" height="30" rx="8" fill="rgba(255, 255, 255, 0.95)" stroke="#bdc3c7" filter="url(#shadow)"/>
-    <text x="1320" y="659" text-anchor="middle" font-size="12" fill="#2c3e50">MCP垂直调用</text>
+    <rect x="1140" y="620" width="120" height="30" rx="8" fill="rgba(255, 255, 255, 0.95)" stroke="#bdc3c7" filter="url(#shadow)"/>
+    <text x="1200" y="639" text-anchor="middle" font-size="12" fill="#2c3e50">MCP垂直调用</text>
   </g>
   
   <!-- 说明文字 -->
