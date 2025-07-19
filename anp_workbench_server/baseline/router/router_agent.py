@@ -147,4 +147,3 @@ async def handle_agent_message(did: str, request: Request):
     return await process_agent_message(did, data, request)
 
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..","..")))

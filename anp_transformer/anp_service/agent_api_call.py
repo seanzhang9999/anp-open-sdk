@@ -28,7 +28,6 @@ logger = logging.getLogger(__name__)
 
 from anp_foundation.auth.auth_client import send_authenticated_request
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 async def agent_api_call(
     caller_agent: str,

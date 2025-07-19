@@ -22,7 +22,6 @@ from fastapi.responses import JSONResponse
 
 from anp_foundation.domain.domain_manager import get_domain_manager
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..","..")))
 import logging
 logger = logging.getLogger(__name__)
 
