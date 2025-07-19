@@ -22,8 +22,8 @@ import json
 import logging
 from pathlib import Path
 from typing import Dict, List, Optional
-from anp_sdk.utils.log_base import setup_logging
-from anp_sdk.config import UnifiedConfig,set_global_config
+from anp_foundation.utils.log_base import setup_logging
+from anp_foundation.config import UnifiedConfig,set_global_config
 
 app_config = UnifiedConfig(config_file='unified_config_framework_demo.yaml')
 set_global_config(app_config)
@@ -177,7 +177,7 @@ class AgentUserBindingManager:
         users_by_host_port = {}
         for did, user_info in self.user_dids.items():
             # 从DID中提取域名和端口
-            from anp_sdk.did.did_tool import parse_wba_did_host_port
+            from anp_foundation.did.did_tool import parse_wba_did_host_port
             host, port = parse_wba_did_host_port(did)
 
             if host and port:
@@ -233,7 +233,7 @@ class AgentUserBindingManager:
         print(f"\n🔧 修复用户名冲突: '{name}' 在 {host}:{port}")
 
         # 导入必要的模块
-        from anp_sdk.anp_user_local_data import get_user_data_manager
+        from anp_foundation.anp_user_local_data import get_user_data_manager
 
         # 获取用户数据管理器
         manager = get_user_data_manager()
@@ -318,7 +318,7 @@ class AgentUserBindingManager:
         """为 agent 创建新的用户 DID"""
         try:
             # 导入必要的模块（延迟导入避免配置依赖）
-            from anp_sdk.anp_user_local_data import create_did_user
+            from anp_foundation.anp_user_local_data import create_did_user
             import uuid
             
             # 生成用户ID

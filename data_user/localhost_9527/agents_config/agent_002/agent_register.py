@@ -1,8 +1,8 @@
 import asyncio
 
-from anp_server_framework.agent_decorator import agent_message_handler, agent_api
-from anp_server_framework.anp_service.anp_tool import wrap_business_handler
-from anp_server_framework.local_service.local_methods_decorators import local_method, register_local_methods_to_agent
+from anp_transformer.agent_decorator import agent_message_handler, agent_api
+from anp_transformer.anp_service.anp_tool import wrap_business_handler
+from anp_transformer.local_service.local_methods_decorators import local_method, register_local_methods_to_agent
 
 
 def register(agent):

@@ -1,17 +1,17 @@
-# anp_sdk/agents_config/orchestrator_agent/agent_handlers.py
+# anp_foundation/agents_config/orchestrator_agent/agent_handlers.py
 
 import httpx  # 需要安装 httpx: pip install httpx
 import json
 
-from anp_server_framework.anp_service.agent_api_call import agent_api_call_get, agent_api_call_post
-from anp_server_framework.anp_service.anp_tool import ANPToolCrawler
+from anp_foundation.did.did_tool import get_did_host_port_from_did
+from anp_transformer.anp_service.agent_api_call import agent_api_call_get, agent_api_call_post
+from anp_transformer.anp_service.anp_tool import ANPToolCrawler
 import logging
 logger = logging.getLogger(__name__)
-from anp_server.anp_server import ANP_Server
-from anp_sdk.anp_user import ANPUser
-from anp_sdk.auth.auth_client import send_authenticated_request
-from anp_server_framework.local_service.local_methods_caller import LocalMethodsCaller
-from anp_server_framework.local_service.local_methods_doc import LocalMethodsDocGenerator
+from anp_foundation.anp_user import ANPUser
+from anp_foundation.auth.auth_client import send_authenticated_request
+from anp_transformer.local_service.local_methods_caller import LocalMethodsCaller
+from anp_transformer.local_service.local_methods_doc import LocalMethodsDocGenerator
 
 # 在初始化时创建调用器
 caller = None
@@ -68,7 +68,7 @@ async def discover_and_describe_agents(publisher_url):
 
                 # 2. 获取每个 agent 的 DID Document
                 user_id = did.split(":")[-1]
-                host , port = ANP_Server.get_did_host_port_from_did(user_id)
+                host , port = get_did_host_port_from_did(user_id)
                 did_doc_url = f"http://{host}:{port}/wba/user/{user_id}/did.json"
 
                 logger.debug(f"    - Step 2: Fetching DID Document from {did_doc_url}")
@@ -168,7 +168,7 @@ async def run_ai_crawler_demo():
     # 协作智能体通过爬虫向组装后的智能体请求服务
     task_description = "我需要计算两个浮点数相加 2.88888+999933.4445556"
 
-    host,port = ANP_Server.get_did_host_port_from_did(target_did)
+    host,port = get_did_host_port_from_did(target_did)
     try:
         result = await crawler.run_crawler_demo(
             req_did=my_agent_instance.anp_user_id,  # 请求方是协作智能体
@@ -197,7 +197,7 @@ async def run_ai_root_crawler_demo():
     # 协作智能体通过爬虫向组装后的智能体请求服务
     task_description = "我需要计算两个浮点数相加 2.88888+999933.4445556"
 
-    host,port = ANP_Server.get_did_host_port_from_did(target_did)
+    host,port = get_did_host_port_from_did(target_did)
     try:
         result = await crawler.run_crawler_demo(
             req_did=my_agent_instance.id,
@@ -216,11 +216,14 @@ async def run_ai_root_crawler_demo():
 
 
 
-async def run_agent_002_demo(sdk, **kwargs):
+async def run_agent_002_demo(**kwargs):
     """调用 agent_002 上的自定义演示方法"""
     try:
-        # 通过 sdk 获取 agent_002 实例
-        target_agent = sdk.get_agent("did:wba:localhost%3A9527:wba:user:3ea884878ea5fbb1")
+        from anp_transformer.agent_manager import AgentManager
+        
+        target_did = "did:wba:localhost%3A9527:wba:user:3ea884878ea5fbb1"
+        target_agent = AgentManager.get_agent_by_did(target_did)
+        
         if not target_agent:
             return "错误：未找到 agent_002"
 

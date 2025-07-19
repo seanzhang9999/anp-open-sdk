@@ -1,8 +1,8 @@
 import os
 import yaml
 from openai import AsyncOpenAI
-from anp_sdk.anp_user import ANPUser
-from anp_sdk.config import get_global_config
+from anp_foundation.anp_user import ANPUser
+from anp_foundation.config import get_global_config
 
 # --- 模块级变量，代表这个Agent实例的状态 ---
 # 这些变量在模块被加载时创建，并贯穿整个应用的生命周期

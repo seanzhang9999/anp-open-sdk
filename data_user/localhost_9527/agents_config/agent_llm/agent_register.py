@@ -1,6 +1,6 @@
 import logging
 
-from anp_server_framework.agent_decorator import agent_api,agent_message_handler
+from anp_transformer.agent_decorator import agent_api,agent_message_handler
 from .agent_handlers import chat_completion, handle_message, handle_text_message
 
 logger = logging.getLogger(__name__)

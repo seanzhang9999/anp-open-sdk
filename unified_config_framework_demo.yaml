@@ -52,9 +52,9 @@ log_settings:
     max_size: 100
 
 anp_sdk:
-  # Framework Server配置
-  use_framework_server: false  # 是否使用framework_server
-  framework_server_url: "http://localhost:9528"  # framework_server的URL
+  # transformer Server配置
+  use_transformer_server: false  # 是否使用transformer_server
+  transformer_server_url: "http://localhost:9528"  # transformer_server的URL
   fallback_to_local: true  # 转发失败时是否回退到本地处理
 
   debug_mode: true
@@ -68,7 +68,7 @@ anp_sdk:
   msg_virtual_dir: /agent/message
   token_expire_time: 3600
   user_did_key_id: key-1
-  group_msg_path: '{APP_ROOT}/anp_sdk'
+  group_msg_path: '{APP_ROOT}/anp_foundation'
   jwt_algorithm: RS256
   publisher_config_path:
   nonce_expire_minutes: 6
