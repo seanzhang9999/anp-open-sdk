@@ -6,7 +6,7 @@ from fastapi import HTTPException
 from starlette.requests import Request
 from starlette.responses import Response, JSONResponse
 
-from anp_foundation.auth.auth_server import _authenticate_request
+from anp_foundation.auth.auth_verifier import _authenticate_request
 
 import logging
 logger = logging.getLogger(__name__)
@@ -16,7 +16,8 @@ EXEMPT_PATHS = [
     "/redoc", "/openapi.json", "/wba/hostuser/*", "/wba/user/*", "/", "/favicon.ico",
     "/agents/example/ad.json","/wba/auth", "/wba/hosted-did/*","/publisher/agents"
 ]
-from anp_transformer.agent_manager import AgentManager
+def is_exempt(path):
+    return any(fnmatch.fnmatch(path, pattern) for pattern in EXEMPT_PATHS)
 
 
 
@@ -103,5 +104,3 @@ async def auth_middleware(request: Request, call_next: Callable, auth_method: st
 
 
 
-def is_exempt(path):
-    return any(fnmatch.fnmatch(path, pattern) for pattern in EXEMPT_PATHS)

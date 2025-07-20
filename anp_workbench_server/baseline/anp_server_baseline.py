@@ -74,6 +74,15 @@ class ANP_Server:
                 docs_url=None,
                 redoc_url=None
                     )
+        # fastapi 关键配置
+        @self.app.middleware("http")
+        async def auth_middleware_wrapper(request, call_next):
+            return await auth_middleware(request, call_next)
+        self.app.include_router(router_auth.router)
+        self.app.include_router(router_did.router)
+        self.app.include_router(router_publisher.router)
+        self.app.include_router(router_host.router)
+        self.app.include_router(router_agent.router)
 
         self.app.add_middleware(
             CORSMiddleware,
@@ -82,21 +91,6 @@ class ANP_Server:
             allow_methods=["*"],
             allow_headers=["*"],
         )
-
-        @self.app.middleware("http")
-        async def auth_middleware_wrapper(request, call_next):
-            return await auth_middleware(request, call_next)
-
-        self._register_default_routes()
-
-
-    def _register_default_routes(self):
-        self.app.include_router(router_auth.router)
-        self.app.include_router(router_did.router)
-        self.app.include_router(router_publisher.router)
-        self.app.include_router(router_host.router)
-        self.app.include_router(router_agent.router)
-
         @self.app.get("/", tags=["status"])
         async def root():
             return {
