@@ -164,13 +164,21 @@ def main():
     server = ANP_Server(host=args.host, port=args.port)
     print(f"正在启动 ANP Server Lite 于 {args.host}:{args.port}")
     try:
-        server.start_server()
+        # 如果是调试模式，start_server 会阻塞直到服务器停止
+        # 如果不是调试模式，start_server 会返回一个线程
+        server_thread = server.start_server()
+
+        if isinstance(server_thread, bool):
+            # 调试模式下，服务器已经停止
+            return
+
         print(f"ANP Server Lite 已启动，访问 http://{args.host}:{args.port} 查看状态")
         print("按 Ctrl+C 停止服务器")
-        # 保持主线程运行
-        import time
-        while True:
-            time.sleep(1)
+
+        # 等待服务器线程结束，而不是无限循环
+        # 这样当uvicorn关闭时，这个join也会结束
+        server_thread.join()
+
     except KeyboardInterrupt:
         print("正在关闭服务器...")
         server.stop_server()
