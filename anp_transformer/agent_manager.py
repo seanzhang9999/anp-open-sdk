@@ -15,7 +15,7 @@ from starlette.requests import Request
 from anp_foundation.anp_user_local_data import get_user_data_manager
 from anp_foundation.anp_user import ANPUser
 from anp_foundation.config import UnifiedConfig
-from anp_workbench_server.baseline.router.router_did import url_did_format
+from anp_workbench_server.baseline.anp_router_baseline.router_did import url_did_format
 from anp_transformer.agent import Agent
 logger = logging.getLogger(__name__)
 
@@ -1454,7 +1454,17 @@ class LocalAgentManager:
                             "description": f"{agent.name} API 路径 {full_path} 的端点 (处理器: {handler_name})"
                         })
 
-        ad_json["ad:interfaces"] = interfaces
+        # 去重逻辑
+        seen_urls = set()
+        unique_interfaces = []
+        for interface in interfaces:
+            url = interface.get('url')
+            if url not in seen_urls:
+                unique_interfaces.append(interface)
+                seen_urls.add(url)
+
+        ad_json["ad:interfaces"] = unique_interfaces
+
 
         # 保存 ad.json
         ad_json_path = Path(user_full_path) / "ad.json"

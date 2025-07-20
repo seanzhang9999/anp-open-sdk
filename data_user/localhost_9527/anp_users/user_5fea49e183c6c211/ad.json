@@ -12,7 +12,7 @@
   },
   "description": "Services provided by DID did:wba:localhost%3A9527:wba:user:5fea49e183c6c211",
   "version": "0.1.0",
-  "created_at": "2025-07-19T19:29:52.350068",
+  "created_at": "2025-07-20T17:13:51.909067",
   "security_definitions": {
     "didwba_sc": {
       "scheme": "didwba",
@@ -56,20 +56,6 @@
     {
       "@type": "ad:StructuredInterface",
       "protocol": "HTTP",
-      "name": "calculator_hello",
-      "url": "/agent/api/did:wba:localhost%3A9527:wba:user:5fea49e183c6c211/calculator/hello",
-      "description": "我的小本田 API 路径 /calculator/hello 的端点 (处理器: hello_handler)"
-    },
-    {
-      "@type": "ad:StructuredInterface",
-      "protocol": "HTTP",
-      "name": "calculator_info",
-      "url": "/agent/api/did:wba:localhost%3A9527:wba:user:5fea49e183c6c211/calculator/info",
-      "description": "我的小本田 API 路径 /calculator/info 的端点 (处理器: info_handler)"
-    },
-    {
-      "@type": "ad:StructuredInterface",
-      "protocol": "HTTP",
       "name": "weather_current",
       "url": "/agent/api/did:wba:localhost%3A9527:wba:user:5fea49e183c6c211/weather/current",
       "description": "代码生成天气 API 路径 /weather/current 的端点 (处理器: bound_method)"
@@ -80,27 +66,6 @@
       "name": "weather_forecast",
       "url": "/agent/api/did:wba:localhost%3A9527:wba:user:5fea49e183c6c211/weather/forecast",
       "description": "代码生成天气 API 路径 /weather/forecast 的端点 (处理器: bound_method)"
-    },
-    {
-      "@type": "ad:StructuredInterface",
-      "protocol": "HTTP",
-      "name": "weather_current",
-      "url": "/agent/api/did:wba:localhost%3A9527:wba:user:5fea49e183c6c211/weather/current",
-      "description": "代码生成天气 API 路径 /weather/current 的端点 (处理器: bound_method)"
-    },
-    {
-      "@type": "ad:StructuredInterface",
-      "protocol": "HTTP",
-      "name": "weather_forecast",
-      "url": "/agent/api/did:wba:localhost%3A9527:wba:user:5fea49e183c6c211/weather/forecast",
-      "description": "代码生成天气 API 路径 /weather/forecast 的端点 (处理器: bound_method)"
-    },
-    {
-      "@type": "ad:StructuredInterface",
-      "protocol": "HTTP",
-      "name": "assistant_help",
-      "url": "/agent/api/did:wba:localhost%3A9527:wba:user:5fea49e183c6c211/assistant/help",
-      "description": "代码生成助手 API 路径 /assistant/help 的端点 (处理器: help_api)"
     },
     {
       "@type": "ad:StructuredInterface",

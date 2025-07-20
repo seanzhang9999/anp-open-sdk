@@ -9,6 +9,8 @@ from typing import Dict, Any, Optional
 
 import aiohttp
 import yaml
+import asyncio 
+
 
 from anp_foundation.anp_user import ANPUser
 from anp_foundation.anp_user_local_data import get_user_data_manager
@@ -16,7 +18,7 @@ from anp_foundation.anp_user_local_data import get_user_data_manager
 logger = logging.getLogger(__name__)
 
 from anp_foundation.did.agent_connect_hotpatch.authentication.did_wba_auth_header_memory import DIDWbaAuthHeaderMemory
-from anp_foundation.auth.auth_client import send_authenticated_request
+from anp_foundation.auth.auth_initiator import send_authenticated_request
 
 
 
@@ -877,34 +879,111 @@ def wrap_business_handler(func):
 
     @functools.wraps(func)
     async def wrapper(*args, **kwargs):
-        sig = inspect.signature(func)
-        param_names = list(sig.parameters.keys())
-
-        # 检查是否已经符合标准接口
-        if (len(param_names) >= 2 and 
-            param_names[0] == 'request_data' and 
-            param_names[1] == 'request'):
-            # 已经符合标准接口，直接调用
-            return await func(*args, **kwargs)
-
-        # 处理非标准接口
-        request_data = args[0] if args else kwargs.get('request_data', {})
-        request = args[1] if len(args) > 1 else kwargs.get('request', None)
-
-        # 从request_data中提取参数
-        func_kwargs = {}
-        for param_name in param_names:
-            if param_name in ['request_data', 'request']:
-                continue
-                
+        # 🔧 关键修复：检查是否有原始方法信息
+        if hasattr(func, '_original_method') and hasattr(func, '_bound_instance'):
+            # 处理类方法的情况
+            original_method = func._original_method
+            instance = func._bound_instance
+            
+            # 使用原始方法的签名进行参数适配
+            sig = inspect.signature(original_method)
+            param_names = list(sig.parameters.keys())[1:]  # 跳过 self
+            
+            # 获取请求数据
+            request_data = args[0] if args else kwargs.get('request_data', {})
+            request = args[1] if len(args) > 1 else kwargs.get('request', None)
+            
+            # 从 request_data.params 中提取参数
+            func_kwargs = {}
             params = request_data.get('params', {}) if isinstance(request_data, dict) else {}
-            if param_name in params:
-                func_kwargs[param_name] = params[param_name]
-            elif param_name in request_data:
-                func_kwargs[param_name] = request_data[param_name]
+            for param_name in param_names:
+                # 优先级1：从 params 中获取（业务参数）
+                if param_name in params:
+                    func_kwargs[param_name] = params[param_name]
+                # 优先级2：从 request_data 顶层获取
+                elif param_name in request_data:
+                    func_kwargs[param_name] = request_data[param_name]
+                # 优先级3：特殊对象处理
+                elif param_name == 'request_data':
+                    func_kwargs[param_name] = request_data
+                elif param_name == 'request':
+                    func_kwargs[param_name] = request
+                # 如果都找不到，不传递该参数（使用默认值）
+            # 处理类方法调用
+            # 调用原始方法
+            if asyncio.iscoroutinefunction(original_method):
+                return await original_method(instance, **func_kwargs)
+            else:
+                return original_method(instance, **func_kwargs)
+        else:
+            # 原有的处理逻辑（处理非类方法或旧式调用）
+            sig = inspect.signature(func)
+            param_names = list(sig.parameters.keys())
 
-        # 调用函数（此时不需要考虑self，因为已经绑定）
-        return await func(**func_kwargs)
+            # 检查是否已经符合标准接口
+            if (len(param_names) >= 2 and 
+                param_names[0] == 'request_data' and 
+                param_names[1] == 'request'):
+                # 已经符合标准接口，直接调用
+                if asyncio.iscoroutinefunction(func):
+                    return await func(*args, **kwargs)
+                else:
+                    return func(*args, **kwargs)
+
+            # 处理非标准接口
+            request_data = args[0] if args else kwargs.get('request_data', {})
+            request = args[1] if len(args) > 1 else kwargs.get('request', None)
+
+            # 检查第一个参数是否是 self
+            if param_names and param_names[0] == 'self':
+                # 需要传递 self 参数
+                instance = args[2] if len(args) > 2 else kwargs.get('self')
+                if not instance:
+                    raise ValueError("缺少 self 参数")
+                
+                # 从request_data中提取其他参数
+                func_kwargs = {}
+                for param_name in param_names[1:]:  # 跳过 self
+                    if param_name in ['request_data', 'request']:
+                        continue
+                        
+                    params = request_data.get('params', {}) if isinstance(request_data, dict) else {}
+                    if param_name in params:
+                        func_kwargs[param_name] = params[param_name]
+                    elif param_name in request_data:
+                        func_kwargs[param_name] = request_data[param_name]
+
+                # 调用方法，传递 self
+                if asyncio.iscoroutinefunction(func):
+                    return await func(instance, **func_kwargs)
+                else:
+                    return func(instance, **func_kwargs)
+            else:
+                # 不需要 self 的函数
+                func_kwargs = {}
+                for param_name in param_names:
+                    if param_name in ['request_data', 'request']:
+                        continue
+                        
+                    params = request_data.get('params', {}) if isinstance(request_data, dict) else {}
+                    if param_name in params:
+                        func_kwargs[param_name] = params[param_name]
+                    elif param_name in request_data:
+                        func_kwargs[param_name] = request_data[param_name]
+                # 调用函数
+                if asyncio.iscoroutinefunction(func):
+                    return await func(**func_kwargs)
+                else:
+                    return func(**func_kwargs)
 
     wrapper._is_wrapped = True
+
+    # 复制原始函数的重要属性
+    if hasattr(func, '_is_class_method'):
+        wrapper._is_class_method = func._is_class_method
+    if hasattr(func, '_capability_meta'):
+        wrapper._capability_meta = func._capability_meta
+    if hasattr(func, '_api_path'):
+        wrapper._api_path = func._api_path
+    
     return wrapper

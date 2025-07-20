@@ -9,7 +9,7 @@ from anp_transformer.anp_service.anp_tool import ANPToolCrawler
 import logging
 logger = logging.getLogger(__name__)
 from anp_foundation.anp_user import ANPUser
-from anp_foundation.auth.auth_client import send_authenticated_request
+from anp_foundation.auth.auth_initiator import send_authenticated_request
 from anp_transformer.local_service.local_methods_caller import LocalMethodsCaller
 from anp_transformer.local_service.local_methods_doc import LocalMethodsDocGenerator
 

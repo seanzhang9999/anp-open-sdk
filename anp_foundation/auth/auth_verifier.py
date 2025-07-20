@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """
-Authentication middleware module.
+Authentication anp_middleware_baseline module.
 """
 import fnmatch
 import logging
@@ -26,7 +26,7 @@ from agent_connect.authentication.did_wba import extract_auth_header_parts
 from starlette.requests import Request
 
 from anp_foundation.config import get_global_config
-from .auth_sender import _resolve_did_document_insecurely
+from .auth_initiator import _resolve_did_document_insecurely
 from anp_foundation.did.did_tool import AuthenticationContext, \
     create_access_token, \
     create_did_auth_header_from_user_data, verify_timestamp, extract_did_from_auth_header

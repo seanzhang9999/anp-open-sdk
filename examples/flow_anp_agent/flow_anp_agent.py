@@ -15,11 +15,14 @@ from anp_transformer.anp_service.agent_message_p2p import agent_msg_post
 
 from anp_foundation.config import UnifiedConfig, set_global_config, get_global_config
 from anp_foundation.utils.log_base import setup_logging
-from anp_workbench_server.baseline.anp_server import ANP_Server
-
-
-
 import logging
+app_config = UnifiedConfig(config_file='unified_config_framework_demo.yaml')
+set_global_config(app_config)
+setup_logging()
+logger = logging.getLogger(__name__)
+
+from anp_workbench_server.baseline.anp_server_baseline import ANP_Server
+
 
 # 导入新的Agent系统
 from anp_transformer.agent_manager import AgentManager, LocalAgentManager
@@ -28,10 +31,7 @@ from anp_transformer.global_router_agent_message import GlobalMessageManager
 
 from anp_transformer.local_service.local_methods_doc import LocalMethodsDocGenerator
 
-app_config = UnifiedConfig(config_file='unified_config_framework_demo.yaml')
-set_global_config(app_config)
-setup_logging()
-logger = logging.getLogger(__name__)
+
 
 
 async def create_agents_with_cfg_path():
@@ -86,7 +86,6 @@ async def create_agents_with_code():
     )
         
     code_agents = []
-    
     try:
         # 使用装饰器创建计算器Agent
         @agent_class(
@@ -200,7 +199,7 @@ async def create_agents_with_code():
                     return {"reply": f"天气查询服务已收到: {content}。可以查询任何城市的天气信息。"}
                 
                 return {"reply": f"代码生成天气Agent收到: {content}"}
-        
+
         # 实例化天气Agent
         weather_agent = WeatherAgent().agent
         code_agents.append(weather_agent)

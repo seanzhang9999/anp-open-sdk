@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """
-DID document API router with multi-domain support.
+DID document API anp_router_baseline with multi-domain support.
 """
 import os
 import sys

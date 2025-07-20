@@ -1,4 +1,3 @@
-import fnmatch
 import json
 from typing import Callable
 
@@ -9,16 +8,10 @@ from starlette.responses import Response, JSONResponse
 from anp_foundation.auth.auth_verifier import _authenticate_request
 
 import logging
+
+from anp_servicepoint.auth_exempt_handler import is_exempt
+
 logger = logging.getLogger(__name__)
-
-EXEMPT_PATHS = [
-    "/docs", "/anp-nlp/", "/ws/", "/did_host/agents", "/agent/group/*",
-    "/redoc", "/openapi.json", "/wba/hostuser/*", "/wba/user/*", "/", "/favicon.ico",
-    "/agents/example/ad.json","/wba/auth", "/wba/hosted-did/*","/publisher/agents"
-]
-def is_exempt(path):
-    return any(fnmatch.fnmatch(path, pattern) for pattern in EXEMPT_PATHS)
-
 
 
 async def _check_permissions(request: Request, auth_info: dict) :
@@ -36,14 +29,9 @@ async def auth_middleware(request: Request, call_next: Callable, auth_method: st
     try:
         logger.debug(f"auth_middleware -- get: {request.url}")
 
-        # Check exempt paths first
-        for exempt_path in EXEMPT_PATHS:
-            if exempt_path == "/" and request.url.path == "/":
-                return await call_next(request)
-            elif request.url.path == exempt_path or (exempt_path != '/' and exempt_path.endswith('/') and request.url.path.startswith(exempt_path)):
-                return await call_next(request)
-            elif is_exempt(request.url.path):
-                return await call_next(request)
+        # Check if the path is exempt from authentication
+        if is_exempt(request.url.path):
+            return await call_next(request)
         # Only authenticate if not exempt
         auth_passed,msg,response_auth = await _authenticate_request(request)
 

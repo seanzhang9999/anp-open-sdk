@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """
-Publisher API router for hosted DID documents, agent descriptions, and API forwarding with multi-domain support.
+Publisher API anp_router_baseline for hosted DID documents, agent descriptions, and API forwarding with multi-domain support.
 """
 import logging
 logger = logging.getLogger(__name__)

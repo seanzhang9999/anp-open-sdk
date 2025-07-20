@@ -37,6 +37,26 @@ anp_sdk:
   user_did_key_id: "key-1"           # DID密钥ID
   helper_lang: "zh"                  # 帮助语言
 
+
+auth_middleware:
+  exempt_paths:
+    - "/docs"
+    - "/anp-nlp/"
+    - "/ws/"
+    - "/did_host/agents"
+    - "/agent/group/*"
+    - "/redoc"
+    - "/openapi.json"
+    - "/wba/hostuser/*"
+    - "/wba/user/*"
+    - "/"
+    - "/favicon.ico"
+    - "/agents/example/ad.json"
+    - "/wba/auth"
+    - "/wba/hosted-did/*"
+    - "/publisher/agents"
+    - "/agent/api/*"
+
 # ==========================================
 # DID 格式配置
 # ==========================================

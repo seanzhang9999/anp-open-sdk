@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """
-Authentication API router.
+Authentication API anp_router_baseline.
 """
 import os
 import sys

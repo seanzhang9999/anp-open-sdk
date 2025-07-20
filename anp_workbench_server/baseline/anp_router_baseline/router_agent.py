@@ -126,7 +126,7 @@ async def list_all_groups(request: Request):
     return get_all_groups()
 
 
-@router.post("/api/{did}/{subpath:path}")
+@router.api_route("/api/{did}/{subpath:path}", methods=["GET", "POST"])
 async def handle_agent_api(did: str, subpath: str, request: Request):
     """处理Agent API调用 - 根据配置决定本地处理或转发"""
     # 获取请求数据

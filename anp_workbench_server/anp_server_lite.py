@@ -15,17 +15,22 @@
 # 在模块顶部获取 logger，这是标准做法
 import logging
 import os
+from anp_foundation.config import UnifiedConfig, set_global_config, get_global_config
+from anp_foundation.utils.log_base import setup_logging
+app_config = UnifiedConfig(config_file='unified_config_framework_demo.yaml')
+set_global_config(app_config)
+setup_logging()
+
+logger = logging.getLogger(__name__)
+
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
-from anp_foundation.config import get_global_config
 from anp_workbench_server.baseline.anp_middleware_baseline.anp_auth_middleware import auth_middleware
 from anp_workbench_server.baseline.anp_router_baseline import router_did
 from anp_workbench_server.baseline.anp_router_baseline import router_publisher, router_agent
-from anp_workbench_server.baseline.anp_router_extend import router_auth, router_host
 
-logger = logging.getLogger(__name__)
+
 
 class ANP_Server:
     """ANP SDK主类，支持多种运行模式"""
@@ -55,8 +60,6 @@ class ANP_Server:
         self.initialized = True
         config = get_global_config()
         self.debug_mode = config.anp_sdk.debug_mode
-
-
         if self.debug_mode:
             self.app = FastAPI(
                 title="ANP DID Server in DebugMode",
@@ -79,10 +82,8 @@ class ANP_Server:
         @self.app.middleware("http")
         async def auth_middleware_wrapper(request, call_next):
             return await auth_middleware(request, call_next)
-        self.app.include_router(router_auth.router)
         self.app.include_router(router_did.router)
         self.app.include_router(router_publisher.router)
-        self.app.include_router(router_host.router)
         self.app.include_router(router_agent.router)
 
         self.app.add_middleware(
@@ -96,7 +97,7 @@ class ANP_Server:
         async def root():
             return {
                 "status": "running",
-                "anp_service": "ANP SDK Server",
+                "anp_service": "ANP Lite Server",
                 "version": "0.1.0",
                 "mode": "Server and client",
                 "documentation": "/docs"
@@ -114,7 +115,6 @@ class ANP_Server:
 
         # 2. 修正配置项的名称
         config = get_global_config()
-
         port = config.anp_sdk.port
         host = config.anp_sdk.host
 
@@ -124,7 +124,6 @@ class ANP_Server:
             config = uvicorn.Config(app_instance, host=host, port=port)
             server = uvicorn.Server(config)
             self.uvicorn_server = server
-
             def run_server():
                 import asyncio
                 loop = asyncio.new_event_loop()
@@ -153,5 +152,31 @@ class ANP_Server:
         return True
 
 
+# 添加 main 函数用于测试
+def main():
+    import argparse
 
+    parser = argparse.ArgumentParser(description='启动 ANP Server Lite')
+    parser.add_argument('--host', type=str, default='0.0.0.0', help='服务器主机地址')
+    parser.add_argument('--port', type=int, default=9527, help='服务器端口')
+    args = parser.parse_args()
+
+    server = ANP_Server(host=args.host, port=args.port)
+    print(f"正在启动 ANP Server Lite 于 {args.host}:{args.port}")
+    try:
+        server.start_server()
+        print(f"ANP Server Lite 已启动，访问 http://{args.host}:{args.port} 查看状态")
+        print("按 Ctrl+C 停止服务器")
+        # 保持主线程运行
+        import time
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("正在关闭服务器...")
+        server.stop_server()
+        print("服务器已关闭")
+
+
+if __name__ == "__main__":
+    main()
 

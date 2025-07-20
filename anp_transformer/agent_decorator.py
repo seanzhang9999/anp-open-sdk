@@ -64,10 +64,11 @@ def agent_class(
     name: str,
     description: str = "",
     version: str = "1.0.0",
+    tags: List[str] = None,  # 新增参数
     did: str = None,
     shared: bool = False,
     prefix: str = None,
-    primary_agent: bool = True
+    primary_agent: bool = False
 ):
     """
     Agent 类装饰器，用于创建和注册 Agent
@@ -78,7 +79,7 @@ def agent_class(
         version: Agent 版本
         did: 用户 DID 字符串，可以直接提供或通过辅助函数获取
         shared: 是否共享 DID
-        prefix: API 路径前缀
+        prefix: API 路径前缀     prefix= '/master',
         primary_agent: 是否为主 Agent
         
     Example:
@@ -127,6 +128,10 @@ def agent_class(
                 prefix=prefix,
                 primary_agent=primary_agent
             )
+
+                        
+            # 存储 tags 到实例
+            self._tags = tags or []
             
             # 注册已定义的方法
             self._register_methods()
@@ -267,19 +272,32 @@ def agent_class(
     
     return decorator
 
-def class_api(path, methods=None, description=None, auto_wrap=True):
+def class_api(path, methods=None, description=None,parameters=None, returns=None, auto_wrap=True):
     """类方法API装饰器（原api_method的增强版）
     
     Args:
         path: API路径
         methods: HTTP方法列表，默认为["GET", "POST"]
         description: API描述
+        parameters: 参数定义字典
+        returns: 返回值类型描述
         auto_wrap: 是否自动应用wrap_business_handler
         
     Example:
         @class_api("/add")
         async def add_api(self, a: float, b: float):
             return {"result": a + b}
+        
+        @class_api(
+            "/coordinate",
+            parameters={
+                "request": {"type": "string", "description": "Natural language request or task"},
+                "request_id": {"type": "string", "description": "Unique identifier for this request"}
+            },
+            returns="string"
+        )
+        async def coordinate_api(self, request: str, request_id: str):
+            return "Task coordinated successfully"
     """
     def decorator(method):
         # 设置API路径
@@ -290,7 +308,9 @@ def class_api(path, methods=None, description=None, auto_wrap=True):
         capability_meta = {
             'name': method.__name__,
             'description': description or method.__doc__ or f"API: {path}",
-            'publish_as': "expose_api"
+            'publish_as': "expose_api",
+            'parameters': parameters or {},  # 新增
+            'returns': returns or "object"   # 新增
         }
         setattr(method, '_capability_meta', capability_meta)
 
@@ -304,10 +324,20 @@ def class_api(path, methods=None, description=None, auto_wrap=True):
                 # 只负责绑定self，保持标准接口
                 def bound_method(request_data, request):
                     return method(instance, request_data, request)
+                
+                # 保存原始方法信息，供 wrap_business_handler 使用
+                bound_method._original_method = method
+                bound_method._bound_instance = instance
+                wrapped = wrap_business_handler(bound_method)
 
-                # 让wrap_business_handler处理参数提取
-                from anp_transformer.anp_service.anp_tool import wrap_business_handler
-                return wrap_business_handler(bound_method)
+                # 复制原始方法的属性到包装后的方法
+                wrapped._is_class_method = True
+                if hasattr(method, '_capability_meta'):
+                    wrapped._capability_meta = method._capability_meta
+                if hasattr(method, '_api_path'):
+                    wrapped._api_path = method._api_path
+                    
+                return wrapped
 
             # 设置特殊标记，表示需要实例绑定
             setattr(method, '_needs_instance_binding', True)
@@ -363,20 +393,6 @@ def class_message_handler(msg_type, description=None, auto_wrap=True):
     return decorator
 
 
-    """消息处理器装饰器，用于标记类方法为消息处理函数
-    
-    Args:
-        msg_type: 消息类型
-        
-    Example:
-        @message_method("text")
-        async def handle_text(self, msg_data):
-            return {"reply": "Hello"}
-    """
-    def decorator(method):
-        setattr(method, '_message_type', msg_type)
-        return method
-    return decorator
 
 def group_event_method(group_id=None, event_type=None):
     """群组事件处理器装饰器，用于标记类方法为群组事件处理函数

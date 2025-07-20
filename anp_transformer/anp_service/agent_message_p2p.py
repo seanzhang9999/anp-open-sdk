@@ -18,7 +18,7 @@
 from urllib.parse import urlencode, quote
 
 from anp_foundation.anp_user import ANPUser, RemoteANPUser
-from anp_foundation.auth.auth_client import send_authenticated_request
+from anp_foundation.auth.auth_initiator import send_authenticated_request
 from anp_transformer.anp_service.agent_api_call import response_to_dict
 
 

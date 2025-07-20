@@ -26,7 +26,7 @@ from anp_foundation.anp_user import RemoteANPUser, ANPUser
 import logging
 logger = logging.getLogger(__name__)
 
-from anp_foundation.auth.auth_client import send_authenticated_request
+from anp_foundation.auth.auth_initiator import send_authenticated_request
 
 
 async def agent_api_call(

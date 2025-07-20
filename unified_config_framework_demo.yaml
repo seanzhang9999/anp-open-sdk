@@ -51,6 +51,25 @@ log_settings:
     file: "{APP_ROOT}/tmp_log/app.log"
     max_size: 100
 
+auth_middleware:
+  exempt_paths:
+    - "/docs"
+    - "/anp-nlp/"
+    - "/ws/"
+    - "/did_host/agents"
+    - "/agent/group/*"
+    - "/redoc"
+    - "/openapi.json"
+    - "/wba/hostuser/*"
+    - "/wba/user/*"
+    - "/"
+    - "/favicon.ico"
+    - "/agents/example/ad.json"
+    - "/wba/auth"
+    - "/wba/hosted-did/*"
+    - "/publisher/agents"
+    - "/agent/api/*"
+
 anp_sdk:
   # transformer Server配置
   use_transformer_server: false  # 是否使用transformer_server

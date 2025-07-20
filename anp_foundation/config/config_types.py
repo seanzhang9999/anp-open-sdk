@@ -17,6 +17,10 @@ class AnpSdkAgentConfig(Protocol):
     demo_agent2: str
     demo_agent3: str
 
+class AuthMiddlewareConfig(Protocol):
+    exempt_paths:List[str]
+
+
 class AnpSdkConfig(Protocol):
     """ANP SDK 配置协议"""
     debug_mode: bool
@@ -206,7 +210,7 @@ class BaseUnifiedConfigProtocol(Protocol):
     chat: ChatConfig
     web_api: WebApiConfig
     acceleration: AccelerationConfig
-    
+    auth_middleware:AuthMiddlewareConfig
     # DID 配置
     did_config: DidConfig
     

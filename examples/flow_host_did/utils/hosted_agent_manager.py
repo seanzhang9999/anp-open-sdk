@@ -8,7 +8,7 @@ from typing import List, Dict, Any
 
 from anp_foundation.anp_user_local_data import get_user_data_manager
 from anp_foundation.utils.log_base import logging as logger
-from anp_workbench_server.baseline.anp_server import ANPUser
+from anp_workbench_server.baseline.anp_server_baseline import ANPUser
 
 
 class HostedAgentManager:
