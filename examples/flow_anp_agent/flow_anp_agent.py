@@ -26,7 +26,7 @@ from anp_workbench_server.baseline.anp_server_baseline import ANP_Server
 
 # 导入新的Agent系统
 from anp_transformer.agent_manager import AgentManager, LocalAgentManager
-from anp_transformer.global_router_agent_api import GlobalRouter
+#from anp_transformer.global_router_agent_api import GlobalRouter
 from anp_transformer.global_router_agent_message import GlobalMessageManager
 
 from anp_transformer.local_service.local_methods_doc import LocalMethodsDocGenerator
@@ -40,7 +40,7 @@ async def create_agents_with_cfg_path():
     
     # 清理之前的状态
     AgentManager.clear_all_agents()
-    GlobalRouter.clear_routes()
+    #GlobalRouter.clear_routes()
     GlobalMessageManager.clear_handlers()
     
     created_agents = []
@@ -321,9 +321,9 @@ async def main():
 
     # 显示全局路由器状态
     logger.debug("\n🔗 全局路由器状态:")
-    routes = GlobalRouter.list_routes()
-    for route in routes:
-        logger.debug(f"  🔗 {route['did']}{route['path']} <- {route['agent_name']}")
+    #routes = GlobalRouter.list_routes()
+    #for route in routes:
+    #    logger.debug(f"  🔗 {route['did']}{route['path']} <- {route['agent_name']}")
 
     # 显示全局消息管理器状态
     logger.debug("\n💬 全局消息管理器状态:")

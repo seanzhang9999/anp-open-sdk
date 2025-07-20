@@ -60,7 +60,7 @@ async def send_authenticated_request(
         custom_headers,
         use_two_way_auth
     )
-    logger.info(f"request:{request_url} \n status: {status}, info: {info},auth_status {is_auth_pass},\n{response},")
+    logger.info(f"request:{request_url} \n status: {status}, ,auth_status {is_auth_pass} \ninfo: {info}")
 
     return  status, response, info, is_auth_pass
 

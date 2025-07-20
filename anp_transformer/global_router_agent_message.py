@@ -14,7 +14,9 @@
 import asyncio
 import logging
 from typing import Dict, Any, Callable, List, Optional
-from datetime import datetime
+from datetime import datetime, time
+
+from starlette.responses import StreamingResponse
 
 logger = logging.getLogger(__name__)
 
@@ -309,6 +311,7 @@ class GlobalMessageManager:
             try:
                 while True:
                     message = await queue.get()
+                    import json
                     yield f"data: {json.dumps(message)}\n\n"
             except asyncio.CancelledError:
                 runner.unregister_listener(req_did)
