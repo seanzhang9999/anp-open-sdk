@@ -18,7 +18,7 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 from anp_foundation.anp_user import ANPUser
-from anp_workbench_server.baseline.anp_server_baseline import ANP_Server
+from anp_server.baseline.anp_server_baseline import ANP_Server
 from anp_foundation.config.unified_config import UnifiedConfig, set_global_config
 from anp_foundation.anp_user_local_data import LocalUserDataManager
 from anp_foundation.domain import get_domain_manager

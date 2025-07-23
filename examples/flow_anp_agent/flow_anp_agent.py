@@ -9,8 +9,8 @@ import threading
 # 添加路径以便导入
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from anp_transformer.anp_service.agent_api_call import agent_api_call_post
-from anp_transformer.anp_service.agent_message_p2p import agent_msg_post
+from anp_runtime.anp_service.agent_api_call import agent_api_call_post
+from anp_runtime.anp_service.agent_message_p2p import agent_msg_post
 
 
 from anp_foundation.config import UnifiedConfig, set_global_config, get_global_config
@@ -21,15 +21,15 @@ set_global_config(app_config)
 setup_logging()
 logger = logging.getLogger(__name__)
 
-from anp_workbench_server.baseline.anp_server_baseline import ANP_Server
+from anp_server.baseline.anp_server_baseline import ANP_Server
 
 
 # 导入新的Agent系统
-from anp_transformer.agent_manager import AgentManager, LocalAgentManager
-#from anp_transformer.global_router_agent_api import GlobalRouter
-from anp_transformer.global_router_agent_message import GlobalMessageManager
+from anp_runtime.agent_manager import AgentManager, LocalAgentManager
+#from anp_runtime.global_router_agent_api import GlobalRouter
+from anp_runtime.global_router_agent_message import GlobalMessageManager
 
-from anp_transformer.local_service.local_methods_doc import LocalMethodsDocGenerator
+from anp_runtime.local_service.local_methods_doc import LocalMethodsDocGenerator
 
 
 
@@ -81,7 +81,7 @@ async def create_agents_with_code():
     logger.debug("🤖 创建代码生成的Agent...")
 
     # 导入新的装饰器和函数
-    from anp_transformer.agent_decorator import (
+    from anp_runtime.agent_decorator import (
         agent_class, class_api, class_message_handler, agent_api, create_shared_agent
     )
         

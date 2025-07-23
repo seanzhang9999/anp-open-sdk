@@ -1,0 +1,119 @@
+# ANP SDK Configuration Example
+
+multiAgentMode:
+  agentsCfgPath: "./data_user/localhost_9527/agents_config"
+
+logSettings:
+  logLevel: "info"
+  detail:
+    file: "./tmp_log/app.log"
+    maxSize: 10485760
+
+anpSdk:
+  debugMode: true
+  host: "localhost"
+  port: 9527
+  userDidPath: "./data_user/localhost_9527/anp_users"
+  userHostedPath: "./data_user/localhost_9527/anp_users_hosted"
+  authVirtualDir: "/auth"
+  msgVirtualDir: "/msg"
+  tokenExpireTime: 3600
+  nonceExpireMinutes: 5
+  jwtAlgorithm: "RS256"
+  userDidKeyId: "key-1"
+  helperLang: "zh-CN"
+  agent:
+    demoAgent1: "agent_001"
+    demoAgent2: "agent_002"
+    demoAgent3: "agent_llm"
+  useTransformerServer: false
+  transformerServerUrl: "http://localhost:9528"
+  fallbackToLocal: true
+
+llm:
+  apiUrl: "https://api.openai.com/v1"
+  defaultModel: "gpt-3.5-turbo"
+  maxTokens: 2048
+  systemPrompt: "You are a helpful AI assistant."
+
+mail:
+  useLocalBackend: true
+  localBackendPath: "./mail_backend"
+  smtpServer: "smtp.gmail.com"
+  smtpPort: 587
+  imapServer: "imap.gmail.com"
+  imapPort: 993
+  hosterMailUser: "host@example.com"
+  senderMailUser: "sender@example.com"
+  registerMailUser: "register@example.com"
+
+chat:
+  maxHistoryItems: 50
+  maxProcessCount: 10
+
+webApi:
+  server:
+    generateNewDidEachTime: false
+    webuiHost: "localhost"
+    webuiPort: 8080
+
+acceleration:
+  enableLocal: true
+  performanceMonitoring: false
+  cacheSize: 1000
+
+authMiddleware:
+  exemptPaths:
+    - "/"
+    - "/health"
+    - "/docs"
+    - "/static/*"
+
+didConfig:
+  method: "wba"
+  formatTemplate: "did:wba:{hostname}_{port}_{identifier}"
+  routerPrefix: "/did"
+  userPathTemplate: "/users/{user_id}"
+  hostuserPathTemplate: "/hostusers/{user_id}"
+  testuserPathTemplate: "/testusers/{user_id}"
+  userTypes:
+    user: "user"
+    hostuser: "hostuser"
+    test: "test"
+  creatableUserTypes:
+    - "user"
+    - "test"
+  hosts:
+    localhost: 9527
+    "127.0.0.1": 9527
+  pathTemplates:
+    userDidPath: "./data_user/{host}_{port}/anp_users"
+    userHostedPath: "./data_user/{host}_{port}/anp_users_hosted"
+    agentsCfgPath: "./data_user/{host}_{port}/agents_config"
+  urlEncoding:
+    usePercentEncoding: false
+    supportLegacyEncoding: true
+  insecurePatterns:
+    - "localhost"
+    - "127.0.0.1"
+    - "*.local"
+  parsing:
+    strictValidation: false
+    allowInsecure: true
+    defaultHost: "localhost"
+    defaultPort: 9527
+
+env:
+  debugMode: true
+  host: "localhost"
+  port: 9527
+
+secrets:
+  openaiApiKey: ""
+  anthropicApiKey: ""
+  mailPassword: ""
+  hosterMailPassword: ""
+  senderMailPassword: ""
+  databaseUrl: ""
+
+appRoot: "."

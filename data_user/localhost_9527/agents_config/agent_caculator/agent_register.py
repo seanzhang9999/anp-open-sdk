@@ -1,6 +1,6 @@
 import logging
 
-from anp_transformer.agent_decorator import agent_api, agent_message_handler
+from anp_runtime.agent_decorator import agent_api, agent_message_handler
 from .agent_handlers import handle_text_message, add
 
 logger = logging.getLogger(__name__)

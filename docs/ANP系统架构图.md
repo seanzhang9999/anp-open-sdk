@@ -10,26 +10,26 @@ graph TB
         A3[业务逻辑处理器]
     end
     
-    subgraph "anp_transformer"
+    subgraph "anp_2_agent"
         T1[AgentManager<br/>Agent管理器]
         T2[Agent装饰器<br/> '@'agent_class]
         T3[全局路由器<br/>GlobalRouter]
         T4[消息管理器<br/>GlobalMessageManager]
     end
     
-    subgraph "anp_servicepoint"
+    subgraph "anp_1_servicepoint"
         S1[核心服务处理器<br/>core_service_handler]
         S2[扩展服务处理器<br/>extend_service_handler]
         S3[DID托管实现<br/>did_host]
     end
     
-    subgraph "anp_workbench_server"
+    subgraph "anp_3_template_server"
         W1[ANP_Server<br/>基线服务器]
         W2[路由器<br/>router_*]
         W3[中间件<br/>middleware]
     end
     
-    subgraph "anp_foundation"
+    subgraph "anp_0_foundation"
         F1[ANPUser<br/>用户管理]
         F2[DID工具<br/>did_tool]
         F3[配置管理<br/>UnifiedConfig]
@@ -442,7 +442,7 @@ graph TB
 ### 🚀 扩展点
 
 1. **自定义Agent**: 通过装饰器或配置文件
-2. **服务处理器**: 扩展anp_servicepoint功能
+2. **服务处理器**: 扩展anp_1_servicepoint功能
 3. **中间件**: 添加认证、限流等功能
 4. **存储后端**: 支持不同的数据存储方案
 5. **通信协议**: 支持WebSocket、gRPC等协议

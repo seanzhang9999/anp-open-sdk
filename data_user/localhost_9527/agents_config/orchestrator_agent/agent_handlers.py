@@ -4,14 +4,14 @@ import httpx  # 需要安装 httpx: pip install httpx
 import json
 
 from anp_foundation.did.did_tool import get_did_host_port_from_did
-from anp_transformer.anp_service.agent_api_call import agent_api_call_get, agent_api_call_post
-from anp_transformer.anp_service.anp_tool import ANPToolCrawler
+from anp_runtime.anp_service.agent_api_call import agent_api_call_get, agent_api_call_post
+from anp_runtime.anp_service.anp_tool import ANPToolCrawler
 import logging
 logger = logging.getLogger(__name__)
 from anp_foundation.anp_user import ANPUser
 from anp_foundation.auth.auth_initiator import send_authenticated_request
-from anp_transformer.local_service.local_methods_caller import LocalMethodsCaller
-from anp_transformer.local_service.local_methods_doc import LocalMethodsDocGenerator
+from anp_runtime.local_service.local_methods_caller import LocalMethodsCaller
+from anp_runtime.local_service.local_methods_doc import LocalMethodsDocGenerator
 
 # 在初始化时创建调用器
 caller = None
@@ -219,7 +219,7 @@ async def run_ai_root_crawler_demo():
 async def run_agent_002_demo(**kwargs):
     """调用 agent_002 上的自定义演示方法"""
     try:
-        from anp_transformer.agent_manager import AgentManager
+        from anp_runtime.agent_manager import AgentManager
         
         target_did = "did:wba:localhost%3A9527:wba:user:3ea884878ea5fbb1"
         target_agent = AgentManager.get_agent_by_did(target_did)

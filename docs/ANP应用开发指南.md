@@ -26,12 +26,12 @@ ANP SDK采用分层架构设计：
 
 ```
 ┌─────────────────────┐    ┌──────────────────┬─────────────────┐    ┌─────────────────────┐
-│                     │    │  anp_servicepoint│ anp_transformer │    │                     │
-│                     │    │   (服务处理)      │   (Agent管理)    │    │   应用层             │
-│   anp_workbench     │◄──►├──────────────────┴─────────────────┤◄──►│ (Your Agents)       │
-│     _server         │    │        anp_foundation              │    │                     │
-│    (服务器)          │    │               基础设施              │    │                      │
-│                     │    │                                    │    │                     │
+│                     │    │   anp_servicepoint│   anp_runtime   │    │                     │
+│                     │    │     (服务处理)     │   (Agent运行时)  │    │   应用层             │
+│     anp_server      │    │                  │                 │    │                     │
+│     (服务器)         │    │────────────────────────────────────│    │    Agent            │
+│                     │    │       anp_foundation               │    │                     │
+│                     │    │         (基础设施)                  │    │                     │
 └─────────────────────┘    └────────────────────────────────────┘    └─────────────────────┘
 
 ```
@@ -40,8 +40,8 @@ ANP SDK采用分层架构设计：
 
 1. **anp_foundation**: DID认证及用户管理基础能力
 2. **anp_servicepoint**: 平台无关的ANP DID节点服务能力
-3. **anp_workbench_server**: 基线样例服务器
-4. **anp_transformer**: 通过装饰器模式加载开发者代码为Agent
+3. **anp_server**: 基线样例服务器
+4. **anp_runtime**: Agent运行时环境，通过装饰器模式加载开发者代码为Agent
 5. **data_user**: 所有用户数据的读写地址
 
 ---
@@ -77,7 +77,7 @@ copy .env.example .env
 ```python
 # my_first_agent.py
 import asyncio
-from anp_transformer.agent_decorator import agent_class, class_api
+from anp_runtime.agent_decorator import agent_class, class_api
 
 
 @agent_class(
@@ -108,7 +108,7 @@ async def main():
     print(f"Agent '{agent.agent.name}' 创建成功!")
 
     # 启动服务器
-    from anp_workbench_server.baseline.anp_server_baseline import ANP_Server
+    from anp_server.baseline.anp_server_baseline import ANP_Server
     server = ANP_Server()
     server.start_server()
 
@@ -129,7 +129,7 @@ python my_first_agent.py
 
 ```python
 # 使用ANP客户端测试API
-from anp_transformer.anp_service.agent_api_call import agent_api_call_post
+from anp_runtime.anp_service.agent_api_call import agent_api_call_post
 
 # 测试问候API
 result = await agent_api_call_post(
@@ -178,11 +178,11 @@ Agent是ANP系统中的基本执行单元，具有以下特征：
 Agent间通过HTTP API进行同步通信：
 
 ```python
-from anp_transformer.anp_service.agent_api_call import agent_api_call_post
+from anp_runtime.anp_service.agent_api_call import agent_api_call_post
 
 result = await agent_api_call_post(
     caller_agent="did:wba:localhost%3A9527:wba:user:caller",
-    target_agent="did:wba:localhost%3A9527:wba:user:target", 
+    target_agent="did:wba:localhost%3A9527:wba:user:target",
     api_path="/calculate",
     params={"a": 10, "b": 20}
 )
@@ -193,7 +193,7 @@ result = await agent_api_call_post(
 Agent间通过消息进行异步通信：
 
 ```python
-from anp_transformer.anp_service.agent_message_p2p import agent_msg_post
+from anp_runtime.anp_service.agent_message_p2p import agent_msg_post
 
 result = await agent_msg_post(
     caller_agent="did:wba:localhost%3A9527:wba:user:sender",
@@ -216,7 +216,8 @@ ANP SDK支持多种开发模式，适应不同的开发需求：
 #### 面向对象风格
 
 ```python
-from anp_transformer.agent_decorator import agent_class, class_api, class_message_handler
+from anp_runtime.agent_decorator import agent_class, class_api, class_message_handler
+
 
 @agent_class(
     name="计算器Agent",
@@ -229,12 +230,12 @@ class CalculatorAgent:
     async def add_api(self, a: float, b: float):
         """加法计算"""
         return {"result": a + b, "operation": "add"}
-    
+
     @class_api("/multiply", auto_wrap=True)
     async def multiply_api(self, a: float, b: float):
         """乘法计算"""
         return {"result": a * b, "operation": "multiply"}
-    
+
     @class_message_handler("text")
     async def handle_text(self, content: str, sender_id: str = None):
         """处理文本消息"""
@@ -252,7 +253,7 @@ class CalculatorAgent:
 #### 函数式风格
 
 ```python
-from anp_transformer.agent_decorator import create_agent, agent_api, agent_message_handler
+from anp_runtime.agent_decorator import create_agent, agent_api, agent_message_handler
 
 # 创建Agent实例
 agent = create_agent(
@@ -260,12 +261,14 @@ agent = create_agent(
     "函数式计算器"
 )
 
+
 @agent_api(agent, "/divide", auto_wrap=True)
 async def divide_api(a: float, b: float):
     """除法计算"""
     if b == 0:
         return {"error": "除数不能为零"}
     return {"result": a / b, "operation": "divide"}
+
 
 @agent_message_handler(agent, "command")
 async def handle_command(content: str):
@@ -376,9 +379,10 @@ async def handle_text_message(content):
 
 ```python
 import logging
-from anp_transformer.agent_decorator import agent_api, agent_message_handler
+from anp_runtime.agent_decorator import agent_api, agent_message_handler
 
 logger = logging.getLogger(__name__)
+
 
 def register(agent):
     """自定义Agent注册函数
@@ -387,18 +391,18 @@ def register(agent):
         agent: 由系统创建的Agent实例
     """
     logger.info(f"开始自定义注册Agent: {agent.name}")
-    
+
     # 导入处理函数
     from . import agent_handlers
-    
+
     # 1. 注册API - 使用装饰器方式
     @agent_api(agent, "/add", auto_wrap=True)
     async def add_api_wrapper(request_data, request):
         """加法API包装器"""
         return await agent_handlers.add(request_data, request)
-    
+
     # 2. 注册更多API
-    @agent_api(agent, "/multiply", auto_wrap=True) 
+    @agent_api(agent, "/multiply", auto_wrap=True)
     async def multiply_api(request_data, request):
         """乘法API - 直接在register中定义"""
         try:
@@ -410,17 +414,17 @@ def register(agent):
             return {"result": result, "operation": "multiply"}
         except Exception as e:
             return {"error": str(e)}
-    
+
     # 3. 注册消息处理器
     @agent_message_handler(agent, "text")
     async def text_message_wrapper(msg_data):
         """文本消息处理器包装器"""
         content = msg_data.get('content', '')
         return await agent_handlers.handle_text_message(content)
-    
+
     # 4. 可以添加更多自定义逻辑
     # 比如初始化数据库连接、设置定时任务等
-    
+
     logger.info(f"Agent {agent.name} 自定义注册完成")
     logger.info(f"  - 注册API: /add, /multiply")
     logger.info(f"  - 注册消息处理器: text")
@@ -464,13 +468,14 @@ version: "1.0.0"
 
 ```python
 import logging
-from anp_transformer.agent_decorator import agent_api, agent_message_handler
+from anp_runtime.agent_decorator import agent_api, agent_message_handler
 
 logger = logging.getLogger(__name__)
 
 # 全局变量存储Agent状态
 llm_client = None
 agent_config = None
+
 
 async def initialize_agent(agent):
     """Agent初始化函数
@@ -480,85 +485,87 @@ async def initialize_agent(agent):
     """
     global llm_client, agent_config
     logger.info(f"初始化Agent: {agent.name}")
-    
+
     try:
         # 1. 初始化LLM客户端
         from openai import AsyncOpenAI
         from anp_foundation.config import get_global_config
-        
+
         config = get_global_config()
         llm_client = AsyncOpenAI(
             api_key=config.llm.api_key,
             base_url=config.llm.api_url
         )
-        
+
         # 2. 保存Agent配置
         agent_config = {
             "model": config.llm.default_model,
             "max_tokens": config.llm.max_tokens,
             "system_prompt": config.llm.system_prompt
         }
-        
+
         # 3. 注册API处理器
         @agent_api(agent, "/chat", auto_wrap=True)
         async def chat_api(message: str, temperature: float = 0.7):
             """聊天API"""
             return await handle_chat_request(message, temperature)
-        
+
         @agent_api(agent, "/summarize", auto_wrap=True)
         async def summarize_api(text: str, max_length: int = 100):
             """文本摘要API"""
             return await handle_summarize_request(text, max_length)
-        
+
         # 4. 注册消息处理器
         @agent_message_handler(agent, "text")
         async def text_message_handler(msg_data):
             """处理文本消息"""
             content = msg_data.get('content', '')
             return await handle_chat_request(content)
-        
+
         logger.info(f"Agent {agent.name} 初始化完成")
         logger.info(f"  - LLM模型: {agent_config['model']}")
         logger.info(f"  - 注册API: /chat, /summarize")
-        
+
     except Exception as e:
         logger.error(f"Agent初始化失败: {e}")
         raise
+
 
 async def cleanup_agent():
     """Agent清理函数"""
     global llm_client, agent_config
     logger.info("开始清理Agent资源...")
-    
+
     try:
         # 清理LLM客户端
         if llm_client:
             await llm_client.close()
             llm_client = None
             logger.info("LLM客户端已关闭")
-        
+
         # 清理配置
         agent_config = None
-        
+
         logger.info("Agent资源清理完成")
-        
+
     except Exception as e:
         logger.error(f"Agent清理失败: {e}")
+
 
 async def handle_chat_request(message: str, temperature: float = 0.7):
     """处理聊天请求"""
     global llm_client, agent_config
-    
+
     if not llm_client:
         return {"error": "LLM客户端未初始化"}
-    
+
     try:
         # 构建消息
         messages = [
             {"role": "system", "content": agent_config["system_prompt"]},
             {"role": "user", "content": message}
         ]
-        
+
         # 调用LLM API
         response = await llm_client.chat.completions.create(
             model=agent_config["model"],
@@ -566,27 +573,28 @@ async def handle_chat_request(message: str, temperature: float = 0.7):
             max_tokens=agent_config["max_tokens"],
             temperature=temperature
         )
-        
+
         reply = response.choices[0].message.content
         logger.info(f"LLM响应: {reply[:50]}...")
-        
+
         return {
             "reply": reply,
             "model": agent_config["model"],
             "tokens_used": response.usage.total_tokens if response.usage else 0
         }
-        
+
     except Exception as e:
         logger.error(f"LLM调用失败: {e}")
         return {"error": f"LLM调用失败: {str(e)}"}
 
+
 async def handle_summarize_request(text: str, max_length: int = 100):
     """处理文本摘要请求"""
     global llm_client, agent_config
-    
+
     if not llm_client:
         return {"error": "LLM客户端未初始化"}
-    
+
     try:
         # 构建摘要提示
         prompt = f"请将以下文本总结为不超过{max_length}字的摘要：\n\n{text}"
@@ -594,7 +602,7 @@ async def handle_summarize_request(text: str, max_length: int = 100):
             {"role": "system", "content": "你是一个专业的文本摘要助手。"},
             {"role": "user", "content": prompt}
         ]
-        
+
         # 调用LLM API
         response = await llm_client.chat.completions.create(
             model=agent_config["model"],
@@ -602,17 +610,17 @@ async def handle_summarize_request(text: str, max_length: int = 100):
             max_tokens=max_length * 2,  # 给一些余量
             temperature=0.3  # 摘要任务使用较低温度
         )
-        
+
         summary = response.choices[0].message.content
         logger.info(f"生成摘要: {summary[:30]}...")
-        
+
         return {
             "summary": summary,
             "original_length": len(text),
             "summary_length": len(summary),
             "compression_ratio": round(len(summary) / len(text), 2)
         }
-        
+
     except Exception as e:
         logger.error(f"摘要生成失败: {e}")
         return {"error": f"摘要生成失败: {str(e)}"}
@@ -918,9 +926,9 @@ import asyncio
 import logging
 from anp_foundation.config import UnifiedConfig, set_global_config
 from anp_foundation.utils.log_base import setup_logging
-from anp_workbench_server.baseline.anp_server_baseline import ANP_Server
-from anp_transformer.agent_manager import AgentManager, LocalAgentManager
-from anp_transformer.agent_decorator import agent_class, class_api, class_message_handler
+from anp_server.baseline.anp_server_baseline import ANP_Server
+from anp_runtime.agent_manager import AgentManager, LocalAgentManager
+from anp_runtime.agent_decorator import agent_class, class_api, class_message_handler
 
 # 配置初始化
 app_config = UnifiedConfig(config_file='unified_config_framework_demo.yaml')
@@ -1089,9 +1097,10 @@ python examples/flow_anp_agent/flow_anp_agent.py
 ```
 
 4. **测试API**
+
 ```python
 # 使用ANP客户端测试API
-from anp_transformer.anp_service.agent_api_call import agent_api_call_post
+from anp_runtime.anp_service.agent_api_call import agent_api_call_post
 
 # 测试计算器API
 result = await agent_api_call_post(
@@ -1291,7 +1300,8 @@ result = await agent_api_call_post(
 ### 🛡️ 错误处理最佳实践
 
 ```python
-from anp_transformer.anp_service.anp_tool import wrap_business_handler
+from anp_runtime.anp_service.anp_tool import wrap_business_handler
+
 
 @class_api("/robust_api", auto_wrap=True)
 async def robust_api(self, data: str, validate: bool = True):
@@ -1304,20 +1314,20 @@ async def robust_api(self, data: str, validate: bool = True):
                 "error": "INVALID_INPUT",
                 "message": "data参数不能为空"
             }
-        
+
         # 业务逻辑
         processed_data = process_complex_data(data)
-        
+
         return {
             "success": True,
             "data": processed_data,
             "timestamp": datetime.now().isoformat()
         }
-        
+
     except ValueError as e:
         return {
             "success": False,
-            "error": "VALIDATION_ERROR", 
+            "error": "VALIDATION_ERROR",
             "message": str(e)
         }
     except Exception as e:
@@ -1334,7 +1344,8 @@ async def robust_api(self, data: str, validate: bool = True):
 ANP SDK支持本地方法调用，无需网络通信：
 
 ```python
-from anp_transformer.local_service.local_methods_caller import call_local_method
+from anp_runtime.local_service.local_methods_caller import call_local_method
+
 
 @class_api("/local_call_demo")
 async def local_call_demo(self, request_data, request):
@@ -1346,8 +1357,10 @@ async def local_call_demo(self, request_data, request):
     )
     return {"local_result": result}
 
+
 # 注册本地方法
-from anp_transformer.local_service.local_methods_decorators import local_method
+from anp_runtime.local_service.local_methods_decorators import local_method
+
 
 @local_method("calculator.add")
 async def local_add(a: float, b: float):

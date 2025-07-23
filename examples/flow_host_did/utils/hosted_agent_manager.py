@@ -8,7 +8,7 @@ from typing import List, Dict, Any
 
 from anp_foundation.anp_user_local_data import get_user_data_manager
 from anp_foundation.utils.log_base import logging as logger
-from anp_workbench_server.baseline.anp_server_baseline import ANPUser
+from anp_server.baseline.anp_server_baseline import ANPUser
 
 
 class HostedAgentManager:
@@ -217,7 +217,7 @@ class HostedAgentManager:
                                             message: str) -> Dict[str, Any]:
         """测试托管Agent通信"""
         try:
-            from anp_transformer.anp_service import agent_msg_post
+            from anp_runtime.anp_service import agent_msg_post
             
             # 发送测试消息
             response = await agent_msg_post(agent.id, target_agent.id, message)
