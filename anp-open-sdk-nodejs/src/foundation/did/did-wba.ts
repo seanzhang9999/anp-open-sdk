@@ -187,13 +187,12 @@ export class DIDWbaAuth {
   }
 
   /**
-   * Generate authentication header
+   * Generate authentication header (single-way)
    */
   public static async generateAuthHeader(
     didDocument: DIDDocument,
     serviceDomain: string,
-    signCallback: SignCallback,
-    respDid?: string
+    signCallback: SignCallback
   ): Promise<string> {
     
     // Generate nonce and timestamp
@@ -207,10 +206,6 @@ export class DIDWbaAuth {
       service: serviceDomain,
       did: didDocument.id
     };
-
-    if (respDid) {
-      authData.resp_did = respDid;
-    }
 
     // Canonicalize and hash
     const canonical = canonicalizeJSON(authData);
@@ -228,7 +223,7 @@ export class DIDWbaAuth {
     }
 
     // Build header
-    let headerParts = [
+    const headerParts = [
       `did="${didDocument.id}"`,
       `nonce="${nonce}"`,
       `timestamp="${timestamp}"`,
@@ -236,9 +231,56 @@ export class DIDWbaAuth {
       `signature="${signatureB64}"`
     ];
 
-    if (respDid) {
-      headerParts.splice(3, 0, `resp_did="${respDid}"`);
+    return `DIDWba ${headerParts.join(', ')}`;
+  }
+
+  /**
+   * Generate authentication header (two-way)
+   */
+  public static async generateAuthHeaderTwoWay(
+    didDocument: DIDDocument,
+    respDid: string,
+    serviceDomain: string,
+    signCallback: SignCallback
+  ): Promise<string> {
+    
+    // Generate nonce and timestamp
+    const nonce = crypto.randomBytes(16).toString('hex');
+    const timestamp = new Date().toISOString();
+
+    // Create auth data for two-way authentication
+    const authData: AuthData = {
+      nonce,
+      timestamp,
+      anp_service: serviceDomain,  // Use anp_service for two-way auth
+      did: didDocument.id,
+      resp_did: respDid
+    };
+
+    // Canonicalize and hash
+    const canonical = canonicalizeJSON(authData);
+    const content = new Uint8Array(Buffer.from(canonical, 'utf8'));
+    const hash = crypto.createHash('sha256').update(content).digest();
+
+    // Sign
+    const signature = await signCallback(hash);
+    const signatureB64 = encodeBase64Url(signature);
+
+    // Find verification method
+    const verificationMethod = didDocument.verificationMethod[0];
+    if (!verificationMethod) {
+      throw new Error('No verification method found in DID document');
     }
+
+    // Build header with resp_did
+    const headerParts = [
+      `did="${didDocument.id}"`,
+      `nonce="${nonce}"`,
+      `timestamp="${timestamp}"`,
+      `resp_did="${respDid}"`,
+      `verification_method="${verificationMethod.id.split('#')[1]}"`,
+      `signature="${signatureB64}"`
+    ];
 
     return `DIDWba ${headerParts.join(', ')}`;
   }
@@ -334,5 +376,95 @@ export class DIDWbaAuth {
       signature: parts.signature,
       respDid: parts.resp_did
     };
+  }
+
+  /**
+   * Extract auth header parts (two-way)
+   */
+  public static extractAuthHeaderPartsTwoWay(authHeader: string): AuthHeaderParts {
+    // Remove "DIDWba " prefix
+    const headerContent = authHeader.replace(/^DIDWba\s+/, '');
+    
+    // Parse key=value pairs
+    const parts: Record<string, string> = {};
+    const regex = /(\w+)="([^"]+)"/g;
+    let match;
+    
+    while ((match = regex.exec(headerContent)) !== null) {
+      parts[match[1]] = match[2];
+    }
+
+    // Validate required fields for two-way auth
+    const required = ['did', 'nonce', 'timestamp', 'resp_did', 'verification_method', 'signature'];
+    for (const field of required) {
+      if (!parts[field]) {
+        throw new Error(`Missing required field: ${field}`);
+      }
+    }
+
+    return {
+      did: parts.did,
+      nonce: parts.nonce,
+      timestamp: parts.timestamp,
+      verificationMethod: parts.verification_method,
+      signature: parts.signature,
+      respDid: parts.resp_did
+    };
+  }
+
+  /**
+   * Verify authentication header signature (two-way)
+   */
+  public static async verifyAuthHeaderSignatureTwoWay(
+    authHeader: string,
+    didDocument: DIDDocument,
+    serviceDomain: string
+  ): Promise<VerifyResult> {
+    
+    try {
+      // Parse header for two-way auth
+      const parts = this.extractAuthHeaderPartsTwoWay(authHeader);
+      
+      // Reconstruct auth data for two-way authentication
+      const authData: AuthData = {
+        nonce: parts.nonce,
+        timestamp: parts.timestamp,
+        anp_service: serviceDomain,  // Use anp_service for two-way auth
+        did: parts.did,
+        resp_did: parts.respDid!
+      };
+
+      // Find verification method
+      const vmId = `${parts.did}#${parts.verificationMethod}`;
+      const verificationMethod = didDocument.verificationMethod.find(vm => vm.id === vmId);
+      
+      if (!verificationMethod) {
+        return {
+          valid: false,
+          message: `Verification method not found: ${vmId}`
+        };
+      }
+
+      // Canonicalize and hash
+      const canonical = canonicalizeJSON(authData);
+      const content = new Uint8Array(Buffer.from(canonical, 'utf8'));
+      const hash = crypto.createHash('sha256').update(content).digest();
+
+      // Verify signature
+      const verifier = createVerificationMethod(verificationMethod);
+      const valid = await verifier.verifySignature(hash, parts.signature);
+
+      return {
+        valid,
+        message: valid ? 'Signature verification successful' : 'Signature verification failed',
+        payload: valid ? authData : undefined
+      };
+
+    } catch (error) {
+      return {
+        valid: false,
+        message: `Verification error: ${error}`
+      };
+    }
   }
 }

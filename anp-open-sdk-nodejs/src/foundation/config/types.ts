@@ -129,16 +129,40 @@ export interface LogConfig {
 }
 
 export interface EnvConfig {
+  // 应用配置
   debugMode?: boolean;
   host?: string;
   port?: number;
+
+  // 系统环境变量
+  systemPath?: string[];
+  homeDir?: string;
+  userName?: string;
+  shell?: string;
+  tempDir?: string;
+  pythonPath?: string[];
+  pythonHome?: string;
+  virtualEnv?: string;
+
+  // 开发工具
+  javaHome?: string;
+  nodePath?: string;
+  goPath?: string;
+
+  // API 密钥
   openaiApiKey?: string;
   anthropicApiKey?: string;
+
+  // 邮件密码
   mailPassword?: string;
   hosterMailPassword?: string;
   senderMailPassword?: string;
+
+  // 数据库和服务
   databaseUrl?: string;
   redisUrl?: string;
+
+  // 其他配置
   useLocalMail?: boolean;
   enableLocalAcceleration?: boolean;
 }
@@ -166,4 +190,20 @@ export interface BaseUnifiedConfig {
   env: EnvConfig;
   secrets: SecretsConfig;
   appRoot: string;
+}
+
+/**
+ * 统一配置协议接口
+ * 对应Python版本的BaseUnifiedConfigProtocol
+ */
+export interface BaseUnifiedConfigProtocol extends BaseUnifiedConfig {
+  // 方法
+  resolvePath(path: string): string;
+  getAppRoot(): string;
+  reload(): void;
+  save(): boolean;
+  toDict(): Record<string, any>;
+  addToPath(newPath: string): void;
+  findInPath(filename: string): string[];
+  getPathInfo(): Record<string, any>;
 }

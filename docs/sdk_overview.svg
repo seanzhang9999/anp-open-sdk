@@ -51,10 +51,14 @@
   <!-- 应用层 -->
   <rect x="650" y="50" width="100" height="300" fill="url(#appGrad)" stroke="#2c3e50" stroke-width="2" rx="8"/>
   <text x="700" y="80" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="white">应用层</text>
-  <text x="700" y="120" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="white">Agent</text>
+  <text x="700" y="120" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="white">Agent为组织单元</text>
 <text x="700" y="160" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="white">
-<tspan x="700" dy="0">Agent为单元</tspan>
-<tspan x="700" dy="15">组织的网络资源</tspan>
+<tspan x="700" dy="20">支持多种加载</tspan>
+<tspan x="700" dy="20">类+@装饰符</tspan>
+<tspan x="700" dy="20">方法+@装饰符</tspan>
+<tspan x="700" dy="20">配置文件夹加载</tspan>
+<tspan x="700" dy="20">程序文件动态加载</tspan>
+
 </text>
   <!-- 连接线 -->
   <!-- server 到 servicepoint -->

@@ -94,7 +94,7 @@ export class DIDWbaAuthClient {
   }
 
   /**
-   * Generate new authentication header
+   * Generate new authentication header (single-way)
    */
   private async generateNewAuthHeader(serverUrl: string): Promise<Record<string, string>> {
     if (!this.didDocument) {
@@ -122,10 +122,42 @@ export class DIDWbaAuthClient {
   }
 
   /**
-   * Get authentication headers for server URL
+   * Generate new authentication header (two-way)
+   */
+  private async generateNewAuthHeaderTwoWay(
+    serverUrl: string,
+    respDid: string
+  ): Promise<Record<string, string>> {
+    if (!this.didDocument) {
+      throw new Error('DID document not loaded');
+    }
+
+    const domain = this.getDomain(serverUrl);
+    const signCallback = this.createSignCallback();
+    
+    try {
+      const authHeader = await DIDWbaAuth.generateAuthHeaderTwoWay(
+        this.didDocument,
+        respDid,
+        domain,
+        signCallback
+      );
+
+      return {
+        'Authorization': authHeader,
+        'X-DID-Caller': this.didDocument.id
+      };
+    } catch (error) {
+      logger.error('Failed to generate two-way auth header:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get authentication headers for server URL (single-way)
    */
   public async getAuthHeader(
-    serverUrl: string, 
+    serverUrl: string,
     forceNew: boolean = false
   ): Promise<Record<string, string>> {
     
@@ -152,6 +184,43 @@ export class DIDWbaAuthClient {
     
     // Cache the headers
     this.authHeaders.set(domain, authHeaders);
+    
+    return authHeaders;
+  }
+
+  /**
+   * Get authentication headers for server URL (two-way)
+   */
+  public async getAuthHeaderTwoWay(
+    serverUrl: string,
+    respDid: string,
+    forceNew: boolean = false
+  ): Promise<Record<string, string>> {
+    
+    const domain = this.getDomain(serverUrl);
+    const cacheKey = `${domain}_${respDid}`;
+
+    // Check if we have cached headers and they're still valid
+    if (!forceNew && this.authHeaders.has(cacheKey)) {
+      const cached = this.authHeaders.get(cacheKey)!;
+      
+      // Check if we have a valid token
+      const tokenInfo = this.tokens.get(domain);
+      if (tokenInfo && Date.now() < tokenInfo.expiresAt) {
+        logger.debug(`Using cached two-way auth header for domain: ${domain}, respDid: ${respDid}`);
+        return {
+          ...cached,
+          'Authorization': `Bearer ${tokenInfo.token}`
+        };
+      }
+    }
+
+    // Generate new two-way auth header
+    logger.debug(`Generating new two-way auth header for domain: ${domain}, respDid: ${respDid}`);
+    const authHeaders = await this.generateNewAuthHeaderTwoWay(serverUrl, respDid);
+    
+    // Cache the headers
+    this.authHeaders.set(cacheKey, authHeaders);
     
     return authHeaders;
   }

@@ -1,0 +1,9 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/did/v1"
+  ],
+  "id": "did:wba:test.example.com%3A9527:wba:hostuser:testuser123",
+  "verificationMethod": [],
+  "authentication": [],
+  "service": []
+}

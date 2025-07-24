@@ -44,9 +44,10 @@ export interface KeyPair {
 export interface AuthData {
   nonce: string;
   timestamp: string;
-  service: string;
+  service?: string;      // for single-way authentication
+  anp_service?: string;  // for two-way authentication
   did: string;
-  resp_did?: string;  // for two-way authentication
+  resp_did?: string;     // for two-way authentication
 }
 
 export interface AuthHeaderParts {
