@@ -101,23 +101,7 @@ class Agent:
             
             # 注册到Agent的路由表 - 使用带前缀的路径
             self.api_routes[full_path] = func  # 修改这里
-            # 注册到ANPUser的API路由系统（这是关键！）
-            # 对于共享DID，我们需要确保API路由不会被覆盖
-            if full_path not in self.anp_user.api_routes:
-                self.anp_user.api_routes[full_path] = func
-            else:
-                # 如果路径已存在，检查是否是同一个Agent注册的
-                existing_handler = self.anp_user.api_routes[full_path]
-                if existing_handler != func:
-                    logger.warning(f"⚠️  API路径冲突: {full_path}")
-                    logger.warning(f"   现有处理器: {getattr(existing_handler, '__name__', 'unknown')}")
-                    logger.warning(f"   新处理器: {getattr(func, '__name__', 'unknown')} (来自 {self.name})")
-                    logger.warning(f"   🔧 覆盖现有处理器")
-                self.anp_user.api_routes[full_path] = func
-            
-
-            
-            logger.debug(f"🔗 API注册成功: {self.anp_user.id}{full_path} <- {self.name}")
+            logger.info(f"🔗 API注册成功: {self.anp_user.id}{full_path} <- {self.name}")
             return func
         
         return decorator

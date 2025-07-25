@@ -16,5 +16,26 @@
 
 export * from './foundation';
 export * from './servicepoint';
-export * from './runtime';
+
+// 导出Runtime模块 - 避免AgentInfo类型冲突
+export {
+  Agent,
+  AgentManager,
+  GlobalMessageManager,
+  GlobalGroupManager,
+  GroupRunner
+} from './runtime';
+export type {
+  AgentOptions,
+  ApiRoute,
+  MessageHandler,
+  GroupEventHandler,
+  AgentInfo as RuntimeAgentInfo,
+  AgentSearchRecord,
+  AgentContactInfo,
+  SessionRecord,
+  ApiCallRecord
+} from './runtime';
+export * from './runtime/decorators';
+
 export * from './server';

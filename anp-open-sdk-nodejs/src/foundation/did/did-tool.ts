@@ -96,7 +96,7 @@ export class DidTool {
     try {
       const key = await importPKCS8(privateKey, 'RS256');
       
-      const payload = {
+      const payload: any = {
         iss: context.callerDid,
         aud: context.targetDid,
         sub: context.requestUrl,
@@ -107,7 +107,7 @@ export class DidTool {
       };
 
       if (context.jsonData) {
-        payload['data'] = context.jsonData;
+        payload.data = context.jsonData;
       }
 
       return await new SignJWT(payload)
@@ -182,5 +182,44 @@ export class DidTool {
       .join(', ');
     
     return `DID-Auth ${parts}`;
+  }
+}
+
+/**
+ * 查找用户通过DID
+ */
+export async function findUserByDid(did: string): Promise<{
+  success: boolean;
+  didDocument?: any;
+  userDir?: string;
+  error?: string;
+}> {
+  try {
+    const { LocalUserDataManager } = await import('../user/local-user-data-manager');
+    const userDataManager = LocalUserDataManager.getInstance();
+    
+    // 确保已初始化
+    if (!userDataManager.isInitialized()) {
+      await userDataManager.initialize();
+    }
+    
+    const userData = userDataManager.getUserData(did);
+    if (userData) {
+      return {
+        success: true,
+        didDocument: userData.didDocument,
+        userDir: userData.folderName
+      };
+    }
+    
+    return {
+      success: false,
+      error: `User with DID ${did} not found`
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: `Error finding user: ${error}`
+    };
   }
 }

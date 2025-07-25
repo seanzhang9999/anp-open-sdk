@@ -66,7 +66,16 @@ def register_local_methods_to_agent(agent, module_or_dict):
             method_info["agent_did"] = agent.anp_user_id
             method_info["agent_name"] = agent.name
 
-            method_key = f"{agent.anp_user_id}::{name}"
+            # 🔧 修改：使用module作为唯一标识，避免共享DID冲突
+            method_key = f"{method_info['module']}::{name}"
+            # 检测冲突（虽然module应该是唯一的，但还是检查一下）
+            if method_key in LOCAL_METHODS_REGISTRY:
+                existing_info = LOCAL_METHODS_REGISTRY[method_key]
+                print(f"⚠️  方法键冲突检测: {method_key}")
+                print(f"   现有: {existing_info['agent_name']} ({existing_info['agent_did']})")
+                print(f"   新的: {agent.name} ({agent.anp_user_id})")
+                print(f"   🔧 覆盖现有方法")
+
             LOCAL_METHODS_REGISTRY[method_key] = method_info
 
             registered_count += 1

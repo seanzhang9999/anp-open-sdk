@@ -248,7 +248,7 @@ async def run_agent_002_demo_new():
 
         # 方式2：通过方法键直接调用
         result2 = await caller.call_method_by_key(
-            "did:wba:localhost%3A9527:wba:user:3ea884878ea5fbb1::calculate_sum",
+            "data_user.localhost_9527.agents_config.agent_002.agent_register::calculate_sum",
             10.5, 20.3
         )
         logger.info(f"直接调用结果: {result2}")

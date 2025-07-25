@@ -6,16 +6,15 @@
 
 import 'reflect-metadata';
 import { AnpServer } from './server';
-import { Agent, getAgentManager } from './runtime';
-import { ANPUser } from './foundation';
-import { api, messageHandler, groupEventHandler } from '@runtime/decorators';
+import { Agent, AgentManager } from './runtime';
+import { ANPUser, LocalUserData } from './foundation';
+import { api, messageHandler, groupEventHandler } from './runtime/decorators';
 import { loadGlobalConfig } from '@foundation/config';
 
 // 示例Agent类 - 继承自Agent
 class ExampleAgent extends Agent {
   constructor(anpUser: ANPUser, name: string) {
-    super({
-      anpUser,
+    super(anpUser, {
       name,
       shared: true,
       prefix: '/example',
@@ -23,7 +22,7 @@ class ExampleAgent extends Agent {
     });
   }
 
-  @api('/hello', { method: 'GET', description: '简单问候' })
+  @api('/hello', { methods: ['GET'], description: '简单问候' })
   async sayHello(context: any) {
     return {
       message: `Hello from ${this.name}!`,
@@ -32,7 +31,7 @@ class ExampleAgent extends Agent {
     };
   }
 
-  @api('/calculate', { method: 'POST', description: '计算器功能' })
+  @api('/calculate', { methods: ['POST'], description: '计算器功能' })
   async calculate(context: any) {
     const { a, b, operation } = context.body;
     
@@ -90,16 +89,30 @@ async function main() {
     await loadGlobalConfig();
     
     // 创建示例用户数据
-    const userData = {
-      did: 'did:wba:localhost_9527_example',
-      name: 'Example Agent',
-      userDir: './data_user/example',
+    const userData = new LocalUserData({
+      folderName: 'example',
+      agentCfg: {
+        name: 'Example Agent',
+        unique_id: 'example-agent-001',
+        did: 'did:wba:localhost_9527_example',
+        type: 'personal'
+      },
+      didDocument: {
+        '@context': ['https://www.w3.org/ns/did/v1'],
+        id: 'did:wba:localhost_9527_example',
+        verificationMethod: [],
+        authentication: [],
+        service: []
+      },
       didDocPath: './data_user/example/did_document.json',
-      didPrivateKeyFilePath: './data_user/example/private_key.pem',
-      jwtPrivateKeyFilePath: './data_user/example/jwt_private_key.pem',
-      jwtPublicKeyFilePath: './data_user/example/jwt_public_key.pem',
-      isHostedDid: false
-    };
+      passwordPaths: {
+        did_private_key_file_path: './data_user/example/private_key.pem',
+        did_public_key_file_path: './data_user/example/public_key.pem',
+        jwt_private_key_file_path: './data_user/example/jwt_private_key.pem',
+        jwt_public_key_file_path: './data_user/example/jwt_public_key.pem'
+      },
+      userFolderPath: './data_user/example'
+    });
 
     // 创建ANPUser
     const anpUser = new ANPUser(userData, 'Example Agent');
@@ -108,8 +121,7 @@ async function main() {
     const agent = new ExampleAgent(anpUser, 'Example Agent');
 
     // 注册Agent到AgentManager
-    const agentManager = getAgentManager();
-    agentManager.registerAgent(agent);
+    AgentManager.registerAgent(agent);
 
     // 创建服务器
     const server = new AnpServer({

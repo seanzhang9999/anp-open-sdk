@@ -83,25 +83,16 @@ class ANPUser:
         self.jwt_public_key_path = self.user_data.jwt_public_key_file_path
 
         self.logger = logger
-        self._ws_connections = {}
-        self._sse_clients = set()
+
         # 托管DID标识
         self.is_hosted_did = self.user_data.is_hosted_did
         self.parent_did = self.user_data.parent_did
         self.hosted_info = self.user_data.hosted_info
-        import requests
-        self.requests = requests
-
-        # 群组相关属性
-        self.group_queues = {}  # 群组消息队列: {group_id: {client_id: Queue}}
-        self.group_members = {}  # 群组成员列表: {group_id: set(did)}
 
         # 新增：联系人管理器
         self.contact_manager = ContactManager(self.user_data)
         
-        # 为了向后兼容，添加API路由和消息处理器属性
-        self.api_routes = {}  # path -> handler
-        self.message_handlers = {}  # type -> handler
+
 
     @classmethod
     def from_did(cls, did: str, name: str = "未命名", agent_type: str = "personal"):
@@ -134,14 +125,7 @@ class ANPUser:
 
     def __del__(self):
         """确保在对象销毁时释放资源"""
-        try:
-            for ws in self._ws_connections.values():
-                self.logger.debug(f"LocalAgent {self.id} 销毁时存在未关闭的WebSocket连接")
-            self._ws_connections.clear()
-            self._sse_clients.clear()
-            self.logger.debug(f"LocalAgent {self.id} 资源已释放")
-        except Exception:
-            pass
+        pass
                 
     def get_host_dids(self):
         """获取用户目录"""

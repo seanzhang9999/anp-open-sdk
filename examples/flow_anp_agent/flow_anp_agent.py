@@ -337,8 +337,8 @@ async def main():
         if hasattr(agent, 'anp_user'):
             logger.debug(f"Agent: {agent.name}")
             logger.debug(f"  DID: {agent.anp_user_id}")
-            logger.debug(f"  API路由数量: {len(agent.anp_user.api_routes)}")
-            for path, handler in agent.anp_user.api_routes.items():
+            logger.debug(f"  API路由数量: {len(agent.api_routes)}")
+            for path, handler in agent.api_routes.items():
                 handler_name = handler.__name__ if hasattr(handler, '__name__') else 'unknown'
                 logger.debug(f"    - {path}: {handler_name}")
 

@@ -50,6 +50,17 @@ class LocalMethodsCaller:
         if not method_info:
             raise ValueError(f"未找到方法: {method_key}")
 
+
+        if not method_info:
+            # 提供更详细的错误信息
+            available_keys = list(LOCAL_METHODS_REGISTRY.keys())
+            raise ValueError(
+                f"未找到方法: {method_key}\n"
+                f"可用的方法键:\n" +
+                "\n".join(f"  - {key}" for key in available_keys[:10]) +
+                (f"\n  ... 还有 {len(available_keys) - 10} 个" if len(available_keys) > 10 else "")
+            )
+
         # 获取目标agent
         target_agent = AgentManager.get_agent(method_info["agent_did"], method_info["agent_name"] )
         if not target_agent:
@@ -74,3 +85,4 @@ class LocalMethodsCaller:
     def list_all_methods(self) -> List[Dict]:
         """列出所有可用的本地方法"""
         return list(LOCAL_METHODS_REGISTRY.values())
+
