@@ -41,7 +41,7 @@ class Agent:
     4. 请求处理核心逻辑 (handle_request方法)
     """
     
-    def __init__(self, anp_user: ANPUser, name: str, shared: bool = False, 
+    def __init__(self, anp_user_did_str: str, name: str, shared: bool = False,
                  prefix: Optional[str] = None, primary_agent: bool = False):
         """初始化Agent
         
@@ -52,15 +52,17 @@ class Agent:
             prefix: 共享模式下的API前缀
             primary_agent: 是否为主Agent（拥有消息处理权限）
         """
-        self.anp_user = anp_user
+        #self.anp_user = anp_user
+        # 为了向后兼容性，添加id属性
+        self.anp_user_did = anp_user_did_str
+
         self.name = name
         self.shared = shared
         self.prefix = prefix
         self.primary_agent = primary_agent
         self.created_at = datetime.now()
         
-        # 为了向后兼容性，添加id属性
-        self.anp_user_id = anp_user.id
+
         
         # 功能注册表 - 从ANPUser迁移过来
         self.api_routes = {}  # path -> handler
@@ -69,7 +71,7 @@ class Agent:
         self.group_global_handlers = []  # [(event_type, handler)] 全局handler
         
         logger.debug(f"✅ Agent创建成功: {name}")
-        logger.debug(f"   DID: {anp_user.id} ({'共享' if shared else '独占'})")
+        logger.debug(f"   DID: {self.anp_user_did} ({'共享' if shared else '独占'})")
         if prefix:
             logger.debug(f"   Prefix: {prefix}")
         if primary_agent:
@@ -101,7 +103,7 @@ class Agent:
             
             # 注册到Agent的路由表 - 使用带前缀的路径
             self.api_routes[full_path] = func  # 修改这里
-            logger.info(f"🔗 API注册成功: {self.anp_user.id}{full_path} <- {self.name}")
+            logger.info(f"🔗 API注册成功: {self.anp_user_did}{full_path} <- {self.name}")
             return func
         
         return decorator
@@ -133,13 +135,13 @@ class Agent:
             # 注册到全局消息管理器
             from anp_runtime.global_router_agent_message import GlobalMessageManager
             GlobalMessageManager.register_handler(
-                did=self.anp_user.id,
+                did=self.anp_user_did,
                 msg_type=msg_type,
                 handler=func,
                 agent_name=self.name
             )
             
-            logger.debug(f"💬 消息处理器注册成功: {self.anp_user.id}:{msg_type} <- {self.name}")
+            logger.debug(f"💬 消息处理器注册成功: {self.anp_user_did}:{msg_type} <- {self.name}")
             return func
         
         return decorator
@@ -394,7 +396,7 @@ class Agent:
         """转换为字典格式"""
         return {
             "name": self.name,
-            "did": self.anp_user.id,
+            "did": self.anp_user_did,
             "shared": self.shared,
             "prefix": self.prefix,
             "primary_agent": self.primary_agent,
@@ -405,4 +407,4 @@ class Agent:
         }
     
     def __repr__(self):
-        return f"Agent(name='{self.name}', did='{self.anp_user.id}', shared={self.shared})"
+        return f"Agent(name='{self.name}', did='{self.anp_user_did}', shared={self.shared})"

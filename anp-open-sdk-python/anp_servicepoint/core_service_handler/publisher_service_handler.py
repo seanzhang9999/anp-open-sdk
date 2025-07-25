@@ -42,10 +42,8 @@ async def get_published_agents(host: str, port: int) -> Tuple[bool, Dict[str, An
         for agent in all_agents:
             # 尝试获取agent的did
             did = "unknown"
-            if hasattr(agent, "anp_user_id"):
-                did = agent.anp_user_id
-            elif hasattr(agent, "anp_user") and hasattr(agent.anp_user, "id"):
-                did = agent.anp_user.id
+            if hasattr(agent, "anp_user_did"):
+                did = agent.anp_user_did
             elif hasattr(agent, "id"):
                 did = agent.id
 

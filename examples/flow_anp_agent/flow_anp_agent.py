@@ -283,7 +283,7 @@ async def main():
     processed_dids = set()  # 用于跟踪已处理的 DID
     for agent in all_agents:
         if hasattr(agent, 'anp_user'):
-            did = agent.anp_user_id
+            did = agent.anp_user_did
             if did not in processed_dids:
                 await LocalAgentManager.generate_and_save_agent_interfaces(agent)
                 processed_dids.add(did)
@@ -336,7 +336,7 @@ async def main():
     for agent in all_agents:
         if hasattr(agent, 'anp_user'):
             logger.debug(f"Agent: {agent.name}")
-            logger.debug(f"  DID: {agent.anp_user_id}")
+            logger.debug(f"  DID: {agent.anp_user_did}")
             logger.debug(f"  API路由数量: {len(agent.api_routes)}")
             for path, handler in agent.api_routes.items():
                 handler_name = handler.__name__ if hasattr(handler, '__name__') else 'unknown'
@@ -424,7 +424,7 @@ async def test_new_agent_system(agents):
             assistant_agent = agent
         elif "llm" in agent.name.lower() or "language" in agent.name.lower():
             llm_agent = agent
-        elif hasattr(agent.anp_user, 'discover_and_describe_agents'):
+        elif hasattr(agent, 'discover_and_describe_agents'):
             discovery_agent = agent
     
     # 基础测试
@@ -436,7 +436,7 @@ async def test_new_agent_system(agents):
         logger.info(f"\n🔧 测试计算器Agent API调用...")
         try:
             # 模拟API调用
-            calc_did = calc_agent.anp_user_id if hasattr(calc_agent, 'anp_user') else calc_agent.did
+            calc_did = calc_agent.anp_user_did
             result = await agent_api_call_post(
                 caller_agent="did:wba:localhost%3A9527:wba:user:e0959abab6fc3c3d",
                 target_agent=calc_did,
@@ -453,7 +453,7 @@ async def test_new_agent_system(agents):
     if weather_agent:
         logger.info(f"\n📨 测试天气Agent消息发送...")
         try:
-            weather_did = weather_agent.anp_user_id if hasattr(weather_agent, 'anp_user') else weather_agent.did
+            weather_did = weather_agent.anp_user_did
             result = await agent_msg_post(
                 caller_agent="did:wba:localhost%3A9527:wba:user:e0959abab6fc3c3d",
                 target_agent=weather_did,
@@ -474,7 +474,7 @@ async def test_new_agent_system(agents):
         logger.info(f"\n🔗 测试共享DID API调用...")
         try:
             # 调用天气API
-            weather_did = weather_agent.anp_user_id if hasattr(weather_agent, 'anp_user') else weather_agent.did
+            weather_did = weather_agent.anp_user_did
             weather_result = await agent_api_call_post(
                 caller_agent="did:wba:localhost%3A9527:wba:user:e0959abab6fc3c3d",
                 target_agent=weather_did,
@@ -484,7 +484,7 @@ async def test_new_agent_system(agents):
             logger.info(f"✅ 天气API调用成功: {weather_result}")
             
             # 调用助手API
-            assistant_did = assistant_agent.anp_user_id if hasattr(assistant_agent, 'anp_user') else assistant_agent.did
+            assistant_did = assistant_agent.anp_user_did
             help_result = await agent_api_call_post(
                 caller_agent="did:wba:localhost%3A9527:wba:user:e0959abab6fc3c3d",
                 target_agent=assistant_did,
@@ -503,10 +503,10 @@ async def test_new_agent_system(agents):
     try:
         # 尝试创建冲突的Agent
         from anp_foundation.anp_user import ANPUser
-        test_user = ANPUser.from_did("did:wba:localhost%3A9527:wba:user:3ea884878ea5fbb1")
+        test_user_did = "did:wba:localhost%3A9527:wba:user:3ea884878ea5fbb1"
         
         # 这应该失败，因为DID已被独占使用
-        conflict_agent = AgentManager.create_agent(test_user, "冲突测试Agent", shared=False)
+        conflict_agent = AgentManager.create_agent(test_user_did, "冲突测试Agent", shared=False)
         logger.error("❌ 冲突检测失败：应该阻止创建冲突Agent")
         
     except ValueError as e:

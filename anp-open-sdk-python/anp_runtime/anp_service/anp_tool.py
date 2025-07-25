@@ -846,7 +846,7 @@ class ANPToolCrawler:
             logger.error(f"ANPTool调用失败 {url}: {str(e)}")
             messages.append({
                 "role": "tool",
-                "tool_call_id": tool_call.anp_user_id,
+                "tool_call_id": tool_call.anp_user_did,
                 "content": json.dumps({
                     "error": f"ANPTool调用失败: {url}",
                     "message": str(e),

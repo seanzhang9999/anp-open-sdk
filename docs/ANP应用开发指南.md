@@ -658,7 +658,7 @@ class CallerAgent:
     async def call_calculator_api(self, request_data, request):
         # 调用计算器Agent的加法API
         result = await agent_api_call_post(
-            caller_agent=self.agent.anp_user_id,
+            caller_agent=self.agent.anp_user_did,
             target_agent="did:wba:localhost%3A9527:wba:user:calculator",
             api_path="/add",
             params={"a": 15, "b": 25}
@@ -687,7 +687,7 @@ class SenderAgent:
     async def send_greeting_api(self, request_data, request):
         # 发送问候消息
         result = await agent_msg_post(
-            caller_agent=self.agent.anp_user_id,
+            caller_agent=self.agent.anp_user_did,
             target_agent="did:wba:localhost%3A9527:wba:user:receiver",
             content="Hello from sender!",
             message_type="text"
@@ -1010,7 +1010,7 @@ async def main():
     processed_dids = set()
     for agent in all_agents:
         if hasattr(agent, 'anp_user'):
-            did = agent.anp_user_id
+            did = agent.anp_user_did
             if did not in processed_dids:
                 await LocalAgentManager.generate_and_save_agent_interfaces(agent)
                 processed_dids.add(did)
@@ -1163,6 +1163,7 @@ async def debug_api(self, request_data, request):
 ```
 
 2. **状态监控**: 监控Agent状态
+
 ```python
 @class_api("/health")
 async def health_check(self, request_data, request):
@@ -1170,7 +1171,7 @@ async def health_check(self, request_data, request):
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
         "agent_name": self.agent.name,
-        "did": self.agent.anp_user_id
+        "did": self.agent.anp_user_did
     }
 ```
 

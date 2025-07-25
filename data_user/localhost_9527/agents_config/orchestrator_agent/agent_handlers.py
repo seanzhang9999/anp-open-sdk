@@ -73,7 +73,7 @@ async def discover_and_describe_agents(publisher_url):
 
                 logger.debug(f"    - Step 2: Fetching DID Document from {did_doc_url}")
                 status, did_doc_data, msg, success = await send_authenticated_request(
-                    caller_agent=my_agent_instance.anp_user_id,  # 使用 self.id 作为调用者
+                    caller_agent=my_agent_instance.anp_user_did,  # 使用 self.id 作为调用者
                     target_agent=did,
                     request_url=did_doc_url
                 )
@@ -101,7 +101,7 @@ async def discover_and_describe_agents(publisher_url):
 
                 logger.debug(f"    - Step 3: Fetching Agent Description from {ad_endpoint}")
                 status, ad_data, msg, success = await send_authenticated_request(
-                    caller_agent=my_agent_instance.anp_user_id,
+                    caller_agent=my_agent_instance.anp_user_did,
                     target_agent=did,
                     request_url=ad_endpoint
                 )
@@ -137,7 +137,7 @@ async def run_calculator_add_demo():
     }
 
     result = await agent_api_call_post(
-    my_agent_instance.anp_user_id, calculator_anp_user.id, "/calculator/add", params  )
+    my_agent_instance.anp_user_did, calculator_anp_user.id, "/calculator/add", params  )
 
     logger.info(f"计算api调用结果: {result}")
     return result
@@ -171,7 +171,7 @@ async def run_ai_crawler_demo():
     host,port = get_did_host_port_from_did(target_did)
     try:
         result = await crawler.run_crawler_demo(
-            req_did=my_agent_instance.anp_user_id,  # 请求方是协作智能体
+            req_did=my_agent_instance.anp_user_did,  # 请求方是协作智能体
             resp_did=target_did,  # 目标是组装后的智能体
             task_input=task_description,
             initial_url=f"http://{host}:{port}/wba/user/{target_did}/ad.json",

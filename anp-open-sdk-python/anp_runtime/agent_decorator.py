@@ -117,12 +117,10 @@ def agent_class(
                 # 如果没有提供 DID，使用第一个可用用户
                 user_did = get_first_available_user()
             
-            # 创建 ANPUser
-            anp_user = ANPUser.from_did(user_did)
-            
+
             # 创建 Agent
             self._agent = AgentManager.create_agent(
-                anp_user=anp_user,
+                anp_user_did_str=user_did,
                 name=name,
                 shared=shared,
                 prefix=prefix,
@@ -439,9 +437,9 @@ def create_agent(did_str: str, name: str, shared: bool = False, prefix: Optional
         async def add_api(request_data, request):
             return {"result": 42}
     """
-    anp_user = ANPUser.from_did(did_str)
+
     return AgentManager.create_agent(
-        anp_user=anp_user,
+        anp_user_did_str=did_str,
         name=name,
         shared=shared,
         prefix=prefix,

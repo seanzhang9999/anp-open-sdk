@@ -63,7 +63,7 @@ def register_local_methods_to_agent(agent, module_or_dict):
 
             # 更新全局注册表
             method_info = obj._method_info.copy()
-            method_info["agent_did"] = agent.anp_user_id
+            method_info["agent_did"] = agent.anp_user_did
             method_info["agent_name"] = agent.name
 
             # 🔧 修改：使用module作为唯一标识，避免共享DID冲突
@@ -73,7 +73,7 @@ def register_local_methods_to_agent(agent, module_or_dict):
                 existing_info = LOCAL_METHODS_REGISTRY[method_key]
                 print(f"⚠️  方法键冲突检测: {method_key}")
                 print(f"   现有: {existing_info['agent_name']} ({existing_info['agent_did']})")
-                print(f"   新的: {agent.name} ({agent.anp_user_id})")
+                print(f"   新的: {agent.name} ({agent.anp_user_did})")
                 print(f"   🔧 覆盖现有方法")
 
             LOCAL_METHODS_REGISTRY[method_key] = method_info

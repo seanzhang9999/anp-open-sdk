@@ -212,8 +212,7 @@ class AgentRouter:
             self.domain_anp_users[domain][port] = {}
 
         # 3. 确定注册键：使用 DID+Agent名称 的组合键，确保唯一性
-        anp_user = agent.anp_user
-        agent_id = str(anp_user.id)
+        agent_id =agent.anp_user_did
         agent_name = agent.name if agent.name else "unnamed"
         registration_key = f"{agent_id}#{agent_name}"  # 使用#分隔符避免冲突
 
@@ -256,9 +255,9 @@ class AgentRouter:
             # 检查Agent名称冲突
             if registration_key in self.global_agents:
                 existing_agent = self.global_agents[registration_key]
-                if existing_agent.anp_user_id != anp_user.id:  # 不同的Agent使用了相同的名称
+                if existing_agent.anp_user_did != agent.anp_user_did:  # 不同的Agent使用了相同的名称
                     self.stats['registration_conflicts'] += 1
-                    self.logger.warning(f"⚠️ 全局索引Agent名称冲突: '{registration_key}' 已被Agent {existing_agent.anp_user_id} 使用，现在被Agent {anp_user.id} 覆盖")
+                    self.logger.warning(f"⚠️ 全局索引Agent名称冲突: '{registration_key}' 已被Agent {existing_agent.name} 使用，现在被Agent {agent.name} 覆盖")
 
             self.global_agents[registration_key] = agent
 
@@ -345,7 +344,7 @@ class AgentRouter:
                 if did_part == agent_id or name_part == agent_id:
                     return agent
             # 3. 检查Agent实例的ID是否匹配
-            elif hasattr(agent, 'id') and str(agent.anp_user_id) == agent_id:
+            elif hasattr(agent, 'id') and str(agent.anp_user_did) == agent_id:
                 return agent
 
         return None
@@ -450,7 +449,7 @@ class AgentRouter:
         # 6. 执行路由
         try:
             self.logger.debug(f"🚀 路由请求: {req_did} -> {resp_did} @ {domain}:{port}")
-            self.logger.debug(f"route_request -- forward to {agent.anp_user_id}'s handler, forward data:{request_data}\n")
+            self.logger.debug(f"route_request -- forward to {agent.anp_user_did}'s handler, forward data:{request_data}\n")
             self.logger.debug(f"route_request -- url: {request.url} \nbody: {await request.body()}")
 
             result = await agent.handle_request(req_did, request_data, request)
@@ -673,7 +672,7 @@ class AgentManager:
         return cls.get_existing_agent(did, agent_name)
 
     @classmethod
-    def create_agent(cls, anp_user: ANPUser, name: str,
+    def create_agent(cls, anp_user_did_str: str, name: str,
                      shared: bool = False,
                      prefix: Optional[str] = None,
                      primary_agent: bool = False) -> Agent:
@@ -692,7 +691,7 @@ class AgentManager:
         Raises:
             ValueError: 当发生冲突时抛出异常
         """
-        did = anp_user.id
+        did = anp_user_did_str
 
         if not shared:
             # 独占模式：检查DID是否已被使用
@@ -729,7 +728,7 @@ class AgentManager:
                             )
 
         # 创建Agent
-        agent = Agent(anp_user, name, shared, prefix, primary_agent)
+        agent = Agent(did, name, shared, prefix, primary_agent)
 
         # 注册使用记录
         if did not in cls._did_usage_registry:
@@ -860,60 +859,52 @@ class LocalAgentManager:
             shared_did = share_did_config['shared_did']
             try:
                 # 使用共享DID获取用户数据
-                anp_user = ANPUser.from_did(shared_did)
+                anp_user_did = shared_did
                 logger.debug(f"  -> 共享DID Agent {cfg['name']} 使用共享DID: {shared_did}")
             except ValueError as e:
                 logger.warning(f"共享DID Agent {cfg['name']} 无法获取共享DID {shared_did} 的用户数据: {e}")
                 return None, None, share_did_config
         else:
             # 独立DID的Agent
-            anp_user = ANPUser.from_did(cfg["did"])
-
-        anp_user.name = cfg["name"]
+            anp_user_did = cfg["did"]
 
         # 创建新的Agent实例 - 全面使用新Agent系统
         if share_did_config:
             # 确保共享DID配置完整
             if not share_did_config.get('path_prefix'):
-                raise ValueError(f"❌ 共享DID配置缺少 path_prefix: {anp_user.name}")
+                raise ValueError(f"❌ 共享DID配置缺少 path_prefix: {base_module_name}")
 
             anp_agent = AgentManager.create_agent(
-                anp_user, anp_user.name,
+                anp_user_did,  cfg['name'],
                 shared=True,
                 prefix=share_did_config.get('path_prefix', ''),
                 primary_agent=share_did_config.get('primary_agent', False)
             )
         else:
-            anp_agent = AgentManager.create_agent(anp_user, anp_user.name, shared=False)
+            anp_agent = AgentManager.create_agent(anp_user_did, cfg['name'], shared=False)
 
         # 1. agent_002: 存在 agent_register.py，优先自定义注册
         if os.path.exists(register_script_path):
             register_module = importlib.import_module(f"{base_module_name}.agent_register")
-            logger.debug(f"  -> self register agent : {anp_user.name}")
+            logger.debug(f"  -> self register agent : {cfg['name']}")
             # 调用register函数注册agent
             if hasattr(register_module, "register"):
                 try:
                     register_module.register(anp_agent)
-                    logger.debug(f"  -> 执行register函数注册agent: {anp_user.name}")
+                    logger.debug(f"  -> 执行register函数注册agent: {cfg['name']}")
                 except Exception as e:
-                    logger.error(f"❌ register函数执行失败: {anp_user.name}, 错误: {e}")
+                    logger.error(f"❌ register函数执行失败: {cfg['name']}, 错误: {e}")
                     # 可以选择继续或者抛出异常
-                logger.debug(f"  -> 执行register函数注册agent: {anp_user.name}")
+                logger.debug(f"  -> 执行register函数注册agent: {cfg['name']}")
 
             # 如果同时存在initialize_agent，要返回
             if hasattr(handlers_module, "initialize_agent"):
-                logger.debug(f"  -> 调用initialize_agent进行初始化: {anp_user.name}")
+                logger.debug(f"  -> 调用initialize_agent进行初始化: {cfg['name']}")
                 return anp_agent, handlers_module, share_did_config
             return anp_agent, None, share_did_config
 
-        # 2. agent_llm: 存在 initialize_agent
-        if hasattr(handlers_module, "initialize_agent"):
-            logger.debug(f"  - Calling 'initialize_agent' in module: {base_module_name}.agent_handlers")
-            logger.debug(f"  - pre-init agent: {anp_user.name}")
-            return anp_agent, handlers_module, share_did_config
-
-        # 3. 普通配置型 agent_001 / agent_caculator
-        logger.debug(f"  -> Self-created agent instance: {anp_user.name}")
+        # 2. 普通配置型 agent_001 / agent_caculator
+        logger.debug(f"  -> Self-created agent instance: {cfg['name']}")
 
         # 使用新Agent系统注册API
         for api in cfg.get("api", []):
@@ -921,12 +912,18 @@ class LocalAgentManager:
 
             # 使用装饰器方式注册API
             agent_api(anp_agent, api["path"], auto_wrap=True)(handler_func)
-            logger.debug(f"  - config register agent: {anp_user.name}，api:{api}")
+            logger.debug(f"  - config register agent: {cfg['name']}，api:{api}")
 
         # 注册消息处理器（如果存在）
         LocalAgentManager._register_message_handlers_new(anp_agent, handlers_module, cfg, share_did_config)
 
-        return anp_agent, None, share_did_config
+        # 3. agent_llm: 存在 initialize_agent
+        if hasattr(handlers_module, "initialize_agent"):
+            logger.debug(f"  - Calling 'initialize_agent' in module: {base_module_name}.agent_handlers")
+            logger.debug(f"  - pre-init agent: {cfg['name']}")
+            return anp_agent, handlers_module, share_did_config
+        else:
+            return anp_agent, None, share_did_config
 
     @staticmethod
     def _register_message_handlers_new(new_agent: Agent, handlers_module, cfg: Dict, share_did_config: Optional[Dict]):
@@ -952,7 +949,7 @@ class LocalAgentManager:
             try:
                 # 使用装饰器方式注册消息处理器
                 agent_message_handler(new_agent, "*")(handlers_module.handle_message)
-                logger.debug(f"  -> 注册消息处理器: {cfg.get('name')} -> DID {new_agent.anp_user.id}")
+                logger.debug(f"  -> 注册消息处理器: {cfg.get('name')} -> DID {new_agent.anp_user_did}")
             except PermissionError as e:
                 logger.warning(f"⚠️ 预期行为: {e}")
 
@@ -964,14 +961,14 @@ class LocalAgentManager:
                 try:
                     # 使用装饰器方式注册消息处理器
                     agent_message_handler(new_agent, msg_type)(handler_func)
-                    logger.debug(f"  -> 注册{msg_type}消息处理器: {cfg.get('name')} -> DID {new_agent.anp_user.id}")
+                    logger.debug(f"  -> 注册{msg_type}消息处理器: {cfg.get('name')} -> DID {new_agent.anp_user_did}")
                 except PermissionError as e:
                     logger.warning(f"⚠️ 预期行为: {e}")
 
     @staticmethod
     def generate_custom_openapi_from_router(agent: Agent) -> Dict:
         """根据 Agent 的路由生成自定义的 OpenAPI 规范"""
-        did = agent.anp_user_id
+        did = agent.anp_user_did
         openapi = {
             "openapi": "3.0.0",
             "info": {
@@ -1072,9 +1069,9 @@ class LocalAgentManager:
     @staticmethod
     async def generate_and_save_agent_interfaces(agent: Agent):
         """为指定的 agent 生成并保存接口文件，按 DID 聚合所有 agent 的方法"""
-        logger.debug(f"开始为 agent '{agent.name}' ({agent.anp_user_id}) 生成接口文件...")
+        logger.debug(f"开始为 agent '{agent.name}' ({agent.anp_user_did}) 生成接口文件...")
 
-        did = agent.anp_user_id
+        did = agent.anp_user_did
         user_data_manager = get_user_data_manager()
         user_data = user_data_manager.get_user_data(did)
         if not user_data:
