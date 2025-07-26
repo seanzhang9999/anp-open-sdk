@@ -253,15 +253,20 @@ describe('DID User Creation Tools', () => {
       expect(result2).not.toBeNull();
 
       // The second user should have a modified name
-      const userDir1 = await findUserDirectory(tempDir, userInput1.host);
-      const userDir2 = await findUserDirectory(tempDir, userInput2.host);
+      const userDirs = await findAllUserDirectories(tempDir, userInput1.host);
+      expect(userDirs.length).toBe(2);
 
-      const agentCfg1 = await readAgentConfig(userDir1!);
-      const agentCfg2 = await readAgentConfig(userDir2!);
+      const agentCfg1 = await readAgentConfig(userDirs[0]);
+      const agentCfg2 = await readAgentConfig(userDirs[1]);
 
-      expect(agentCfg1.name).toBe('conflict-test');
-      expect(agentCfg2.name).not.toBe('conflict-test');
-      expect(agentCfg2.name).toContain('conflict-test');
+      // 确保我们有两个不同的配置
+      const configs = [agentCfg1, agentCfg2];
+      const originalConfig = configs.find(cfg => cfg.name === 'conflict-test');
+      const modifiedConfig = configs.find(cfg => cfg.name !== 'conflict-test');
+
+      expect(originalConfig).toBeDefined();
+      expect(modifiedConfig).toBeDefined();
+      expect(modifiedConfig.name).toContain('conflict-test');
     });
 
     it('should create user with hex-based unique ID by default', async () => {
@@ -308,7 +313,7 @@ describe('DID User Creation Tools', () => {
       expect(result).not.toBeNull();
 
       // Check that the DID doesn't contain a hex ID
-      const expectedDid = `did:wba:${userInput.host}%3A${userInput.port}:${encodeURIComponent(userInput.dir)}:${encodeURIComponent(userInput.type)}`;
+      const expectedDid = `did:wba:${userInput.host}%3A${userInput.port}:${encodeURIComponent(userInput.dir)}:${encodeURIComponent(userInput.type)}:${encodeURIComponent(userInput.name)}`;
       expect(result!.id).toBe(expectedDid);
     });
   });
@@ -351,7 +356,8 @@ describe('DID User Creation Tools', () => {
         };
 
         const options: CreateDidUserOptions = {
-          userDidPath: tempDir
+          userDidPath: tempDir,
+          didHex: false  // 禁用hex格式，使DID包含用户名
         };
 
         return createDidUser(userInput, options);
@@ -441,6 +447,17 @@ async function findUserDirectory(basePath: string, host: string): Promise<string
     return userDir ? path.join(hostPath, userDir) : null;
   } catch {
     return null;
+  }
+}
+
+async function findAllUserDirectories(basePath: string, host: string): Promise<string[]> {
+  try {
+    const hostPath = path.join(basePath, host, 'anp_users');
+    const entries = await fs.readdir(hostPath);
+    const userDirs = entries.filter(entry => entry.startsWith('user_'));
+    return userDirs.map(dir => path.join(hostPath, dir));
+  } catch {
+    return [];
   }
 }
 

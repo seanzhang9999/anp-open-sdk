@@ -301,15 +301,19 @@ export class AuthInitiator {
 
   /**
    * 验证响应认证头 - 对应Python的_verify_response_auth_header
+   * 严格按照Python实现的逻辑进行解析和验证
    */
   private async verifyResponseAuthHeader(authValue: string): Promise<boolean> {
     try {
-      // 处理JSON格式的auth_value
+      // 处理CIMultiDictProxy类型的headers（在Node.js中对应headers对象）
       let actualAuthHeader = authValue;
-      if (authValue.startsWith('{') && authValue.endsWith('}')) {
+      
+      // 尝试解析JSON格式的auth_value，对应Python第275-283行
+      if (typeof authValue === 'string' && authValue.startsWith('{') && authValue.endsWith('}')) {
         try {
           const authJson = JSON.parse(authValue);
-          if (authJson.resp_did_auth_header?.Authorization) {
+          // 检查是否有嵌套的Authorization头
+          if (authJson.resp_did_auth_header && authJson.resp_did_auth_header.Authorization) {
             actualAuthHeader = authJson.resp_did_auth_header.Authorization;
           }
         } catch (error) {
@@ -317,21 +321,18 @@ export class AuthInitiator {
         }
       }
 
-      // 尝试解析为双向认证头
+      // 确保actualAuthHeader是字符串
+      if (typeof actualAuthHeader !== 'string') {
+        actualAuthHeader = String(actualAuthHeader);
+      }
+
+      // 解析认证头部分，对应Python第288行
       let headerParts;
-      let isTwoWayAuth = false;
       try {
         headerParts = DIDWbaAuth.extractAuthHeaderPartsTwoWay(actualAuthHeader);
-        isTwoWayAuth = true;
       } catch (error) {
-        // 如果双向认证解析失败，尝试单向认证
-        try {
-          headerParts = DIDWbaAuth.extractAuthHeaderParts(actualAuthHeader);
-          isTwoWayAuth = false;
-        } catch (fallbackError) {
-          logger.error('AuthHeader格式错误');
-          return false;
-        }
+        logger.error(`无法从AuthHeader中解析信息: ${error}`);
+        return false;
       }
 
       if (!headerParts) {
@@ -339,40 +340,43 @@ export class AuthInitiator {
         return false;
       }
 
-      const { did, timestamp } = headerParts;
-      
-      // 验证时间戳
+      const { did, nonce, timestamp, respDid, verificationMethod } = headerParts;
+      logger.debug(`用 ${did}的${verificationMethod}检验`);
+
+      // 验证时间戳，对应Python第300-302行
       if (!this.verifyTimestamp(timestamp)) {
         return false;
       }
 
-      // 解析DID文档
-      const didDocument = await this.resolveDidDocumentInsecurely(did);
+      // 尝试使用自定义解析器解析DID文档，对应Python第306行
+      let didDocument = await this.resolveDidDocumentInsecurely(did);
+
+      // 如果自定义解析器失败，尝试使用标准解析器（在Node.js中暂时跳过）
       if (!didDocument) {
         logger.error('Failed to resolve DID document');
         return false;
       }
 
-      // 验证签名
-      const serviceDomain = 'virtual.WBAback';
-      let result;
-      
-      if (isTwoWayAuth) {
-        result = await DIDWbaAuth.verifyAuthHeaderSignatureTwoWay(
-          actualAuthHeader,
-          didDocument,
-          serviceDomain
-        );
-      } else {
-        result = await DIDWbaAuth.verifyAuthHeaderSignature(
-          actualAuthHeader,
-          didDocument,
-          serviceDomain
-        );
-      }
+      try {
+        // 重新构造完整的授权头，对应Python第322行
+        const fullAuthHeader = actualAuthHeader;
+        // 用固定值测试返回认证，本地没有做http过滤逻辑，直接写即可，对应Python第324行
+        const serviceDomain = 'virtual.WBAback';
 
-      logger.debug(`签名验证结果: ${result.valid}, 消息: ${result.message}`);
-      return result.valid;
+        // 调用验证函数，对应Python第327-331行
+        const result = await DIDWbaAuth.verifyAuthHeaderSignatureTwoWay(
+          fullAuthHeader,
+          didDocument,
+          serviceDomain
+        );
+
+        logger.debug(`签名验证结果: ${result.valid}, 消息: ${result.message}`);
+        return result.valid;
+
+      } catch (error) {
+        logger.error(`验证签名时出错: ${error}`);
+        return false;
+      }
 
     } catch (error) {
       logger.error(`验证签名时出错: ${error}`);
@@ -443,16 +447,49 @@ export class AuthInitiator {
   }
 
   /**
-   * 验证时间戳
+   * 验证时间戳 - 支持ISO格式和Unix时间戳格式
+   * 兼容Node.js生成的毫秒精度（2024-01-01T00:00:00.000Z）和Python生成的秒精度（2024-01-01T00:00:00Z）
    */
   private verifyTimestamp(timestamp: string): boolean {
     try {
-      const timestampNum = parseInt(timestamp, 10);
-      const now = Math.floor(Date.now() / 1000);
-      const diff = Math.abs(now - timestampNum);
+      let requestTime: Date;
+      
+      // 尝试解析ISO格式时间戳
+      if (timestamp.includes('T') && (timestamp.includes('Z') || timestamp.includes('+') || timestamp.includes('-'))) {
+        requestTime = new Date(timestamp);
+        if (isNaN(requestTime.getTime())) {
+          logger.error(`无效的ISO时间戳格式: ${timestamp}`);
+          return false;
+        }
+      } else {
+        // 尝试解析Unix时间戳（秒或毫秒）
+        const timestampNum = parseInt(timestamp, 10);
+        if (isNaN(timestampNum)) {
+          logger.error(`无效的时间戳格式: ${timestamp}`);
+          return false;
+        }
+        
+        // 判断是秒还是毫秒（毫秒时间戳通常大于10^12）
+        if (timestampNum > 1000000000000) {
+          requestTime = new Date(timestampNum); // 毫秒
+        } else {
+          requestTime = new Date(timestampNum * 1000); // 秒转毫秒
+        }
+      }
+      
+      const now = new Date();
+      const diffMinutes = Math.abs(now.getTime() - requestTime.getTime()) / (1000 * 60);
       
       // 允许5分钟的时间差
-      return diff <= 300;
+      const isValid = diffMinutes <= 5;
+      
+      if (!isValid) {
+        logger.debug(`时间戳验证失败: 请求时间=${requestTime.toISOString()}, 当前时间=${now.toISOString()}, 时间差=${diffMinutes.toFixed(2)}分钟`);
+      } else {
+        logger.debug(`时间戳验证通过: 请求时间=${requestTime.toISOString()}, 时间差=${diffMinutes.toFixed(2)}分钟`);
+      }
+      
+      return isValid;
     } catch (error) {
       logger.error(`时间戳验证失败: ${error}`);
       return false;

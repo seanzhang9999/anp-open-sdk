@@ -68,7 +68,8 @@ auth_middleware:
     - "/wba/auth"
     - "/wba/hosted-did/*"
     - "/publisher/agents"
-    - "/agent/api/*"
+    - "/agent/disable/api/*"
+    - "/health"
 
 anp_sdk:
   # transformer Server配置

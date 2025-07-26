@@ -11,6 +11,11 @@
     "start": "node dist/index.js",
     "test": "jest",
     "test:watch": "jest --watch",
+    "test:verbose": "jest --verbose --no-coverage",
+    "test:failed": "jest --verbose --onlyFailures",
+    "test:cross-lang": "jest --testPathPattern=cross-language --verbose",
+    "test:foundation": "jest --testPathPattern=foundation --verbose",
+    "test:summary": "jest --silent && echo '\n📋 运行 npm run test:verbose 查看详细结果'",
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix"
   },

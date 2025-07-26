@@ -242,6 +242,13 @@ class SecretsConfigNode implements SecretsConfig {
 export class UnifiedConfig implements BaseUnifiedConfigProtocol {
   private static appRootCls: string | null = null;
   
+  /**
+   * 重置静态appRoot（用于测试）
+   */
+  public static resetAppRoot(): void {
+    UnifiedConfig.appRootCls = null;
+  }
+  
   private appRootInstance: string;
   private configFile: string;
   private configData: Record<string, any> = {};

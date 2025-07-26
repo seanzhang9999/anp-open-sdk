@@ -67,9 +67,11 @@ export async function createDidUser(
   // 获取用户目录路径
   const resolvedUserDidPath = userDidPath || path.resolve(process.cwd(), '..', 'data_user');
 
-  // 检查并处理用户名冲突
+  // 检查并处理用户名冲突 - 只有在冲突时才修改名称
   const finalName = await handleUsernameConflict(userInput.name, resolvedUserDidPath);
-  userInput.name = finalName;
+  if (finalName !== userInput.name) {
+    userInput.name = finalName;
+  }
 
   // 检查域名端口下用户名唯一性
   const userDataManager = getUserDataManager();
@@ -282,6 +284,9 @@ function buildDidId(userInput: CreateUserInput, uniqueId: string | null): string
   
   if (uniqueId) {
     didParts.push(uniqueId);
+  } else {
+    // 当didHex为false时，使用用户名作为标识符以确保唯一性
+    didParts.push(encodeURIComponent(userInput.name));
   }
   
   return didParts.join(':');

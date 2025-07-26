@@ -34,12 +34,25 @@ export class DidTool {
    */
   public static parseWbaDidHostPort(did: string): { host: string; port: number } | null {
     try {
-      // 匹配格式: did:wba:host_port_identifier
-      const match = did.match(/^did:wba:(.+?)_(\d+)_(.+)$/);
-      if (match) {
+      // 支持两种格式:
+      // 1. did:wba:host_port_identifier (旧格式)
+      // 2. did:wba:localhost%3A9527:wba:user:identifier (新格式，URL编码)
+      
+      // 先尝试新格式 (URL编码格式)
+      const urlEncodedMatch = did.match(/^did:wba:([^:]+)%3A(\d+):/);
+      if (urlEncodedMatch) {
         return {
-          host: match[1],
-          port: parseInt(match[2], 10)
+          host: decodeURIComponent(urlEncodedMatch[1]),
+          port: parseInt(urlEncodedMatch[2], 10)
+        };
+      }
+      
+      // 再尝试旧格式
+      const oldFormatMatch = did.match(/^did:wba:(.+?)_(\d+)_(.+)$/);
+      if (oldFormatMatch) {
+        return {
+          host: oldFormatMatch[1],
+          port: parseInt(oldFormatMatch[2], 10)
         };
       }
     } catch (error) {

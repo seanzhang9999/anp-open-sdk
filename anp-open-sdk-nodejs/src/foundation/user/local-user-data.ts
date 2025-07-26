@@ -268,7 +268,7 @@ export class LocalUserData {
       created_at: now.toISOString(),
       expires_at: expiresAt.toISOString(),
       is_revoked: false,
-      req_did: remoteDid,
+      req_did: this.did, // 应该是当前用户的DID（请求者）
     };
     
     this.tokenToRemoteDict.set(remoteDid, tokenInfo);

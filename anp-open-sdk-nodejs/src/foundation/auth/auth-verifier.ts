@@ -458,16 +458,49 @@ export class AuthVerifier {
   }
 
   /**
-   * 验证时间戳
+   * 验证时间戳 - 支持ISO格式和Unix时间戳格式
+   * 兼容Node.js生成的毫秒精度（2024-01-01T00:00:00.000Z）和Python生成的秒精度（2024-01-01T00:00:00Z）
    */
   private verifyTimestamp(timestamp: string): boolean {
     try {
-      const timestampNum = parseInt(timestamp, 10);
-      const now = Math.floor(Date.now() / 1000);
-      const diff = Math.abs(now - timestampNum);
+      let requestTime: Date;
+      
+      // 尝试解析ISO格式时间戳
+      if (timestamp.includes('T') && (timestamp.includes('Z') || timestamp.includes('+') || timestamp.includes('-'))) {
+        requestTime = new Date(timestamp);
+        if (isNaN(requestTime.getTime())) {
+          logger.error(`无效的ISO时间戳格式: ${timestamp}`);
+          return false;
+        }
+      } else {
+        // 尝试解析Unix时间戳（秒或毫秒）
+        const timestampNum = parseInt(timestamp, 10);
+        if (isNaN(timestampNum)) {
+          logger.error(`无效的时间戳格式: ${timestamp}`);
+          return false;
+        }
+        
+        // 判断是秒还是毫秒（毫秒时间戳通常大于10^12）
+        if (timestampNum > 1000000000000) {
+          requestTime = new Date(timestampNum); // 毫秒
+        } else {
+          requestTime = new Date(timestampNum * 1000); // 秒转毫秒
+        }
+      }
+      
+      const now = new Date();
+      const diffMinutes = Math.abs(now.getTime() - requestTime.getTime()) / (1000 * 60);
       
       // 允许5分钟的时间差
-      return diff <= 300;
+      const isValid = diffMinutes <= 5;
+      
+      if (!isValid) {
+        logger.debug(`时间戳验证失败: 请求时间=${requestTime.toISOString()}, 当前时间=${now.toISOString()}, 时间差=${diffMinutes.toFixed(2)}分钟`);
+      } else {
+        logger.debug(`时间戳验证通过: 请求时间=${requestTime.toISOString()}, 时间差=${diffMinutes.toFixed(2)}分钟`);
+      }
+      
+      return isValid;
     } catch (error) {
       logger.error(`时间戳验证失败: ${error}`);
       return false;

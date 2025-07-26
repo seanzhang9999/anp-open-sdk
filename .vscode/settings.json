@@ -1,6 +1,7 @@
 {
     "python.analysis.extraPaths": [
     "anp-open-sdk-python"
-]
+],
+"kiroAgent.configureMCP": "Enabled"
 
 }

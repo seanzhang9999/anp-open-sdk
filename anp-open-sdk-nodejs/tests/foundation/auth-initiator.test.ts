@@ -31,11 +31,11 @@ describe('AuthInitiator', () => {
     resetAuthInitiator();
     authInitiator = new AuthInitiator();
 
-    // Setup mock user data
+    // Setup mock user data using real data directory
     mockUserData = {
-      didDocPath: path.join(__dirname, '../data/test-did.json'),
+      didDocPath: path.join(__dirname, '../../../data_user/localhost_9527/anp_users/user_27c0b1d11180f973/did_document.json'),
       passwordPaths: {
-        did_private_key_file_path: path.join(__dirname, '../data/test-private-key.pem')
+        did_private_key_file_path: path.join(__dirname, '../../../data_user/localhost_9527/anp_users/user_27c0b1d11180f973/key-1_private.pem')
       }
     };
 
@@ -53,15 +53,19 @@ describe('AuthInitiator', () => {
 
   describe('sendAuthenticatedRequest', () => {
     it('should handle successful two-way authentication', async () => {
-      // Mock successful HTTP response with token
+      // Mock successful HTTP response with token - 按照Python实现的格式
       const mockSendHttpRequest = jest.spyOn(authInitiator as any, 'sendHttpRequest')
         .mockResolvedValue({
           status: 200,
-          headers: { 
+          headers: {
+            // Python实现中的响应格式：第128-130行解析逻辑
             'authorization': JSON.stringify({
               access_token: 'test-token',
+              token_type: 'bearer',
+              req_did: 'did:wba:localhost%3A9527:wba:user:27c0b1d11180f973',
+              resp_did: 'did:wba:localhost%3A9527:wba:user:5fea49e183c6c211',
               resp_did_auth_header: {
-                Authorization: 'DIDWba did="did:wba:target.example.com", nonce="abc123", timestamp="2024-01-01T00:00:00.000Z", resp_did="did:wba:caller.example.com", verification_method="key-1", signature="test-sig"'
+                Authorization: 'DIDWba did="did:wba:localhost%3A9527:wba:user:5fea49e183c6c211", nonce="abc123", timestamp="1640995200", resp_did="did:wba:localhost%3A9527:wba:user:27c0b1d11180f973", verification_method="key-1", signature="Ry6jWGItJbPI8Nu8oavpejqRadDOrzJkol3FcoZRUWgiu0EcVTtA4sKUoUTUDUI0HtNk4CD4H_hBRmJnvTgfFg"'
               }
             })
           },
@@ -71,28 +75,33 @@ describe('AuthInitiator', () => {
       // Mock DID document resolution
       const mockResolveDidDocument = jest.spyOn(authInitiator as any, 'resolveDidDocumentInsecurely')
         .mockResolvedValue({
-          id: 'did:wba:target.example.com',
+          id: 'did:wba:localhost%3A9527:wba:user:5fea49e183c6c211',
           verificationMethod: [{
-            id: 'did:wba:target.example.com#key-1',
+            id: 'did:wba:localhost%3A9527:wba:user:5fea49e183c6c211#key-1',
             type: 'EcdsaSecp256k1VerificationKey2019',
-            controller: 'did:wba:target.example.com',
+            controller: 'did:wba:localhost%3A9527:wba:user:5fea49e183c6c211',
             publicKeyJwk: {
               kty: 'EC',
               crv: 'secp256k1',
-              x: 'test-x',
-              y: 'test-y'
+              x: 'KgwORYL-hfGNuAPfOvJqKpjLm7nz0ARvw4spUABUwug',
+              y: 'OMkHQEtoKCwqGOCMk-PSKejqQvjMDjBz6sYzFQvoS20',
+              kid: 'xJw5Qmq8JM_cmCr97dlTmMQGWFCzn3Eyb25xoZggARM'
             }
           }]
         });
 
-      // Mock signature verification
+      // Mock signature verification - 使用有效的时间戳
       const mockVerifyTimestamp = jest.spyOn(authInitiator as any, 'verifyTimestamp')
         .mockReturnValue(true);
 
+      // Mock DIDWbaAuth.verifyAuthHeaderSignatureTwoWay
+      const mockVerifySignature = jest.spyOn(require('../../src/foundation/did/did-wba').DIDWbaAuth, 'verifyAuthHeaderSignatureTwoWay')
+        .mockResolvedValue({ valid: true, message: 'Verification successful' });
+
       const result = await authInitiator.sendAuthenticatedRequest(
-        'did:wba:caller.example.com',
-        'did:wba:target.example.com',
-        'https://test.example.com/api',
+        'did:wba:localhost%3A9527:wba:user:27c0b1d11180f973',
+        'did:wba:localhost%3A9527:wba:user:5fea49e183c6c211',
+        'http://localhost:9527/api/test',
         'GET',
         undefined,
         undefined,
@@ -103,6 +112,7 @@ describe('AuthInitiator', () => {
       expect(result.is_auth_pass).toBe(true);
       expect(result.info).toContain('DID双向认证成功');
       expect(mockSendHttpRequest).toHaveBeenCalled();
+      expect(mockVerifySignature).toHaveBeenCalled();
     });
 
     it('should fallback to single-way authentication when two-way fails', async () => {
@@ -128,9 +138,9 @@ describe('AuthInitiator', () => {
         });
 
       const result = await authInitiator.sendAuthenticatedRequest(
-        'did:wba:caller.example.com',
-        'did:wba:target.example.com',
-        'https://test.example.com/api',
+        'did:wba:localhost%3A9527:wba:user:27c0b1d11180f973',
+        'did:wba:localhost%3A9527:wba:user:5fea49e183c6c211',
+        'http://localhost:9527/api/test',
         'GET',
         undefined,
         undefined,
@@ -152,9 +162,9 @@ describe('AuthInitiator', () => {
         });
 
       const result = await authInitiator.sendAuthenticatedRequest(
-        'did:wba:caller.example.com',
-        'did:wba:target.example.com',
-        'https://test.example.com/api',
+        'did:wba:localhost%3A9527:wba:user:27c0b1d11180f973',
+        'did:wba:localhost%3A9527:wba:user:5fea49e183c6c211',
+        'http://localhost:9527/api/test',
         'GET',
         undefined,
         undefined,
@@ -171,14 +181,14 @@ describe('AuthInitiator', () => {
         .mockRejectedValue(new Error('Network error'));
 
       const result = await authInitiator.sendAuthenticatedRequest(
-        'did:wba:caller.example.com',
-        'did:wba:target.example.com',
-        'https://test.example.com/api'
+        'did:wba:localhost%3A9527:wba:user:27c0b1d11180f973',
+        'did:wba:localhost%3A9527:wba:user:5fea49e183c6c211',
+        'http://localhost:9527/api/test'
       );
 
       expect(result.status).toBe(500);
       expect(result.is_auth_pass).toBe(false);
-      expect(result.info).toContain('请求中发生错误');
+      expect(result.info).toContain('认证过程中发生错误');
     });
   });
 
@@ -271,9 +281,9 @@ describe('AuthInitiator', () => {
   describe('buildWbaAuthHeader', () => {
     it('should build single-way auth header when use_two_way_auth is false', async () => {
       const context = {
-        caller_did: 'did:wba:caller.example.com',
-        target_did: 'did:wba:target.example.com',
-        request_url: 'https://test.example.com/api',
+        caller_did: 'did:wba:localhost%3A9527:wba:user:27c0b1d11180f973',
+        target_did: 'did:wba:localhost%3A9527:wba:user:5fea49e183c6c211',
+        request_url: 'http://localhost:9527/api/test',
         method: 'GET',
         custom_headers: {},
         json_data: undefined,
@@ -284,14 +294,16 @@ describe('AuthInitiator', () => {
       const mockAuthClient = {
         getAuthHeader: jest.fn().mockResolvedValue({
           'Authorization': 'DIDWba single-way-header',
-          'X-DID-Caller': 'did:wba:caller.example.com'
+          'X-DID-Caller': 'did:wba:localhost%3A9527:wba:user:27c0b1d11180f973'
         }),
         getAuthHeaderTwoWay: jest.fn()
       };
 
       // Mock the auth client creation
-      jest.spyOn(authInitiator as any, 'authClients', 'get')
-        .mockReturnValue(new Map([['did:wba:caller.example.com', mockAuthClient]]));
+      Object.defineProperty(authInitiator, 'authClients', {
+        value: new Map([['did:wba:localhost%3A9527:wba:user:27c0b1d11180f973', mockAuthClient]]),
+        writable: true
+      });
 
       const result = await (authInitiator as any).buildWbaAuthHeader(context);
 
@@ -302,9 +314,9 @@ describe('AuthInitiator', () => {
 
     it('should build two-way auth header when use_two_way_auth is true', async () => {
       const context = {
-        caller_did: 'did:wba:caller.example.com',
-        target_did: 'did:wba:target.example.com',
-        request_url: 'https://test.example.com/api',
+        caller_did: 'did:wba:localhost%3A9527:wba:user:27c0b1d11180f973',
+        target_did: 'did:wba:localhost%3A9527:wba:user:5fea49e183c6c211',
+        request_url: 'http://localhost:9527/api/test',
         method: 'GET',
         custom_headers: {},
         json_data: undefined,
@@ -316,13 +328,15 @@ describe('AuthInitiator', () => {
         getAuthHeader: jest.fn(),
         getAuthHeaderTwoWay: jest.fn().mockResolvedValue({
           'Authorization': 'DIDWba two-way-header',
-          'X-DID-Caller': 'did:wba:caller.example.com'
+          'X-DID-Caller': 'did:wba:localhost%3A9527:wba:user:27c0b1d11180f973'
         })
       };
 
       // Mock the auth client creation
-      jest.spyOn(authInitiator as any, 'authClients', 'get')
-        .mockReturnValue(new Map([['did:wba:caller.example.com', mockAuthClient]]));
+      Object.defineProperty(authInitiator, 'authClients', {
+        value: new Map([['did:wba:localhost%3A9527:wba:user:27c0b1d11180f973', mockAuthClient]]),
+        writable: true
+      });
 
       const result = await (authInitiator as any).buildWbaAuthHeader(context);
 
@@ -339,8 +353,8 @@ describe('AuthInitiator', () => {
 
       const context = {
         caller_did: 'did:wba:nonexistent.example.com',
-        target_did: 'did:wba:target.example.com',
-        request_url: 'https://test.example.com/api',
+        target_did: 'did:wba:localhost%3A9527:wba:user:5fea49e183c6c211',
+        request_url: 'http://localhost:9527/api/test',
         use_two_way_auth: false
       };
 
@@ -390,15 +404,15 @@ describe('AuthInitiator', () => {
 
       // Test POST request
       await authInitiator.sendAuthenticatedRequest(
-        'did:wba:caller.example.com',
-        'did:wba:target.example.com',
-        'https://test.example.com/api',
+        'did:wba:localhost%3A9527:wba:user:27c0b1d11180f973',
+        'did:wba:localhost%3A9527:wba:user:5fea49e183c6c211',
+        'http://localhost:9527/api/test',
         'POST',
         { data: 'test' }
       );
 
       expect(mockSendHttpRequest).toHaveBeenCalledWith(
-        'https://test.example.com/api',
+        'http://localhost:9527/api/test',
         expect.objectContaining({
           method: 'POST',
           json: { data: 'test' }
@@ -416,16 +430,16 @@ describe('AuthInitiator', () => {
       };
 
       await authInitiator.sendAuthenticatedRequest(
-        'did:wba:caller.example.com',
-        'did:wba:target.example.com',
-        'https://test.example.com/api',
+        'did:wba:localhost%3A9527:wba:user:27c0b1d11180f973',
+        'did:wba:localhost%3A9527:wba:user:5fea49e183c6c211',
+        'http://localhost:9527/api/test',
         'GET',
         undefined,
         customHeaders
       );
 
       expect(mockSendHttpRequest).toHaveBeenCalledWith(
-        'https://test.example.com/api',
+        'http://localhost:9527/api/test',
         expect.objectContaining({
           headers: expect.objectContaining({
             'X-Custom-Header': 'custom-value',

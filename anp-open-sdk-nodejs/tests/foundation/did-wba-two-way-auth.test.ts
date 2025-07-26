@@ -5,6 +5,8 @@
  */
 
 import * as crypto from 'crypto';
+import * as fs from 'fs';
+import * as path from 'path';
 import { DIDWbaAuth } from '../../src/foundation/did/did-wba';
 import { DIDDocument, SignCallback, AuthData } from '../../src/foundation/did/types';
 
@@ -14,45 +16,34 @@ describe('DIDWbaAuth - Two-Way Authentication', () => {
   let testSignCallback: SignCallback;
 
   beforeAll(async () => {
-    // Generate test key pair
-    const keyPair = crypto.generateKeyPairSync('ec', {
-      namedCurve: 'secp256k1',
-      publicKeyEncoding: { type: 'spki', format: 'pem' },
-      privateKeyEncoding: { type: 'pkcs8', format: 'pem' }
-    });
+    // Load real DID document and private key
+    const didDocPath = path.join(__dirname, '../../../data_user/localhost_9527/anp_users/user_27c0b1d11180f973/did_document.json');
+    const privateKeyPath = path.join(__dirname, '../../../data_user/localhost_9527/anp_users/user_27c0b1d11180f973/key-1_private.pem');
 
-    testPrivateKey = crypto.createPrivateKey(keyPair.privateKey);
-    const publicKeyObj = crypto.createPublicKey(keyPair.publicKey);
+    // Read real DID document
+    const didDocContent = fs.readFileSync(didDocPath, 'utf8');
+    testDidDocument = JSON.parse(didDocContent);
 
-    // Create test DID document
-    const did = 'did:wba:test.example.com';
-    testDidDocument = {
-      '@context': [
-        'https://www.w3.org/ns/did/v1',
-        'https://w3id.org/security/suites/jws-2020/v1',
-        'https://w3id.org/security/suites/secp256k1-2019/v1'
-      ],
-      id: did,
-      verificationMethod: [{
-        id: `${did}#key-1`,
-        type: 'EcdsaSecp256k1VerificationKey2019',
-        controller: did,
-        publicKeyJwk: publicKeyObj.export({ format: 'jwk' }) as any
-      }],
-      authentication: [`${did}#key-1`]
-    };
+    // Read real private key
+    const privateKeyPem = fs.readFileSync(privateKeyPath, 'utf8');
+    testPrivateKey = crypto.createPrivateKey(privateKeyPem);
 
     // Create test sign callback
     testSignCallback = async (data: Uint8Array): Promise<Uint8Array> => {
+      // Sign with the private key - DER format
       const signature = crypto.sign('sha256', data, testPrivateKey);
+      
+      // For secp256k1, Node.js crypto.sign returns DER format
+      // We need to keep it as DER format since verification-methods.ts
+      // expects DER format and converts R|S to DER internally
       return new Uint8Array(signature);
     };
   });
 
   describe('generateAuthHeaderTwoWay', () => {
     it('should generate valid two-way authentication header', async () => {
-      const respDid = 'did:wba:target.example.com';
-      const serviceDomain = 'test.service.com';
+      const respDid = 'did:wba:localhost%3A9527:wba:user:5fea49e183c6c211';
+      const serviceDomain = 'localhost:9527';
 
       const authHeader = await DIDWbaAuth.generateAuthHeaderTwoWay(
         testDidDocument,
@@ -71,8 +62,8 @@ describe('DIDWbaAuth - Two-Way Authentication', () => {
     });
 
     it('should include resp_did in the correct position', async () => {
-      const respDid = 'did:wba:target.example.com';
-      const serviceDomain = 'test.service.com';
+      const respDid = 'did:wba:localhost%3A9527:wba:user:5fea49e183c6c211';
+      const serviceDomain = 'localhost:9527';
 
       const authHeader = await DIDWbaAuth.generateAuthHeaderTwoWay(
         testDidDocument,
@@ -99,8 +90,8 @@ describe('DIDWbaAuth - Two-Way Authentication', () => {
       await expect(
         DIDWbaAuth.generateAuthHeaderTwoWay(
           invalidDidDocument,
-          'did:wba:target.example.com',
-          'test.service.com',
+          'did:wba:localhost%3A9527:wba:user:5fea49e183c6c211',
+          'localhost:9527',
           testSignCallback
         )
       ).rejects.toThrow('No verification method found in DID document');
@@ -109,8 +100,8 @@ describe('DIDWbaAuth - Two-Way Authentication', () => {
 
   describe('extractAuthHeaderPartsTwoWay', () => {
     it('should extract all parts from two-way auth header', async () => {
-      const respDid = 'did:wba:target.example.com';
-      const serviceDomain = 'test.service.com';
+      const respDid = 'did:wba:localhost%3A9527:wba:user:5fea49e183c6c211';
+      const serviceDomain = 'localhost:9527';
 
       const authHeader = await DIDWbaAuth.generateAuthHeaderTwoWay(
         testDidDocument,
@@ -130,7 +121,7 @@ describe('DIDWbaAuth - Two-Way Authentication', () => {
     });
 
     it('should throw error when resp_did is missing', () => {
-      const headerWithoutRespDid = 'DIDWba did="did:wba:test.example.com", nonce="abc123", timestamp="2024-01-01T00:00:00.000Z", verification_method="key-1", signature="test"';
+      const headerWithoutRespDid = 'DIDWba did="did:wba:localhost%3A9527:wba:user:27c0b1d11180f973", nonce="abc123", timestamp="2024-01-01T00:00:00.000Z", verification_method="key-1", signature="test"';
 
       expect(() => {
         DIDWbaAuth.extractAuthHeaderPartsTwoWay(headerWithoutRespDid);
@@ -138,7 +129,7 @@ describe('DIDWbaAuth - Two-Way Authentication', () => {
     });
 
     it('should throw error when required fields are missing', () => {
-      const incompleteHeader = 'DIDWba did="did:wba:test.example.com", nonce="abc123"';
+      const incompleteHeader = 'DIDWba did="did:wba:localhost%3A9527:wba:user:27c0b1d11180f973", nonce="abc123"';
 
       expect(() => {
         DIDWbaAuth.extractAuthHeaderPartsTwoWay(incompleteHeader);
@@ -146,18 +137,18 @@ describe('DIDWbaAuth - Two-Way Authentication', () => {
     });
 
     it('should throw error when header does not start with DIDWba', () => {
-      const invalidHeader = 'Bearer did="did:wba:test.example.com", resp_did="did:wba:target.example.com", nonce="abc123", timestamp="2024-01-01T00:00:00.000Z", verification_method="key-1", signature="test"';
+      const invalidHeader = 'Bearer did="did:wba:localhost%3A9527:wba:user:27c0b1d11180f973", resp_did="did:wba:localhost%3A9527:wba:user:5fea49e183c6c211", nonce="abc123", timestamp="2024-01-01T00:00:00.000Z", verification_method="key-1", signature="test"';
 
       expect(() => {
         DIDWbaAuth.extractAuthHeaderPartsTwoWay(invalidHeader);
-      }).toThrow('Missing required field');
+      }).toThrow('Authorization header must start with DIDWba');
     });
   });
 
   describe('verifyAuthHeaderSignatureTwoWay', () => {
     it('should verify valid two-way authentication signature', async () => {
-      const respDid = 'did:wba:target.example.com';
-      const serviceDomain = 'test.service.com';
+      const respDid = 'did:wba:localhost%3A9527:wba:user:5fea49e183c6c211';
+      const serviceDomain = 'localhost:9527';
 
       const authHeader = await DIDWbaAuth.generateAuthHeaderTwoWay(
         testDidDocument,
@@ -181,8 +172,8 @@ describe('DIDWbaAuth - Two-Way Authentication', () => {
     });
 
     it('should fail verification with wrong service domain', async () => {
-      const respDid = 'did:wba:target.example.com';
-      const serviceDomain = 'test.service.com';
+      const respDid = 'did:wba:localhost%3A9527:wba:user:5fea49e183c6c211';
+      const serviceDomain = 'localhost:9527';
       const wrongServiceDomain = 'wrong.service.com';
 
       const authHeader = await DIDWbaAuth.generateAuthHeaderTwoWay(
@@ -203,8 +194,8 @@ describe('DIDWbaAuth - Two-Way Authentication', () => {
     });
 
     it('should fail verification with tampered signature', async () => {
-      const respDid = 'did:wba:target.example.com';
-      const serviceDomain = 'test.service.com';
+      const respDid = 'did:wba:localhost%3A9527:wba:user:5fea49e183c6c211';
+      const serviceDomain = 'localhost:9527';
 
       const authHeader = await DIDWbaAuth.generateAuthHeaderTwoWay(
         testDidDocument,
@@ -227,8 +218,8 @@ describe('DIDWbaAuth - Two-Way Authentication', () => {
     });
 
     it('should fail verification when verification method not found', async () => {
-      const respDid = 'did:wba:target.example.com';
-      const serviceDomain = 'test.service.com';
+      const respDid = 'did:wba:localhost%3A9527:wba:user:5fea49e183c6c211';
+      const serviceDomain = 'localhost:9527';
 
       const authHeader = await DIDWbaAuth.generateAuthHeaderTwoWay(
         testDidDocument,
@@ -256,8 +247,8 @@ describe('DIDWbaAuth - Two-Way Authentication', () => {
 
   describe('Two-way vs Single-way Authentication Data Structure', () => {
     it('should use different service field names', async () => {
-      const respDid = 'did:wba:target.example.com';
-      const serviceDomain = 'test.service.com';
+      const respDid = 'did:wba:localhost%3A9527:wba:user:5fea49e183c6c211';
+      const serviceDomain = 'localhost:9527';
 
       // Generate both types of headers
       const singleWayHeader = await DIDWbaAuth.generateAuthHeader(
@@ -297,8 +288,8 @@ describe('DIDWbaAuth - Two-Way Authentication', () => {
     });
 
     it('should include resp_did only in two-way authentication', async () => {
-      const respDid = 'did:wba:target.example.com';
-      const serviceDomain = 'test.service.com';
+      const respDid = 'did:wba:localhost%3A9527:wba:user:5fea49e183c6c211';
+      const serviceDomain = 'localhost:9527';
 
       // Single-way should not have resp_did
       const singleWayHeader = await DIDWbaAuth.generateAuthHeader(
@@ -334,7 +325,7 @@ describe('DIDWbaAuth - Two-Way Authentication', () => {
         const result = await DIDWbaAuth.verifyAuthHeaderSignatureTwoWay(
           header,
           testDidDocument,
-          'test.service.com'
+          'localhost:9527'
         );
 
         expect(result.valid).toBe(false);
@@ -356,8 +347,8 @@ describe('DIDWbaAuth - Two-Way Authentication', () => {
         }]
       } as DIDDocument;
 
-      const respDid = 'did:wba:target.example.com';
-      const serviceDomain = 'test.service.com';
+      const respDid = 'did:wba:localhost%3A9527:wba:user:5fea49e183c6c211';
+      const serviceDomain = 'localhost:9527';
 
       const authHeader = await DIDWbaAuth.generateAuthHeaderTwoWay(
         testDidDocument,

@@ -28,9 +28,11 @@ export interface ApiCallResult {
 
 export class AgentApiCaller {
   private authInitiator: AuthInitiator;
+  private callerDid: string;
 
   constructor(privateKey: string, callerDid: string) {
-    this.authInitiator = new AuthInitiator(privateKey, callerDid);
+    this.authInitiator = new AuthInitiator();
+    this.callerDid = callerDid;
   }
 
   /**
@@ -58,30 +60,30 @@ export class AgentApiCaller {
 
       logger.debug(`🔗 调用Agent API: ${method} ${url}`);
 
-      // 创建认证header
-      const authHeaders = await this.authInitiator.addAuthHeader(
+      // 使用AuthInitiator发送认证请求
+      const result = await this.authInitiator.sendAuthenticatedRequest(
+        this.callerDid,
         targetDid,
         url,
         method,
-        options.headers || {},
-        payload
+        payload,
+        options.headers
       );
 
-      // 发送请求
-      const response = await axios({
-        method,
-        url,
-        data: payload,
-        headers: authHeaders,
-        timeout: options.timeout || 30000
-      });
-
-      return {
-        success: true,
-        data: response.data,
-        statusCode: response.status,
-        headers: response.headers as Record<string, string>
-      };
+      if (result.is_auth_pass) {
+        return {
+          success: true,
+          data: result.response ? JSON.parse(result.response) : {},
+          statusCode: result.status,
+          headers: {}
+        };
+      } else {
+        return {
+          success: false,
+          error: result.info || 'Authentication failed',
+          statusCode: result.status
+        };
+      }
 
     } catch (error: any) {
       logger.error('Agent API调用失败:', error);
@@ -107,7 +109,7 @@ export class AgentApiCaller {
       type: messageType,
       payload,
       timestamp: new Date().toISOString(),
-      sender: this.authInitiator['did'] // 访问私有属性
+      sender: this.callerDid
     };
 
     return await this.callAgentApi(

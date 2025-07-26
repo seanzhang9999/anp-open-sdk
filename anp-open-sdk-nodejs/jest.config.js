@@ -31,6 +31,16 @@ module.exports = {
   setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
   testTimeout: 30000,
   verbose: true,
+  // 增强测试报告
+  reporters: [
+    ['<rootDir>/tests/custom-reporter.js', { showPassed: false }],
+    'default'
+  ],
+  // 显示更多错误信息
+  errorOnDeprecated: true,
+  bail: false,
+  collectCoverage: false,
+  maxWorkers: 1,
   // 支持路径映射
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',

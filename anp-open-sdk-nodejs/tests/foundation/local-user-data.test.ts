@@ -105,7 +105,7 @@ describe('LocalUserData类测试', () => {
 
       expect(storedToken).toBeDefined();
       expect(storedToken?.token).toBe(token);
-      expect(storedToken?.req_did).toBe(remoteDid);
+      expect(storedToken?.req_did).toBe(userData.getDid());
       expect(storedToken?.is_revoked).toBe(false);
       expect(storedToken?.expires_at).toBeDefined();
     });

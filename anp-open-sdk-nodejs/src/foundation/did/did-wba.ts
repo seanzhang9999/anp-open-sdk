@@ -16,7 +16,7 @@ import {
   JWK,
   VerificationMethod 
 } from './types';
-import { createVerificationMethod } from './verification-methods';
+import { createVerificationMethod, VerificationMethodBase } from './verification-methods';
 
 // JSON Canonicalization Scheme implementation (simplified)
 function canonicalizeJSON(obj: any): string {
@@ -212,9 +212,11 @@ export class DIDWbaAuth {
     const content = new Uint8Array(Buffer.from(canonical, 'utf8'));
     const hash = crypto.createHash('sha256').update(content).digest();
 
-    // Sign
-    const signature = await signCallback(hash);
-    const signatureB64 = encodeBase64Url(signature);
+    // Sign (signCallback returns DER format)
+    const derSignature = await signCallback(hash);
+    
+    // Convert DER to R|S format and encode as base64url
+    const signatureB64 = VerificationMethodBase.encodeSignature(derSignature);
 
     // Find verification method
     const verificationMethod = didDocument.verificationMethod[0];
@@ -262,9 +264,11 @@ export class DIDWbaAuth {
     const content = new Uint8Array(Buffer.from(canonical, 'utf8'));
     const hash = crypto.createHash('sha256').update(content).digest();
 
-    // Sign
-    const signature = await signCallback(hash);
-    const signatureB64 = encodeBase64Url(signature);
+    // Sign (signCallback returns DER format)
+    const derSignature = await signCallback(hash);
+    
+    // Convert DER to R|S format and encode as base64url
+    const signatureB64 = VerificationMethodBase.encodeSignature(derSignature);
 
     // Find verification method
     const verificationMethod = didDocument.verificationMethod[0];
@@ -382,6 +386,11 @@ export class DIDWbaAuth {
    * Extract auth header parts (two-way)
    */
   public static extractAuthHeaderPartsTwoWay(authHeader: string): AuthHeaderParts {
+    // Verify the header starts with DIDWba
+    if (!authHeader.trim().startsWith('DIDWba')) {
+      throw new Error('Authorization header must start with DIDWba');
+    }
+
     // Remove "DIDWba " prefix
     const headerContent = authHeader.replace(/^DIDWba\s+/, '');
     
@@ -452,7 +461,12 @@ export class DIDWbaAuth {
 
       // Verify signature
       const verifier = createVerificationMethod(verificationMethod);
+      console.log(`🔍 验证签名 - 哈希: ${Buffer.from(hash).toString('hex')}`);
+      console.log(`🔍 验证签名 - 签名: ${parts.signature}`);
+      console.log(`🔍 验证方法: ${JSON.stringify(verificationMethod.publicKeyJwk)}`);
+      
       const valid = await verifier.verifySignature(hash, parts.signature);
+      console.log(`🔍 签名验证结果: ${valid}`);
 
       return {
         valid,

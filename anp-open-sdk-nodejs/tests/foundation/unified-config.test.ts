@@ -15,6 +15,9 @@ describe('UnifiedConfig', () => {
   let configPath: string;
 
   beforeEach(() => {
+    // Reset static app root before each test
+    UnifiedConfig.resetAppRoot();
+    
     // Create temporary directory for test files
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'unified-config-test-'));
     configPath = path.join(tempDir, 'unified_config.yaml');

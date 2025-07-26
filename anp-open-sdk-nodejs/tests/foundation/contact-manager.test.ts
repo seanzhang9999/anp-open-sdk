@@ -16,8 +16,8 @@ describe('ContactManager', () => {
   let userDataManager: LocalUserDataManager;
 
   beforeEach(async () => {
-    // 使用真实的测试数据
-    const testDataPath = path.join(__dirname, '../../data_user');
+    // 使用项目根目录的测试数据
+    const testDataPath = path.resolve(__dirname, '../../../data_user');
     userDataManager = LocalUserDataManager.getInstance(testDataPath);
     
     // 初始化并获取第一个可用的用户数据
