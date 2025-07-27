@@ -296,13 +296,21 @@ export class AgentManager {
    * 根据DID获取Agent实例（如果有多个，返回第一个）
    */
   static getAgentByDid(did: string): Agent | null {
+    logger.debug(`🔍 [AgentManager] 查找Agent: ${did}`);
+    logger.debug(`🔍 [AgentManager] 当前注册的DID列表:`);
+    for (const registeredDid of this.didUsageRegistry.keys()) {
+      logger.debug(`🔍 [AgentManager]   - ${registeredDid}`);
+    }
+    
     const agentsInfo = this.getAgentInfo(did) as Map<string, AgentInfo> | null;
     if (!agentsInfo || agentsInfo.size === 0) {
+      logger.debug(`🔍 [AgentManager] Agent未找到: ${did}`);
       return null;
     }
 
     // 返回第一个Agent实例
     const firstAgent = agentsInfo.values().next().value;
+    logger.debug(`🔍 [AgentManager] Agent找到: ${did}, 名称: ${firstAgent?.agent?.name}`);
     return firstAgent?.agent || null;
   }
 

@@ -105,8 +105,8 @@ export function agentClass(options: AgentClassOptions) {
           userDid = getFirstAvailableUser();
         }
 
-        // 创建ANPUser
-        const anpUser = ANPUser.fromDid(userDid);
+        // 创建ANPUser - 使用同步版本
+        const anpUser = ANPUser.fromDidSync(userDid);
 
         // 创建Agent
         this._agent = AgentManager.createAgent(anpUser, {
@@ -214,7 +214,7 @@ export function createAgent(options: AgentClassOptions): Agent {
     userDid = getFirstAvailableUser();
   }
 
-  const anpUser = ANPUser.fromDid(userDid);
+  const anpUser = ANPUser.fromDidSync(userDid);
   return AgentManager.createAgent(anpUser, {
     name: options.name,
     shared: options.shared || false,
@@ -302,16 +302,16 @@ export async function createAgentsWithCode(
  * 创建共享Agent - 兼容Python的create_shared_agent
  */
 export function createSharedAgent(
-  didStr: string, 
-  name: string, 
-  prefix: string, 
+  didStr: string,
+  name: string,
+  prefix: string,
   primaryAgent: boolean
 ): Agent {
-  const anpUser = ANPUser.fromDid(didStr);
+  const anpUser = ANPUser.fromDidSync(didStr);
   return AgentManager.createAgent(anpUser, {
-    name, 
-    shared: true, 
-    prefix, 
+    name,
+    shared: true,
+    prefix,
     primaryAgent
   });
 }

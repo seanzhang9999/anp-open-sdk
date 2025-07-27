@@ -523,13 +523,15 @@ export class AuthVerifier {
   }
 
   /**
-   * 本地DID文档解析
+   * 本地DID文档解析 - 对应Python版本的_resolve_did_document_insecurely
    */
   private async resolveDidDocumentInsecurely(did: string): Promise<DIDDocument | null> {
     try {
+      logger.debug(`🔍 开始解析本地DID文档: ${did}`);
+      
       const parts = did.split(':');
       if (parts.length < 5 || parts[0] !== 'did' || parts[1] !== 'wba') {
-        logger.debug(`无效的DID格式: ${did}`);
+        logger.debug(`❌ 无效的DID格式: ${did}`);
         return null;
       }
 
@@ -543,14 +545,45 @@ export class AuthVerifier {
       const userDir = pathSegments[pathSegments.length - 2];
 
       const httpUrl = `http://${hostname}/wba/${userDir}/${userId}/did.json`;
+      logger.debug(`📡 准备从HTTP端点获取DID文档: ${httpUrl}`);
 
-      // 这里应该发送HTTP请求，目前返回null
-      // TODO: 实现HTTP请求获取DID文档
-      logger.debug(`需要从 ${httpUrl} 获取DID文档`);
-      return null;
+      // 实现HTTP请求获取DID文档 - 对应Python版本的aiohttp实现
+      try {
+        const response = await fetch(httpUrl, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          },
+          // 设置超时时间
+          signal: AbortSignal.timeout(10000) // 10秒超时
+        });
+
+        logger.debug(`📡 HTTP请求状态: ${response.status} ${response.statusText}`);
+
+        if (response.status === 200) {
+          const didDocument = await response.json();
+          logger.debug(`✅ 成功通过DID标识解析的${httpUrl}获取${did}的DID文档`);
+          logger.debug(`📄 DID文档内容: ${JSON.stringify(didDocument, null, 2)}`);
+          return didDocument as DIDDocument;
+        } else {
+          logger.debug(`❌ DID本地解析器地址${httpUrl}获取失败，状态码: ${response.status}`);
+          return null;
+        }
+      } catch (fetchError: any) {
+        logger.debug(`❌ HTTP请求失败: ${fetchError.message}`);
+        if (fetchError.name === 'TimeoutError') {
+          logger.debug(`⏰ 请求超时: ${httpUrl}`);
+        } else if (fetchError.code === 'ECONNREFUSED') {
+          logger.debug(`🔌 连接被拒绝: ${httpUrl}`);
+        } else if (fetchError.code === 'ENOTFOUND') {
+          logger.debug(`🌐 域名解析失败: ${httpUrl}`);
+        }
+        return null;
+      }
 
     } catch (error) {
-      logger.debug(`解析DID文档时出错: ${error}`);
+      logger.debug(`❌ 解析DID文档时出错: ${error}`);
       return null;
     }
   }

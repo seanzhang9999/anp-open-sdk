@@ -15,6 +15,8 @@ import {
 import { AuthVerifier } from '../../foundation/auth';
 import { getGlobalConfig } from '../../foundation/config';
 import { getLogger } from '../../foundation/utils';
+import { DIDServiceHandler } from '../../servicepoint/handlers/did-service-handler';
+import { DomainManager } from '../../foundation/domain';
 
 const logger = getLogger('AnpServer');
 
@@ -80,6 +82,20 @@ export class AnpServer {
    * 设置路由
    */
   private setupRoutes(): void {
+    // DID服务路由 - 必须在认证中间件之前或者豁免认证
+    this.setupDIDRoutes();
+
+    // 添加路由调试日志中间件
+    this.app.use((req: Request, res: Response, next) => {
+      logger.debug(`🔍 [路由调试] ${req.method} ${req.path} - 查找匹配的路由`);
+      if (req.path.startsWith('/agent/api/')) {
+        logger.warn(`⚠️ [路由调试] 检测到 /agent/api/ 路径请求，但当前没有对应的路由配置！`);
+        logger.warn(`⚠️ [路由调试] 请求详情: ${req.method} ${req.path}`);
+        logger.warn(`⚠️ [路由调试] 查询参数: ${JSON.stringify(req.query)}`);
+      }
+      next();
+    });
+
     // 健康检查端点
     this.app.get('/health', (req: Request, res: Response) => {
       res.json({
@@ -98,7 +114,17 @@ export class AnpServer {
     // Agent详情端点
     this.app.get('/agents/:did', (req: Request, res: Response) => {
       const { did } = req.params;
-      const agent = AgentManager.getAgentByDid(did);
+      
+      // 智能DID解码：解码一次后如果包含 %3A，就停止解码
+      let decodedDid = decodeURIComponent(did);
+      if (decodedDid.includes('%3A')) {
+        // 使用包含 %3A 的格式，这与Agent注册时的格式一致
+        logger.debug(`🔍 Agent详情 - 原始DID: ${did}, 解码后(包含%3A): ${decodedDid}`);
+      } else {
+        logger.debug(`🔍 Agent详情 - 原始DID: ${did}, 完全解码后: ${decodedDid}`);
+      }
+      
+      const agent = AgentManager.getAgentByDid(decodedDid);
       
       if (!agent) {
         return res.status(404).json({ error: 'Agent not found' });
@@ -112,7 +138,16 @@ export class AnpServer {
       const { did } = req.params;
       const path = '/' + req.params[0];
       
-      const agent = AgentManager.getAgentByDid(did);
+      // 智能DID解码：解码一次后如果包含 %3A，就停止解码
+      let decodedDid = decodeURIComponent(did);
+      if (decodedDid.includes('%3A')) {
+        // 使用包含 %3A 的格式，这与Agent注册时的格式一致
+        logger.debug(`🔍 Agent API调用 - 原始DID: ${did}, 解码后(包含%3A): ${decodedDid}`);
+      } else {
+        logger.debug(`🔍 Agent API调用 - 原始DID: ${did}, 完全解码后: ${decodedDid}`);
+      }
+      
+      const agent = AgentManager.getAgentByDid(decodedDid);
       
       if (!agent) {
         return res.status(404).json({ error: 'Agent not found' });
@@ -148,6 +183,9 @@ export class AnpServer {
         res.status(500).json({ error: 'Internal server error' });
       }
     });
+
+    // 添加 /agent/api/ 路径支持 - 修复404错误
+    this.setupAgentApiRoutes();
 
     // 动态路由处理（基于Agent prefix）
     this.app.all('*', async (req: Request, res: Response) => {
@@ -188,6 +226,262 @@ export class AnpServer {
         res.status(500).json({ error: 'Internal server error' });
       }
     });
+  }
+
+  /**
+   * 设置DID服务路由
+   */
+  private setupDIDRoutes(): void {
+    const domainManager = new DomainManager();
+
+    // DID文档端点: /wba/user/{user_id}/did.json
+    this.app.get('/wba/user/:userId/did.json', async (req: Request, res: Response) => {
+      try {
+        const { userId } = req.params;
+        const host = req.hostname || 'localhost';
+        const port = this.config.port || 9527;
+
+        logger.debug(`DID文档请求: userId=${userId}, host=${host}, port=${port}`);
+
+        const result = await DIDServiceHandler.getDidDocument(userId, host, port);
+        
+        if (result.success) {
+          res.json(result.data);
+        } else {
+          logger.warn(`DID文档获取失败: ${result.error}`);
+          res.status(404).json({ error: result.error });
+        }
+      } catch (error) {
+        logger.error(`DID文档端点错误:`, error);
+        res.status(500).json({ error: 'Internal server error' });
+      }
+    });
+
+    // Agent描述端点: /wba/user/{user_id}/ad.json
+    this.app.get('/wba/user/:userId/ad.json', async (req: Request, res: Response) => {
+      try {
+        const { userId } = req.params;
+        const host = req.hostname || 'localhost';
+        const port = this.config.port || 9527;
+
+        logger.debug(`Agent描述请求: userId=${userId}, host=${host}, port=${port}`);
+
+        const result = await DIDServiceHandler.getAgentDescription(userId, host, port);
+        
+        if (result.success) {
+          res.json(result.data);
+        } else {
+          logger.warn(`Agent描述获取失败: ${result.error}`);
+          res.status(404).json({ error: result.error });
+        }
+      } catch (error) {
+        logger.error(`Agent描述端点错误:`, error);
+        res.status(500).json({ error: 'Internal server error' });
+      }
+    });
+
+    // Agent YAML文件端点: /wba/user/{resp_did}/{yaml_file_name}.yaml
+    this.app.get('/wba/user/:respDid/:yamlFileName.yaml', async (req: Request, res: Response) => {
+      try {
+        const { respDid, yamlFileName } = req.params;
+        const host = req.hostname || 'localhost';
+        const port = this.config.port || 9527;
+
+        logger.debug(`Agent YAML请求: respDid=${respDid}, yamlFileName=${yamlFileName}, host=${host}, port=${port}`);
+
+        const result = await DIDServiceHandler.getAgentYamlFile(respDid, yamlFileName, host, port);
+        
+        if (result.success) {
+          res.setHeader('Content-Type', 'application/x-yaml');
+          res.send(result.data);
+        } else {
+          logger.warn(`Agent YAML获取失败: ${result.error}`);
+          res.status(404).json({ error: result.error });
+        }
+      } catch (error) {
+        logger.error(`Agent YAML端点错误:`, error);
+        res.status(500).json({ error: 'Internal server error' });
+      }
+    });
+
+    // Agent JSON文件端点: /wba/user/{resp_did}/{json_file_name}.json
+    this.app.get('/wba/user/:respDid/:jsonFileName.json', async (req: Request, res: Response) => {
+      try {
+        const { respDid, jsonFileName } = req.params;
+        const host = req.hostname || 'localhost';
+        const port = this.config.port || 9527;
+
+        logger.debug(`Agent JSON请求: respDid=${respDid}, jsonFileName=${jsonFileName}, host=${host}, port=${port}`);
+
+        const result = await DIDServiceHandler.getAgentJsonFile(respDid, jsonFileName, host, port);
+        
+        if (result.success) {
+          res.json(result.data);
+        } else {
+          logger.warn(`Agent JSON获取失败: ${result.error}`);
+          res.status(404).json({ error: result.error });
+        }
+      } catch (error) {
+        logger.error(`Agent JSON端点错误:`, error);
+        res.status(500).json({ error: 'Internal server error' });
+      }
+    });
+
+    logger.info('DID服务路由已注册');
+  }
+
+  /**
+   * 设置Agent API路由 - 修复 /agent/api/ 路径404错误
+   */
+  private setupAgentApiRoutes(): void {
+    // Agent API通用路由: /agent/api/{did}/{subpath}
+    this.app.all('/agent/api/:did/*', async (req: Request, res: Response) => {
+      const { did } = req.params;
+      const subpath = req.params[0] || '';
+      const fullPath = '/' + subpath;
+      
+      logger.debug(`🔄 处理Agent API请求: /agent/api/${did}${fullPath}`);
+      
+      // 智能DID解码：解码一次后如果包含 %3A，就停止解码
+      let decodedDid = decodeURIComponent(did);
+      
+      // 如果解码后包含 %3A，说明这是正确的格式，不需要进一步解码
+      if (decodedDid.includes('%3A')) {
+        // 使用包含 %3A 的格式，这与Agent注册时的格式一致
+        logger.debug(`🔍 原始DID参数: ${did}`);
+        logger.debug(`🔍 解码后的DID (包含%3A): ${decodedDid}`);
+      } else {
+        // 如果解码后不包含 %3A，使用解码后的结果
+        logger.debug(`🔍 原始DID参数: ${did}`);
+        logger.debug(`🔍 完全解码后的DID: ${decodedDid}`);
+      }
+      
+      // 调试：列出所有已注册的Agent DID
+      const allAgents = AgentManager.getAllAgents();
+      logger.debug(`🔍 已注册的Agent数量: ${allAgents.length}`);
+      for (const agent of allAgents) {
+        logger.debug(`🔍 已注册Agent DID: ${agent.anpUser.id}`);
+      }
+      
+      const agent = AgentManager.getAgentByDid(decodedDid);
+      
+      if (!agent) {
+        logger.warn(`❌ Agent未找到: ${decodedDid}`);
+        return res.status(404).json({
+          error: 'Agent not found',
+          did: decodedDid,
+          originalDid: did
+        });
+      }
+
+      try {
+        const callerDid = (req as any).auth?.callerDid || req.query.req_did || 'anonymous';
+        
+        const requestData = {
+          type: 'api_call',
+          path: fullPath,
+          method: req.method,
+          headers: req.headers,
+          body: req.body,
+          query: req.query,
+          req_did: callerDid
+        };
+
+        logger.debug(`📤 发送请求到Agent: ${decodedDid}, 路径: ${fullPath}, 调用者: ${callerDid}`);
+        
+        const response = await agent.handleRequest(callerDid, requestData, req);
+        
+        if (response && typeof response === 'object' && 'status' in response) {
+          res.status(response.status);
+          if (response.headers) {
+            Object.entries(response.headers).forEach(([key, value]) => {
+              res.setHeader(key, String(value));
+            });
+          }
+          res.json(response.body);
+        } else {
+          res.json(response);
+        }
+
+        logger.debug(`✅ Agent API请求处理成功: ${decodedDid}${fullPath}`);
+
+      } catch (error) {
+        logger.error(`❌ Agent API请求处理失败: ${decodedDid}${fullPath}:`, error);
+        res.status(500).json({
+          error: 'Internal server error',
+          message: error instanceof Error ? error.message : String(error)
+        });
+      }
+    });
+
+    // 特定的add端点路由: /agent/api/{did}/add
+    this.app.all('/agent/api/:did/add', async (req: Request, res: Response) => {
+      const { did } = req.params;
+      
+      logger.debug(`🔄 处理Agent连接添加请求: /agent/api/${did}/add`);
+      
+      // 智能DID解码：解码一次后如果包含 %3A，就停止解码
+      let decodedDid = decodeURIComponent(did);
+      
+      // 如果解码后包含 %3A，说明这是正确的格式，不需要进一步解码
+      if (decodedDid.includes('%3A')) {
+        // 使用包含 %3A 的格式，这与Agent注册时的格式一致
+        logger.debug(`🔍 Agent连接添加 - 原始DID: ${did}, 解码后(包含%3A): ${decodedDid}`);
+      } else {
+        // 如果解码后不包含 %3A，使用解码后的结果
+        logger.debug(`🔍 Agent连接添加 - 原始DID: ${did}, 完全解码后: ${decodedDid}`);
+      }
+      const agent = AgentManager.getAgentByDid(decodedDid);
+      
+      if (!agent) {
+        logger.warn(`❌ Agent未找到 (add请求): ${decodedDid}`);
+        return res.status(404).json({
+          error: 'Agent not found for add request',
+          did: decodedDid,
+          originalDid: did
+        });
+      }
+
+      try {
+        const callerDid = (req as any).auth?.callerDid || req.query.req_did || 'anonymous';
+        const respDid = req.query.resp_did || decodedDid;
+        
+        const requestData = {
+          type: 'agent_connect',
+          action: 'add',
+          method: req.method,
+          headers: req.headers,
+          body: req.body,
+          query: req.query,
+          req_did: callerDid,
+          resp_did: respDid
+        };
+
+        logger.debug(`📤 发送连接添加请求到Agent: ${decodedDid}, 调用者: ${callerDid}, 响应者: ${respDid}`);
+        
+        const response = await agent.handleRequest(callerDid, requestData, req);
+        
+        // 返回成功响应
+        res.json({
+          success: true,
+          action: 'add',
+          req_did: callerDid,
+          resp_did: respDid,
+          data: response
+        });
+
+        logger.debug(`✅ Agent连接添加请求处理成功: ${decodedDid}`);
+
+      } catch (error) {
+        logger.error(`❌ Agent连接添加请求处理失败: ${decodedDid}:`, error);
+        res.status(500).json({
+          error: 'Agent connect add failed',
+          message: error instanceof Error ? error.message : String(error)
+        });
+      }
+    });
+
+    logger.info('Agent API路由已注册 (/agent/api/)');
   }
 
   /**

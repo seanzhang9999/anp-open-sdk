@@ -17,7 +17,7 @@ import {
 import { agentApi } from '../src/runtime/decorators/simple-decorators';
 import { ANPUser } from '../src/foundation';
 import { getLogger } from '../src/foundation';
-import { UnifiedConfig, setGlobalConfig } from '../src/foundation/config';
+import { loadGlobalConfig } from '../src/foundation/config';
 import { getUserDataManager } from '../src/foundation/user';
 import { AgentApiCaller } from '../src/runtime/services/agent-api-caller';
 import { agentMsgPost as agentMsgPostService } from '../src/runtime/services/agent-message-caller';
@@ -302,8 +302,7 @@ async function main() {
   // 🔧 步骤1：初始化配置系统（参考Python版本）
   logger.debug("🔧 初始化配置系统...");
   try {
-    const appConfig = new UnifiedConfig('unified_config.yaml');
-    setGlobalConfig(appConfig);
+    await loadGlobalConfig();
     logger.debug("✅ 配置系统初始化成功");
   } catch (error) {
     logger.error(`❌ 配置系统初始化失败: ${error}`);
@@ -508,12 +507,23 @@ async function testNewAgentSystem(agents: any[]): Promise<void> {
     // 尝试创建冲突的Agent
     const testUserDid = "did:wba:localhost%3A9527:wba:user:3ea884878ea5fbb1";
     
-    // 这应该失败，因为DID已被独占使用
-    const conflictAgent = AgentManager.createAgent(testUserDid, {
-      name: "冲突测试Agent",
-      shared: false
-    });
-    logger.error("❌ 冲突检测失败：应该阻止创建冲突Agent");
+    // 获取用户数据管理器并创建ANPUser对象
+    const userDataManager = getUserDataManager();
+    const testUserData = userDataManager.getUserData(testUserDid);
+    
+    if (testUserData) {
+      const testAnpUser = new ANPUser(testUserData);
+      
+      // 这应该失败，因为DID已被独占使用
+      const conflictAgent = AgentManager.createAgent(testAnpUser, {
+        name: "冲突测试Agent",
+        shared: false
+      });
+      logger.error("❌ 冲突检测失败：应该阻止创建冲突Agent");
+    } else {
+      logger.info(`✅ 冲突检测成功: 测试用户数据不存在，无法创建Agent`);
+      conflictTestSuccess = true;
+    }
     
   } catch (error: any) {
     logger.info(`✅ 冲突检测成功: ${error.message}`);

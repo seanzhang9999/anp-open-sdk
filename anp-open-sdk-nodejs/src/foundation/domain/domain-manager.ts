@@ -153,7 +153,10 @@ export class DomainManager {
   getDataPathForDomain(domain: string, port: number): string {
     // 标准化域名（移除特殊字符）
     const safeDomain = domain.replace(/\./g, '_').replace(/:/g, '_');
-    return `${DEFAULT_CONFIG.DATA_USER_DIR}/${safeDomain}_${port}`;
+    
+    // 解析相对于项目根目录的路径
+    const dataUserDir = path.resolve(process.cwd(), '..', DEFAULT_CONFIG.DATA_USER_DIR);
+    return path.join(dataUserDir, `${safeDomain}_${port}`);
   }
 
   /**

@@ -37,27 +37,40 @@ export class AuthExemptHandler {
    * 检查路径是否豁免认证
    */
   public static isExempt(path: string): boolean {
+    logger.debug(`检查路径是否豁免认证: ${path}`);
+    logger.debug(`当前豁免路径列表: ${this.exemptPaths.join(', ')}`);
+    
     // 检查是否在豁免路径列表中
     for (const exemptPath of this.exemptPaths) {
+      logger.debug(`  检查豁免路径: ${exemptPath}`);
+      
       // 根路径的精确匹配
       if (exemptPath === "/" && path === "/") {
+        logger.debug(`  ✅ 根路径精确匹配`);
         return true;
       }
       // 其他路径的精确匹配
       else if (path === exemptPath) {
+        logger.debug(`  ✅ 精确匹配`);
         return true;
       }
       // 以斜杠结尾的路径的目录匹配
       else if (exemptPath !== '/' && exemptPath.endsWith('/') && path.startsWith(exemptPath)) {
+        logger.debug(`  ✅ 目录匹配`);
         return true;
       }
       // 通配符匹配
       else if (exemptPath.includes('*')) {
-        if (this.matchPattern(path, exemptPath)) {
+        const isMatch = this.matchPattern(path, exemptPath);
+        logger.debug(`  通配符匹配 ${exemptPath} vs ${path}: ${isMatch}`);
+        if (isMatch) {
+          logger.debug(`  ✅ 通配符匹配成功`);
           return true;
         }
       }
     }
+    
+    logger.debug(`  ❌ 路径不在豁免列表中: ${path}`);
     return false;
   }
 

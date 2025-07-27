@@ -302,16 +302,29 @@ export class DIDWbaAuth {
       // Parse header
       const parts = this.extractAuthHeaderParts(authHeader);
       
-      // Reconstruct auth data
-      const authData: AuthData = {
-        nonce: parts.nonce,
-        timestamp: parts.timestamp,
-        service: serviceDomain,
-        did: parts.did
-      };
-
-      if (parts.respDid) {
-        authData.resp_did = parts.respDid;
+      // 检查是否为双向认证（包含resp_did）
+      const isTwoWayAuth = !!parts.respDid;
+      
+      // Reconstruct auth data - 根据认证类型使用不同的字段名
+      let authData: AuthData;
+      
+      if (isTwoWayAuth) {
+        // 双向认证使用 anp_service 字段（与Python版本一致）
+        authData = {
+          nonce: parts.nonce,
+          timestamp: parts.timestamp,
+          anp_service: serviceDomain,  // 使用 anp_service 而不是 service
+          did: parts.did,
+          resp_did: parts.respDid!
+        };
+      } else {
+        // 单向认证使用 service 字段
+        authData = {
+          nonce: parts.nonce,
+          timestamp: parts.timestamp,
+          service: serviceDomain,
+          did: parts.did
+        };
       }
 
       // Find verification method

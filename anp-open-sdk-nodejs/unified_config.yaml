@@ -13,8 +13,8 @@ anpSdk:
   debugMode: true
   host: "localhost"
   port: 9527
-  userDidPath: "./data_user/localhost_9527/anp_users"
-  userHostedPath: "./data_user/localhost_9527/anp_users_hosted"
+  userDidPath: "../data_user"
+  userHostedPath: "../data_user"
   authVirtualDir: "/auth"
   msgVirtualDir: "/msg"
   tokenExpireTime: 3600
@@ -68,6 +68,8 @@ authMiddleware:
     - "/health"
     - "/docs"
     - "/static/*"
+    - "/wba/user/*/did.json"
+    - "/wba/user/*"
 
 didConfig:
   method: "wba"
