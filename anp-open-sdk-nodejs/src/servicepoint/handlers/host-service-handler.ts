@@ -6,9 +6,9 @@
 
 import * as path from 'path';
 import * as fs from 'fs';
-import { DomainManager } from '@foundation/domain';
-import { getUserDataManager } from '@foundation/user';
-import { getLogger } from '@foundation/utils';
+import { DomainManager } from '../../foundation/domain';
+import { getUserDataManager } from '../../foundation/user';
+import { getLogger } from '../../foundation/utils';
 
 const logger = getLogger('HostServiceHandler');
 

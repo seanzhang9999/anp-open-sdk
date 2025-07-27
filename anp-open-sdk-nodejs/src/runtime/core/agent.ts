@@ -4,8 +4,8 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  */
 
-import { ANPUser } from '@foundation/user';
-import { getLogger } from '@foundation/utils';
+import { ANPUser } from '../../foundation/user';
+import { getLogger } from '../../foundation/utils';
 
 const logger = getLogger('Agent');
 

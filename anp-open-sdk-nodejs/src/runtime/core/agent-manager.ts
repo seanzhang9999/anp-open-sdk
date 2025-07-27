@@ -7,8 +7,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { Agent, AgentOptions } from './agent';
-import { ANPUser } from '@foundation/user';
-import { getLogger } from '@foundation/utils';
+import { ANPUser } from '../../foundation/user';
+import { getLogger } from '../../foundation/utils';
 
 const logger = getLogger('AgentManager');
 
@@ -320,6 +320,27 @@ export class AgentManager {
   }
 
   /**
+   * 根据路径前缀查找Agent
+   */
+  static findAgentByPathPrefix(path: string): Agent | null {
+    for (const agentsMap of this.didUsageRegistry.values()) {
+      for (const agentInfo of agentsMap.values()) {
+        if (agentInfo.prefix && path.startsWith(agentInfo.prefix)) {
+          return agentInfo.agent;
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * 获取所有Agent实例（别名方法，用于兼容）
+   */
+  static getAllAgents(): Agent[] {
+    return this.getAllAgentInstances();
+  }
+
+  /**
    * 列出所有Agent信息
    */
   static listAgents(): Record<string, Record<string, Omit<AgentInfo, 'agent'>>> {
@@ -440,4 +461,12 @@ export class AgentManager {
       recentApiCalls: this.apiCallManager.getRecentCalls().length
     };
   }
+}
+
+/**
+ * 获取AgentManager实例（兼容性函数）
+ * 返回AgentManager类的引用，用于与现有代码兼容
+ */
+export function getAgentManager(): typeof AgentManager {
+  return AgentManager;
 }

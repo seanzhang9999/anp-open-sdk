@@ -625,6 +625,57 @@ export class AuthVerifier {
       resp_did: parts.respDid
     };
   }
+  /**
+   * 验证认证请求 - 为中间件提供的适配器方法
+   * 兼容原有的verifyAuthRequest接口
+   */
+  async verifyAuthRequest(authHeader: string, request?: any): Promise<AuthResult> {
+    try {
+      // 构建请求对象，如果没有提供request参数
+      const requestObj = request || {
+        headers: { authorization: authHeader },
+        method: 'POST',
+        path: '/',
+        query: {},
+        hostname: 'localhost'
+      };
+
+      // 调用现有的authenticateRequest方法
+      const result = await this.authenticateRequest(requestObj);
+
+      // 转换返回格式以匹配AuthResult接口
+      if (result.success === true) {
+        return {
+          success: true,
+          caller_did: this.extractCallerDidFromResult(result.result),
+          payload: result.result
+        };
+      } else {
+        return {
+          success: false,
+          error: result.message || 'Authentication failed'
+        };
+      }
+
+    } catch (error) {
+      logger.error(`认证适配器错误: ${error}`);
+      return {
+        success: false,
+        error: `Authentication adapter error: ${error}`
+      };
+    }
+  }
+
+  /**
+   * 从认证结果中提取调用者DID
+   */
+  private extractCallerDidFromResult(result: any): string | undefined {
+    if (typeof result === 'object' && result) {
+      // 尝试从不同的字段中提取DID
+      return result.req_did || result.caller_did || result.did;
+    }
+    return undefined;
+  }
 }
 
 // 全局认证验证器实例

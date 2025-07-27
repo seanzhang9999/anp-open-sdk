@@ -5,9 +5,9 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
-import { getGlobalConfig } from '@foundation/config';
-import { AuthVerifier, AuthResult } from '@foundation/auth';
-import { getLogger } from '@foundation/utils';
+import { getGlobalConfig } from '../../foundation/config';
+import { AuthVerifier, AuthResult } from '../../foundation/auth';
+import { getLogger } from '../../foundation/utils';
 
 const logger = getLogger('AuthMiddleware');
 
@@ -115,11 +115,11 @@ export class AuthMiddleware {
 
         // 将认证信息添加到请求对象
         (req as any).auth = {
-          callerDid: result.callerDid,
+          callerDid: result.caller_did,
           payload: result.payload
         };
 
-        logger.debug(`认证成功: ${result.callerDid}`);
+        logger.debug(`认证成功: ${result.caller_did}`);
         next();
 
       } catch (error) {

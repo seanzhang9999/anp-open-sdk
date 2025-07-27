@@ -5,7 +5,7 @@
  */
 
 import axios from 'axios';
-import { getLogger } from '@foundation/utils';
+import { getLogger } from '../../foundation/utils';
 
 const logger = getLogger('AgentServiceHandler');
 

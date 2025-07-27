@@ -6,9 +6,9 @@
 
 import { Agent, AgentOptions } from '../core/agent';
 import { AgentManager } from '../core/agent-manager';
-import { ANPUser } from '@foundation/user';
-import { getUserDataManager } from '@foundation/user';
-import { getLogger } from '@foundation/utils';
+import { ANPUser } from '../../foundation/user';
+import { getUserDataManager } from '../../foundation/user';
+import { getLogger } from '../../foundation/utils';
 
 const logger = getLogger('AgentDecorators');
 

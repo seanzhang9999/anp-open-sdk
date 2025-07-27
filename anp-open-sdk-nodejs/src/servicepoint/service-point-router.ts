@@ -5,7 +5,7 @@
  */
 
 import { ServicePointManager, ServicePointRequest, ServicePointResponse } from './service-point-manager';
-import { getLogger } from '@foundation/utils';
+import { getLogger } from '../foundation/utils';
 
 const logger = getLogger('ServicePointRouter');
 

@@ -170,8 +170,9 @@ export class ANPUser {
   /**
    * 从DID创建ANPUser实例
    * 对应Python版本的from_did类方法
+   * 修复：采用被动加载模式，不自动扫描用户数据
    */
-  public static fromDid(did: string, name: string = "未命名", agentType: string = "personal"): ANPUser {
+  public static async fromDid(did: string, name: string = "未命名", agentType: string = "personal"): Promise<ANPUser> {
     // 检查实例缓存
     if (ANPUser.instances.has(did)) {
       console.debug(`🔄 复用ANPUser实例: ${did}`);
@@ -179,18 +180,40 @@ export class ANPUser {
     }
     
     const userDataManager = getUserDataManager();
-    let userData = userDataManager.getUserData(did);
+    const userData = userDataManager.getUserData(did);
     
     if (!userData) {
-      // 尝试刷新用户数据
-      console.debug(`用户 ${did} 不在内存中，尝试刷新用户数据...`);
-      userDataManager.scanAndLoadNewUsers();
-      // 再次尝试获取
-      userData = userDataManager.getUserData(did);
-      if (!userData) {
-        // 如果还是找不到，抛出异常
-        throw new Error(`未找到 DID 为 '${did}' 的用户数据。请检查您的用户目录和配置文件。`);
-      }
+      // 参考Python版本：不自动扫描，直接抛出异常
+      throw new Error(`未找到 DID 为 '${did}' 的用户数据。请检查您的用户目录和配置文件。`);
+    }
+    
+    if (name === "未命名") {
+      name = userData.name || "未命名";
+    }
+    
+    // 创建新实例并缓存
+    const instance = new ANPUser(userData, name, agentType);
+    ANPUser.instances.set(did, instance);
+    console.debug(`🆕 创建并缓存ANPUser实例: ${did}`);
+    return instance;
+  }
+
+  /**
+   * 同步从DID创建ANPUser实例（仅从缓存中获取）
+   * 用于装饰器等需要同步初始化的场景
+   */
+  public static fromDidSync(did: string, name: string = "未命名", agentType: string = "personal"): ANPUser {
+    // 检查实例缓存
+    if (ANPUser.instances.has(did)) {
+      console.debug(`🔄 复用ANPUser实例: ${did}`);
+      return ANPUser.instances.get(did)!;
+    }
+    
+    const userDataManager = getUserDataManager();
+    const userData = userDataManager.getUserData(did);
+    
+    if (!userData) {
+      throw new Error(`未找到 DID 为 '${did}' 的用户数据。请确保用户数据已预加载到内存中。`);
     }
     
     if (name === "未命名") {

@@ -5,15 +5,16 @@
  */
 
 import express, { Application, Request, Response } from 'express';
-import { Agent, getAgentManager } from '@runtime/core';
+import { Agent } from '../../runtime/core/agent';
+import { AgentManager } from '../../runtime/core/agent-manager';
 import { 
   createAuthMiddleware, 
   corsMiddleware, 
   requestLogMiddleware 
-} from '@servicepoint/middleware';
-import { AuthVerifier } from '@foundation/auth';
-import { getGlobalConfig } from '@foundation/config';
-import { getLogger } from '@foundation/utils';
+} from '../../servicepoint/middleware';
+import { AuthVerifier } from '../../foundation/auth';
+import { getGlobalConfig } from '../../foundation/config';
+import { getLogger } from '../../foundation/utils';
 
 const logger = getLogger('AnpServer');
 
@@ -90,16 +91,14 @@ export class AnpServer {
 
     // Agent状态端点
     this.app.get('/agents', (req: Request, res: Response) => {
-      const agentManager = getAgentManager();
-      const agents = agentManager.getAllAgentInfo();
+      const agents = AgentManager.listAgents();
       res.json(agents);
     });
 
     // Agent详情端点
     this.app.get('/agents/:did', (req: Request, res: Response) => {
       const { did } = req.params;
-      const agentManager = getAgentManager();
-      const agent = agentManager.getAgentByDid(did);
+      const agent = AgentManager.getAgentByDid(did);
       
       if (!agent) {
         return res.status(404).json({ error: 'Agent not found' });
@@ -113,30 +112,36 @@ export class AnpServer {
       const { did } = req.params;
       const path = '/' + req.params[0];
       
-      const agentManager = getAgentManager();
-      const agent = agentManager.getAgentByDid(did);
+      const agent = AgentManager.getAgentByDid(did);
       
       if (!agent) {
         return res.status(404).json({ error: 'Agent not found' });
       }
 
       try {
-        const requestContext = {
-          method: req.method,
+        const requestData = {
+          type: 'api_call',
           path: path,
-          headers: req.headers as Record<string, string>,
+          method: req.method,
+          headers: req.headers,
           body: req.body,
-          query: req.query as Record<string, string>,
-          callerDid: (req as any).auth?.callerDid
+          query: req.query,
+          req_did: (req as any).auth?.callerDid || 'anonymous'
         };
 
-        const response = await agent.handleRequest(requestContext);
+        const response = await agent.handleRequest((req as any).auth?.callerDid || 'anonymous', requestData, req);
         
-        res.status(response.statusCode);
-        Object.entries(response.headers).forEach(([key, value]) => {
-          res.setHeader(key, value);
-        });
-        res.json(response.body);
+        if (response && typeof response === 'object' && 'status' in response) {
+          res.status(response.status);
+          if (response.headers) {
+            Object.entries(response.headers).forEach(([key, value]) => {
+              res.setHeader(key, String(value));
+            });
+          }
+          res.json(response.body);
+        } else {
+          res.json(response);
+        }
 
       } catch (error) {
         logger.error(`Agent API调用失败: ${did}${path}:`, error);
@@ -146,30 +151,37 @@ export class AnpServer {
 
     // 动态路由处理（基于Agent prefix）
     this.app.all('*', async (req: Request, res: Response) => {
-      const agentManager = getAgentManager();
-      const agent = agentManager.findAgentByPathPrefix(req.path);
+      const agent = AgentManager.findAgentByPathPrefix(req.path);
       
       if (!agent) {
         return res.status(404).json({ error: 'Route not found' });
       }
 
       try {
-        const requestContext = {
+        const prefixLength = agent.prefix ? agent.prefix.length : 0;
+        const requestData = {
+          type: 'api_call',
+          path: req.path.substring(prefixLength),
           method: req.method,
-          path: req.path.substring(agent.prefix.length),
-          headers: req.headers as Record<string, string>,
+          headers: req.headers,
           body: req.body,
-          query: req.query as Record<string, string>,
-          callerDid: (req as any).auth?.callerDid
+          query: req.query,
+          req_did: (req as any).auth?.callerDid || 'anonymous'
         };
 
-        const response = await agent.handleRequest(requestContext);
+        const response = await agent.handleRequest((req as any).auth?.callerDid || 'anonymous', requestData, req);
         
-        res.status(response.statusCode);
-        Object.entries(response.headers).forEach(([key, value]) => {
-          res.setHeader(key, value);
-        });
-        res.json(response.body);
+        if (response && typeof response === 'object' && 'status' in response) {
+          res.status(response.status);
+          if (response.headers) {
+            Object.entries(response.headers).forEach(([key, value]) => {
+              res.setHeader(key, String(value));
+            });
+          }
+          res.json(response.body);
+        } else {
+          res.json(response);
+        }
 
       } catch (error) {
         logger.error(`动态路由处理失败: ${req.path}:`, error);
@@ -182,8 +194,7 @@ export class AnpServer {
    * 注册Agent
    */
   public registerAgent(agent: Agent): void {
-    const agentManager = getAgentManager();
-    agentManager.registerAgent(agent);
+    // Agent已经通过AgentManager.createAgent创建并注册，这里只是日志记录
     logger.info(`Agent注册到服务器: ${agent.name} (${agent.anpUser.id})`);
   }
 
@@ -196,9 +207,12 @@ export class AnpServer {
 
   /**
    * 注册DID文档到认证验证器
+   * TODO: 实现DID文档注册功能
    */
   public registerDIDDocument(did: string, didDocument: any): void {
-    this.authVerifier.registerDIDDocument(did, didDocument);
+    // AuthVerifier 目前不支持直接注册DID文档
+    // 这个功能需要在未来版本中实现
+    logger.info(`DID文档注册请求: ${did} (暂未实现)`);
   }
 
   /**
@@ -214,8 +228,11 @@ export class AnpServer {
   public async start(): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
-        this.server = this.app.listen(this.config.port, this.config.host, () => {
-          logger.info(`🚀 ANP服务器启动成功: http://${this.config.host}:${this.config.port}`);
+        const port = this.config.port!; // 使用非空断言，因为构造函数中已经设置了默认值
+        const host = this.config.host!; // 使用非空断言，因为构造函数中已经设置了默认值
+        
+        this.server = this.app.listen(port, host, () => {
+          logger.info(`🚀 ANP服务器启动成功: http://${host}:${port}`);
           resolve();
         });
 
@@ -269,11 +286,9 @@ export class AnpServer {
     agents: number;
     uptime: number;
   } {
-    const agentManager = getAgentManager();
-    
     return {
       config: this.config,
-      agents: agentManager.getAllAgents().length,
+      agents: AgentManager.getAllAgents().length,
       uptime: process.uptime()
     };
   }

@@ -16,6 +16,7 @@ import {
   FileNotFoundError,
   DEFAULT_CONFIG
 } from '../types';
+import { getGlobalConfig } from '../config';
 
 /**
  * 本地用户数据管理器
@@ -35,10 +36,23 @@ export class LocalUserDataManager {
   // 配置
   private userDir: string;
   private initialized: boolean = false;
+  private lastScanTime: number = 0;
+  private scanCooldown: number = 1000; // 1秒内不重复扫描 (更短的冷却时间)
 
   private constructor(userDir?: string) {
-    // 默认使用相对于当前工作目录的data_user路径
-    this.userDir = userDir || path.resolve(process.cwd(), '..', 'data_user');
+    // 使用配置系统获取用户数据路径，参考Python版本的实现
+    if (userDir) {
+      this.userDir = userDir;
+    } else {
+      try {
+        const config = getGlobalConfig();
+        this.userDir = config.anpSdk.userDidPath;
+      } catch (error) {
+        // 如果配置未初始化，使用默认路径作为后备
+        console.warn('配置系统未初始化，使用默认用户数据路径');
+        this.userDir = path.resolve(process.cwd(), '..', 'data_user');
+      }
+    }
   }
 
   /**
@@ -427,6 +441,17 @@ export class LocalUserDataManager {
    * 扫描并加载新用户
    */
   public async scanAndLoadNewUsers(): Promise<void> {
+    const now = Date.now();
+    
+    // 检查是否在冷却时间内
+    if (now - this.lastScanTime < this.scanCooldown) {
+      console.debug(`扫描冷却中，跳过重复扫描 (距离上次扫描 ${now - this.lastScanTime}ms)`);
+      return;
+    }
+    
+    console.debug(`开始扫描新用户...`);
+    this.lastScanTime = now;
+    
     const currentDids = new Set(this.usersByDid.keys());
     const foundDids = new Set<string>();
 

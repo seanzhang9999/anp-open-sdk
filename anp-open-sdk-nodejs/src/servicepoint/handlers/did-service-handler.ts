@@ -6,9 +6,9 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { DomainManager } from '@foundation/domain';
-import { findUserByDid } from '@foundation/did';
-import { getLogger } from '@foundation/utils';
+import { DomainManager } from '../../foundation/domain';
+import { findUserByDid } from '../../foundation/did';
+import { getLogger } from '../../foundation/utils';
 
 const logger = getLogger('DIDServiceHandler');
 

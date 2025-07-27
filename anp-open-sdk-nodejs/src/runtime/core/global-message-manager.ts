@@ -4,7 +4,7 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  */
 
-import { getLogger } from '@foundation/utils';
+import { getLogger } from '../../foundation/utils';
 
 const logger = getLogger('GlobalMessageManager');
 

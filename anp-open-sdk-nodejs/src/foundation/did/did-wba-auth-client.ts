@@ -10,7 +10,7 @@ import * as path from 'path';
 import { URL } from 'url';
 import { DIDDocument, SignCallback } from './types';
 import { DIDWbaAuth } from './did-wba';
-import { getLogger } from '@foundation/utils';
+import { getLogger } from '../utils';
 
 const logger = getLogger('DIDWbaAuthClient');
 

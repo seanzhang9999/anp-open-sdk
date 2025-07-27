@@ -8,7 +8,7 @@
 export { Agent } from './agent';
 export type { AgentOptions, ApiRoute, MessageHandler, GroupEventHandler } from './agent';
 
-export { AgentManager } from './agent-manager';
+export { AgentManager, getAgentManager } from './agent-manager';
 export type { 
   AgentInfo, 
   AgentSearchRecord, 

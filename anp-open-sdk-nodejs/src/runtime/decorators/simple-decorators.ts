@@ -5,8 +5,8 @@
 
 import { Agent, AgentOptions } from '../core/agent';
 import { AgentManager } from '../core/agent-manager';
-import { ANPUser } from '@foundation/user';
-import { getUserDataManager } from '@foundation/user';
+import { ANPUser } from '../../foundation/user';
+import { getUserDataManager } from '../../foundation/user';
 
 // ===== 元数据符号定义 =====
 const API_PATH_SYMBOL = Symbol('apiPath');
@@ -223,12 +223,6 @@ export function createAgent(options: AgentClassOptions): Agent {
   });
 }
 
-/**
- * 创建共享Agent实例
- */
-export function createSharedAgent(options: Omit<AgentClassOptions, 'shared'>): Agent {
-  return createAgent({ ...options, shared: true });
-}
 
 /**
  * 全局消息管理器
@@ -302,9 +296,38 @@ export async function createAgentsWithCode(
   };
 }
 
+// ===== Python兼容的函数式API =====
+
+/**
+ * 创建共享Agent - 兼容Python的create_shared_agent
+ */
+export function createSharedAgent(
+  didStr: string, 
+  name: string, 
+  prefix: string, 
+  primaryAgent: boolean
+): Agent {
+  const anpUser = ANPUser.fromDid(didStr);
+  return AgentManager.createAgent(anpUser, {
+    name, 
+    shared: true, 
+    prefix, 
+    primaryAgent
+  });
+}
+
+/**
+ * Agent API装饰器函数 - 兼容Python的@agent_api
+ */
+export function agentApi(agent: Agent, path: string) {
+  return function(handler: Function) {
+    agent.apiRoutes.set(path, handler);
+    return handler;
+  };
+}
+
 // ===== 导出别名 =====
 export { classApi as api };
-export { classApi as agentApi };
 export { classMessageHandler as messageHandler };
 export { classMessageHandler as agentMessageHandler };
 export { groupEventMethod as groupEventHandler };

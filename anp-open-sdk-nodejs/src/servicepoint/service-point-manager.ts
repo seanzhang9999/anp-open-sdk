@@ -11,8 +11,8 @@ import {
   HostServiceHandler,
   AuthExemptHandler
 } from './handlers';
-import { DomainManager } from '@foundation/domain';
-import { getLogger } from '@foundation/utils';
+import { DomainManager } from '../foundation/domain';
+import { getLogger } from '../foundation/utils';
 
 const logger = getLogger('ServicePointManager');
 

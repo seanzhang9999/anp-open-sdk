@@ -5,9 +5,9 @@
  */
 
 import axios from 'axios';
-import { DidTool } from '@foundation/did';
-import { AuthInitiator } from '@foundation/auth';
-import { getLogger } from '@foundation/utils';
+import { DidTool } from '../../foundation/did';
+import { AuthInitiator } from '../../foundation/auth';
+import { getLogger } from '../../foundation/utils';
 
 const logger = getLogger('AgentApiCaller');
 
@@ -56,9 +56,18 @@ export class AgentApiCaller {
 
       const { host, port } = didComponents;
       const method = options.method || 'POST';
-      const url = `http://${host}:${port}${endpoint}`;
+      
+      // 按照Python版本的格式构建URL: /agent/api/{target_agent_path}{api_path}?{url_params}
+      const targetAgentPath = encodeURIComponent(targetDid);
+      const urlParams = new URLSearchParams({
+        req_did: this.callerDid,
+        resp_did: targetDid
+      });
+      const url = `http://${host}:${port}/agent/api/${targetAgentPath}${endpoint}?${urlParams.toString()}`;
 
       logger.debug(`🔗 调用Agent API: ${method} ${url}`);
+      logger.debug(`📍 URL构建详情: host=${host}, port=${port}, targetAgentPath=${targetAgentPath}, endpoint=${endpoint}`);
+      logger.debug(`📋 请求payload: ${JSON.stringify(payload, null, 2)}`);
 
       // 使用AuthInitiator发送认证请求
       const result = await this.authInitiator.sendAuthenticatedRequest(

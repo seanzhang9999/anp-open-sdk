@@ -5,8 +5,8 @@
 
 import { Agent, AgentOptions } from '../core/agent';
 import { AgentManager } from '../core/agent-manager';
-import { ANPUser } from '@foundation/user';
-import { getUserDataManager } from '@foundation/user';
+import { ANPUser } from '../../foundation/user';
+import { getUserDataManager } from '../../foundation/user';
 
 // ===== 类型定义 =====
 export interface ApiHandlerConfig {

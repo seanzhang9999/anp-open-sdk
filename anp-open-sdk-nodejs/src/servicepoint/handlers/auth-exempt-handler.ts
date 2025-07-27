@@ -4,8 +4,8 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  */
 
-import { DomainManager } from '@foundation/domain';
-import { getLogger } from '@foundation/utils';
+import { DomainManager } from '../../foundation/domain';
+import { getLogger } from '../../foundation/utils';
 
 const logger = getLogger('AuthExemptHandler');
 

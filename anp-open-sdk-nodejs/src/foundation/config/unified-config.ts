@@ -332,7 +332,16 @@ export class UnifiedConfig implements BaseUnifiedConfigProtocol {
    */
   private createEnvConfigs(): void {
     const envMapping = this.configData.env_mapping || {};
-    const secretsList = this.configData.secrets || [];
+    let secretsList = this.configData.secrets || [];
+    
+    // 确保secretsList是数组
+    if (!Array.isArray(secretsList)) {
+      if (typeof secretsList === 'object' && secretsList !== null) {
+        secretsList = Object.keys(secretsList);
+      } else {
+        secretsList = [];
+      }
+    }
     
     this.env = new EnvConfigNode(envMapping);
     this.secrets = new SecretsConfigNode(secretsList, envMapping);

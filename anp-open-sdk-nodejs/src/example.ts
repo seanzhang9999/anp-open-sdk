@@ -9,7 +9,7 @@ import { AnpServer } from './server';
 import { Agent, AgentManager } from './runtime';
 import { ANPUser, LocalUserData } from './foundation';
 import { api, messageHandler, groupEventHandler } from './runtime/decorators';
-import { loadGlobalConfig } from '@foundation/config';
+import { loadGlobalConfig } from './foundation/config';
 
 // 示例Agent类 - 继承自Agent
 class ExampleAgent extends Agent {

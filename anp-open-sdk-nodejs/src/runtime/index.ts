@@ -53,8 +53,8 @@ export {
   isClassMethod,
   createAgent,
   createSharedAgent,
+  agentApi,
   // 导出别名
-  classApi as agentApi,
   classMessageHandler as agentMessageHandler,
   type ApiDecoratorOptions,
   type MessageHandlerOptions,

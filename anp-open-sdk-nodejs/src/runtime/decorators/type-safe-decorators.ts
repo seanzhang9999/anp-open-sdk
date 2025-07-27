@@ -6,9 +6,9 @@
 
 import { Agent, AgentOptions } from '../core/agent';
 import { AgentManager } from '../core/agent-manager';
-import { ANPUser } from '@foundation/user';
-import { getUserDataManager } from '@foundation/user';
-import { getLogger } from '@foundation/utils';
+import { ANPUser } from '../../foundation/user';
+import { getUserDataManager } from '../../foundation/user';
+import { getLogger } from '../../foundation/utils';
 
 const logger = getLogger('TypeSafeDecorators');
 
@@ -137,10 +137,11 @@ export function agentClass<T extends new (...args: any[]) => any>(options: Agent
       constructor(...args: any[]) {
         super(...args);
         this._tags = options.tags || [];
-        this.initializeAgent();
+        // 同步初始化Agent
+        this.initializeAgentSync();
       }
 
-      public initializeAgent(): void {
+      public initializeAgentSync(): void {
         // 获取 DID
         let userDid = options.did;
         if (!userDid) {
@@ -148,8 +149,8 @@ export function agentClass<T extends new (...args: any[]) => any>(options: Agent
           userDid = getFirstAvailableUser();
         }
 
-        // 创建 ANPUser
-        const anpUser = ANPUser.fromDid(userDid);
+        // 同步创建 ANPUser（从缓存中获取）
+        const anpUser = ANPUser.fromDidSync(userDid);
 
         // 创建 Agent
         this._agent = AgentManager.createAgent(anpUser, {
@@ -163,6 +164,11 @@ export function agentClass<T extends new (...args: any[]) => any>(options: Agent
         this.registerMethods();
 
         logger.debug(`✅ Agent '${options.name}' 已创建 (DID: ${userDid})`);
+      }
+
+      public async initializeAgent(): Promise<void> {
+        // 保留异步版本以备后用
+        this.initializeAgentSync();
       }
 
       public registerMethods(): void {
@@ -247,7 +253,7 @@ function getFirstAvailableUser(): string {
 /**
  * 创建单个Agent实例
  */
-export function createAgent(options: AgentClassOptions): Agent {
+export async function createAgent(options: AgentClassOptions): Promise<Agent> {
   // 获取 DID
   let userDid = options.did;
   if (!userDid) {
@@ -255,7 +261,7 @@ export function createAgent(options: AgentClassOptions): Agent {
   }
 
   // 创建 ANPUser
-  const anpUser = ANPUser.fromDid(userDid);
+  const anpUser = await ANPUser.fromDid(userDid);
 
   // 创建 Agent
   const agent = AgentManager.createAgent(anpUser, {
@@ -272,8 +278,8 @@ export function createAgent(options: AgentClassOptions): Agent {
 /**
  * 创建共享Agent实例
  */
-export function createSharedAgent(options: Omit<AgentClassOptions, 'shared'>): Agent {
-  return createAgent({ ...options, shared: true });
+export async function createSharedAgent(options: Omit<AgentClassOptions, 'shared'>): Promise<Agent> {
+  return await createAgent({ ...options, shared: true });
 }
 
 /**
@@ -347,7 +353,7 @@ export async function createAgentsWithCode(
     logger.debug(`  - ${agentName}: ${mode}${primary}${prefix}`);
     
     // 创建Agent
-    const agent = createAgent({
+    const agent = await createAgent({
       name: agentName,
       did: userDid || agentInfo.did,
       shared: agentInfo.shared || false,

@@ -9,18 +9,103 @@ import {
   agentClass, 
   classApi, 
   classMessageHandler, 
-  agentApi, 
+  createAgent,
   createSharedAgent,
   AgentManager,
   GlobalMessageManager
-} from '../src/runtime';
+} from '../src/runtime/decorators/type-safe-decorators';
+import { agentApi } from '../src/runtime/decorators/simple-decorators';
 import { ANPUser } from '../src/foundation';
-import { getLogger } from '../src/foundation/utils';
+import { getLogger } from '../src/foundation';
+import { UnifiedConfig, setGlobalConfig } from '../src/foundation/config';
+import { getUserDataManager } from '../src/foundation/user';
+import { AgentApiCaller } from '../src/runtime/services/agent-api-caller';
+import { agentMsgPost as agentMsgPostService } from '../src/runtime/services/agent-message-caller';
+import { AnpServer } from '../src/server/express/anp-server';
 
 const logger = getLogger('FlowAnpAgent');
 
 /**
+ * 等待用户输入
+ */
+async function waitForUserInput(): Promise<void> {
+  return new Promise((resolve) => {
+    process.stdin.setRawMode(true);
+    process.stdin.resume();
+    process.stdin.on('data', () => {
+      process.stdin.setRawMode(false);
+      process.stdin.pause();
+      resolve();
+    });
+  });
+}
+
+/**
+ * Agent API调用函数 - 模拟Python版本的agent_api_call_post
+ */
+async function agentApiCallPost(
+  callerAgent: string,
+  targetAgent: string,
+  apiPath: string,
+  params: any = {}
+): Promise<any> {
+  try {
+    // 获取调用者的私钥（简化版，实际应该从用户数据中获取）
+    const userDataManager = getUserDataManager();
+    const callerUserData = userDataManager.getUserData(callerAgent);
+    if (!callerUserData) {
+      throw new Error(`找不到调用者用户数据: ${callerAgent}`);
+    }
+
+    // 创建API调用器
+    const apiCaller = new AgentApiCaller(
+      callerUserData.jwtPrivateKeyFilePath, // 简化版，实际应该读取私钥内容
+      callerAgent
+    );
+
+    // 构建请求数据
+    const requestData = {
+      type: 'api_call',
+      path: apiPath,
+      params: params,
+      req_did: callerAgent,
+      timestamp: new Date().toISOString()
+    };
+
+    // 调用API - 修复：直接使用具体的API路径，而不是统一的/wba/agent/request
+    const result = await apiCaller.callAgentApi(
+      targetAgent,
+      apiPath,  // 直接使用传入的apiPath，如 '/add', '/weather/current' 等
+      requestData
+    );
+
+    if (result.success) {
+      return result.data;
+    } else {
+      throw new Error(result.error || 'API调用失败');
+    }
+
+  } catch (error) {
+    logger.error(`Agent API调用失败: ${error}`);
+    throw error;
+  }
+}
+
+/**
+ * Agent消息发送函数 - 使用新的消息服务
+ */
+async function agentMsgPost(
+  callerAgent: string,
+  targetAgent: string,
+  content: string,
+  messageType: string = 'text'
+): Promise<any> {
+  return await agentMsgPostService(callerAgent, targetAgent, content, messageType);
+}
+
+/**
  * 创建代码生成的Agent - 完整复现Python版本功能
+ * 使用方案C+A组合：装饰器模式 + 函数式API
  */
 async function createAgentsWithCode(): Promise<any[]> {
   logger.debug("🤖 创建代码生成的Agent...");
@@ -28,7 +113,7 @@ async function createAgentsWithCode(): Promise<any[]> {
   const codeAgents: any[] = [];
   
   try {
-    // 使用装饰器创建计算器Agent
+    // ===== 方案C：使用装饰器创建计算器Agent =====
     @agentClass({
       name: "代码生成计算器",
       description: "提供基本的计算功能",
@@ -87,11 +172,12 @@ async function createAgentsWithCode(): Promise<any[]> {
     }
     
     // 实例化计算器Agent
-    const calcAgent = new (CalculatorAgent as any)().agent;
+    const calcAgentInstance = new (CalculatorAgent as any)();
+    const calcAgent = calcAgentInstance.agent;
     codeAgents.push(calcAgent);
     logger.debug("✅ 创建代码生成计算器Agent成功");
     
-    // 使用装饰器创建天气Agent
+    // ===== 方案C：使用装饰器创建天气Agent =====
     @agentClass({
       name: "代码生成天气",
       description: "提供天气信息服务",
@@ -159,20 +245,21 @@ async function createAgentsWithCode(): Promise<any[]> {
     }
 
     // 实例化天气Agent
-    const weatherAgent = new (WeatherAgent as any)().agent;
+    const weatherAgentInstance = new (WeatherAgent as any)();
+    const weatherAgent = weatherAgentInstance.agent;
     codeAgents.push(weatherAgent);
     logger.debug("✅ 创建代码生成天气Agent成功");
     
-    // 使用函数式方法创建助手Agent（共享DID，非主Agent）
-    const assistantAgent = createSharedAgent(
-      "did:wba:localhost%3A9527:wba:user:5fea49e183c6c211",  // 使用相同的DID
-      "代码生成助手",
-      "/assistant",
-      false  // primary_agent = false
-    );
+    // ===== 方案A：使用函数式API创建助手Agent（共享DID，非主Agent）=====
+    const assistantAgent = await createSharedAgent({
+      name: "代码生成助手",
+      did: "did:wba:localhost%3A9527:wba:user:5fea49e183c6c211",  // 使用相同的DID
+      prefix: "/assistant",
+      primaryAgent: false  // primary_agent = false
+    });
 
-    // 注册API
-    const helpApiHandler = agentApi(assistantAgent, "/help")(
+    // 使用agentApi注册API
+    agentApi(assistantAgent, "/help")(
       async function helpApi(requestData: any, request: any) {
         // 从params中获取参数
         const params = requestData.params || {};
@@ -212,6 +299,29 @@ async function createAgentsWithCode(): Promise<any[]> {
 async function main() {
   logger.debug("🚀 Starting Agent System Demo...");
   
+  // 🔧 步骤1：初始化配置系统（参考Python版本）
+  logger.debug("🔧 初始化配置系统...");
+  try {
+    const appConfig = new UnifiedConfig('unified_config.yaml');
+    setGlobalConfig(appConfig);
+    logger.debug("✅ 配置系统初始化成功");
+  } catch (error) {
+    logger.error(`❌ 配置系统初始化失败: ${error}`);
+    // 继续运行，使用默认配置
+  }
+  
+  // 🔧 步骤2：预加载用户数据（参考Python版本）
+  logger.debug("🔧 预加载用户数据...");
+  try {
+    const userDataManager = getUserDataManager();
+    await userDataManager.initialize();
+    const userCount = userDataManager.getAllUsers().length;
+    logger.debug(`✅ 用户数据预加载成功，共加载 ${userCount} 个用户`);
+  } catch (error) {
+    logger.error(`❌ 用户数据预加载失败: ${error}`);
+    // 继续运行，但可能会有用户数据找不到的问题
+  }
+  
   // 清除之前的Agent注册记录
   AgentManager.clearAllAgents();
   GlobalMessageManager.clearHandlers();
@@ -244,25 +354,189 @@ async function main() {
   // 显示全局消息管理器状态
   logger.debug("\n💬 全局消息管理器状态:");
   const handlers = GlobalMessageManager.listHandlers();
-  for (const handler of handlers) {
-    logger.debug(`  💬 ${handler.did}:${handler.msgType} <- ${handler.agentName}`);
+  for (const [msgType, count] of Object.entries(handlers)) {
+    logger.debug(`  💬 ${msgType}: ${count} handlers`);
   }
 
   // 调试：检查Agent的API路由注册情况
   logger.debug("\n🔍 调试：检查Agent的API路由注册情况...");
-  for (const agent of allAgents) {
-    if (agent.anpUser) {
+  const registeredAgents = AgentManager.getAllAgents();
+  for (const agent of registeredAgents) {
+    if (agent && agent.anpUser) {
       logger.debug(`Agent: ${agent.name}`);
       logger.debug(`  DID: ${agent.anpUser.id}`);
-      logger.debug(`  API路由数量: ${agent.anpUser.apiRoutes.size}`);
-      for (const [path, handler] of agent.anpUser.apiRoutes) {
+      logger.debug(`  API路由数量: ${agent.apiRoutes.size}`);
+      for (const [path, handler] of agent.apiRoutes) {
         const handlerName = handler.name || 'unknown';
         logger.debug(`    - ${path}: ${handlerName}`);
       }
+    } else {
+      logger.debug(`⚠️  发现无效的Agent对象: ${agent?.name || 'unknown'}`);
     }
   }
   
+  // 🚀 步骤3：启动ANP服务器（参考Python版本）
+  logger.debug("\n✅ All agents created with new system. Creating server instance...");
+  const server = new AnpServer({
+    host: 'localhost',
+    port: 9527,
+    enableCors: true,
+    enableAuth: true,
+    enableLogging: true
+  });
+
+  // 注册所有Agent到服务器
+  server.registerAgents(allAgents);
+  
+  logger.debug("⏳ 等待服务器启动 localhost:9527 ...");
+  await server.start();
+  logger.debug("✅ 服务器就绪，开始执行任务。");
+
+  // 测试新Agent系统功能
+  await testNewAgentSystem(allAgents);
+  
+  // 等待用户输入
+  logger.debug("\n🔥 Demo completed. Press Enter to stop server...");
+  await waitForUserInput();
+  
+  // 停止服务器
+  await server.stop();
   logger.debug("\n🎉 Agent系统演示完成!");
+}
+
+/**
+ * 测试新Agent系统功能 - 对应Python版本的test_new_agent_system
+ */
+async function testNewAgentSystem(agents: any[]): Promise<void> {
+  logger.debug("\n🧪 开始测试新Agent系统功能...");
+  
+  // 找到不同类型的Agent
+  let calcAgent: any = null;
+  let weatherAgent: any = null;
+  let assistantAgent: any = null;
+  
+  for (const agent of agents) {
+    if (agent && agent.name) {
+      if (agent.name.includes("计算器")) {
+        calcAgent = agent;
+      } else if (agent.name.includes("天气")) {
+        weatherAgent = agent;
+      } else if (agent.name.includes("助手")) {
+        assistantAgent = agent;
+      }
+    } else {
+      logger.debug(`⚠️  发现无效的Agent对象: ${agent}`);
+    }
+  }
+  
+  // 基础测试
+  logger.debug("\n🔍 基础功能测试...");
+  
+  // 测试1: 计算器API调用
+  let calcApiSuccess = false;
+  if (calcAgent) {
+    logger.info("\n🔧 测试计算器Agent API调用...");
+    try {
+      const calcDid = calcAgent.anpUser.id;
+      const result = await agentApiCallPost(
+        "did:wba:localhost%3A9527:wba:user:e0959abab6fc3c3d",
+        calcDid,
+        "/add",
+        { a: 15, b: 25 }
+      );
+      logger.info(`✅ 计算器API调用成功: ${JSON.stringify(result)}`);
+      calcApiSuccess = true;
+    } catch (error) {
+      logger.info(`❌ 计算器API调用失败: ${error}`);
+    }
+  }
+  
+  // 测试2: 消息发送
+  let msgSuccess = false;
+  if (weatherAgent) {
+    logger.info("\n📨 测试天气Agent消息发送...");
+    try {
+      const weatherDid = weatherAgent.anpUser.id;
+      const result = await agentMsgPost(
+        "did:wba:localhost%3A9527:wba:user:e0959abab6fc3c3d",
+        weatherDid,
+        "请问今天北京的天气怎么样？",
+        "text"
+      );
+      logger.info(`✅ 天气Agent消息发送成功: ${JSON.stringify(result)}`);
+      msgSuccess = true;
+    } catch (error) {
+      logger.info(`❌ 天气Agent消息发送失败: ${error}`);
+    }
+  }
+  
+  // 测试3: 共享DID API调用
+  let sharedApiSuccess = false;
+  if (weatherAgent && assistantAgent) {
+    logger.info("\n🔗 测试共享DID API调用...");
+    try {
+      // 调用天气API
+      const weatherDid = weatherAgent.anpUser.id;
+      const weatherResult = await agentApiCallPost(
+        "did:wba:localhost%3A9527:wba:user:e0959abab6fc3c3d",
+        weatherDid,
+        "/weather/current",
+        { city: "上海" }
+      );
+      logger.info(`✅ 天气API调用成功: ${JSON.stringify(weatherResult)}`);
+      
+      // 调用助手API
+      const assistantDid = assistantAgent.anpUser.id;
+      const helpResult = await agentApiCallPost(
+        "did:wba:localhost%3A9527:wba:user:e0959abab6fc3c3d",
+        assistantDid,
+        "/assistant/help",
+        { topic: "weather" }
+      );
+      logger.info(`✅ 助手API调用成功: ${JSON.stringify(helpResult)}`);
+      sharedApiSuccess = true;
+      
+    } catch (error) {
+      logger.info(`❌ 共享DID API调用失败: ${error}`);
+    }
+  }
+  
+  // 测试4: 冲突检测
+  let conflictTestSuccess = false;
+  logger.info("\n⚠️  测试冲突检测...");
+  try {
+    // 尝试创建冲突的Agent
+    const testUserDid = "did:wba:localhost%3A9527:wba:user:3ea884878ea5fbb1";
+    
+    // 这应该失败，因为DID已被独占使用
+    const conflictAgent = AgentManager.createAgent(testUserDid, {
+      name: "冲突测试Agent",
+      shared: false
+    });
+    logger.error("❌ 冲突检测失败：应该阻止创建冲突Agent");
+    
+  } catch (error: any) {
+    logger.info(`✅ 冲突检测成功: ${error.message}`);
+    conflictTestSuccess = true;
+  }
+  
+  // 测试结果总结
+  logger.debug("\n📊 测试结果总结:");
+  logger.info(`  🔧 计算器API调用: ${calcApiSuccess ? '✅ 成功' : '❌ 失败'}`);
+  logger.info(`  📨 消息发送: ${msgSuccess ? '✅ 成功' : '❌ 失败'}`);
+  logger.info(`  🔗 共享DID API调用: ${sharedApiSuccess ? '✅ 成功' : '❌ 失败'}`);
+  logger.info(`  ⚠️  冲突检测: ${conflictTestSuccess ? '✅ 成功' : '❌ 失败'}`);
+  
+  const successCount = [calcApiSuccess, msgSuccess, sharedApiSuccess, conflictTestSuccess].filter(Boolean).length;
+  const totalCount = 4;
+  
+  if (successCount === totalCount) {
+    logger.info(`\n🎉 所有测试通过! (${successCount}/${totalCount}) 架构重构验证成功!`);
+  } else {
+    logger.info(`\n⚠️  部分测试失败 (${successCount}/${totalCount})，需要进一步调试`);
+  }
+  
+  logger.debug("\n🎉 新Agent系统测试完成!");
 }
 
 // 如果这个文件被直接运行
@@ -270,4 +544,4 @@ if (require.main === module) {
   main().catch(console.error);
 }
 
-export { createAgentsWithCode, main };
+export { createAgentsWithCode, main, testNewAgentSystem };

@@ -5,9 +5,9 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { getAgentManager } from '@runtime/core';
-import { AgentServiceHandler } from '@servicepoint/handlers';
-import { getLogger } from '@foundation/utils';
+import { getAgentManager } from '../../runtime/core';
+import { AgentServiceHandler } from '../../servicepoint/handlers';
+import { getLogger } from '../../foundation/utils';
 
 const logger = getLogger('AnpRouters');
 
