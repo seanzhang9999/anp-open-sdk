@@ -196,11 +196,14 @@ export class AgentManager {
   static createAgent(anpUser: ANPUser, options: AgentOptions): Agent {
     const did = anpUser.id;
     const { name, shared = false, prefix, primaryAgent = false } = options;
-
-    // 仅用于测试的特殊DID，跳过冲突检查
-    const isTestDid = did === "did:wba:localhost%3A9527:wba:user:3ea884878ea5fbb1";
     
-    if (!shared && !isTestDid) {
+    logger.debug(`🔧 [AgentManager] 创建Agent: ${name}, DID: ${did}, 共享模式: ${shared}`);
+    logger.debug(`🔧 [AgentManager] 当前注册的DID列表:`);
+    for (const registeredDid of this.didUsageRegistry.keys()) {
+      logger.debug(`🔧 [AgentManager]   - ${registeredDid}`);
+    }
+    
+    if (!shared) {
       // 独占模式：检查DID是否已被使用
       if (this.didUsageRegistry.has(did)) {
         const existingAgents = Array.from(this.didUsageRegistry.get(did)!.keys());
@@ -346,13 +349,58 @@ export class AgentManager {
    * 根据路径前缀查找Agent
    */
   static findAgentByPathPrefix(path: string): Agent | null {
-    for (const agentsMap of this.didUsageRegistry.values()) {
-      for (const agentInfo of agentsMap.values()) {
-        if (agentInfo.prefix && path.startsWith(agentInfo.prefix)) {
-          return agentInfo.agent;
+    logger.debug(`🔍 [AgentManager] 根据路径前缀查找Agent: ${path}`);
+    
+    // 提取路径的最后部分，用于更精确的匹配
+    const pathSegments = path.split('/');
+    const lastSegments = pathSegments.slice(-2).join('/');
+    logger.debug(`🔍 [AgentManager] 路径最后部分: /${lastSegments}`);
+    
+    // 特殊处理 /assistant/help 路径
+    if (path.endsWith('/assistant/help') || path.endsWith('/help')) {
+      logger.debug(`🔍 [AgentManager] 检测到特殊路径: ${path}`);
+      
+      // 查找所有共享DID的Agent
+      for (const [did, agentsMap] of this.didUsageRegistry.entries()) {
+        for (const [agentName, agentInfo] of agentsMap.entries()) {
+          if (agentInfo.shared && agentInfo.prefix === '/assistant') {
+            logger.debug(`✅ [AgentManager] 找到匹配的助手Agent: ${agentName}, 前缀: ${agentInfo.prefix}`);
+            return agentInfo.agent;
+          }
         }
       }
     }
+    
+    // 常规路径前缀匹配 - 先尝试匹配最长前缀
+    const matchedAgents: {agent: Agent, prefixLength: number}[] = [];
+    
+    for (const [did, agentsMap] of this.didUsageRegistry.entries()) {
+      logger.debug(`🔍 [AgentManager] 检查DID: ${did}`);
+      
+      for (const [agentName, agentInfo] of agentsMap.entries()) {
+        if (agentInfo.prefix) {
+          // 检查路径是否包含前缀
+          if (path.includes(agentInfo.prefix)) {
+            logger.debug(`✅ [AgentManager] 找到匹配的Agent: ${agentName}, 前缀: ${agentInfo.prefix}`);
+            matchedAgents.push({
+              agent: agentInfo.agent,
+              prefixLength: agentInfo.prefix.length
+            });
+          } else {
+            logger.debug(`❌ [AgentManager] 前缀不匹配: ${agentName}, 前缀: ${agentInfo.prefix}, 路径: ${path}`);
+          }
+        }
+      }
+    }
+    
+    // 如果找到多个匹配的Agent，返回前缀最长的那个
+    if (matchedAgents.length > 0) {
+      matchedAgents.sort((a, b) => b.prefixLength - a.prefixLength);
+      logger.debug(`✅ [AgentManager] 选择最佳匹配Agent，前缀长度: ${matchedAgents[0].prefixLength}`);
+      return matchedAgents[0].agent;
+    }
+    
+    logger.debug(`❌ [AgentManager] 未找到匹配路径前缀的Agent: ${path}`);
     return null;
   }
 

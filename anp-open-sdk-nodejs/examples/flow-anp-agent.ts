@@ -300,7 +300,7 @@ async function createAgentsWithCode(): Promise<any[]> {
 function parseCommandLineArgs(): { waitForInput: boolean } {
   const args = process.argv.slice(2);
   return {
-    waitForInput: args.includes('--wait') || args.includes('-w')
+    waitForInput: args.includes('--wait') || args.includes('-w') || args.includes('keeprunning')
   };
 }
 
@@ -427,6 +427,11 @@ async function main() {
   // 停止服务器
   await server.stop();
   logger.debug("\n🎉 Agent系统演示完成!");
+  
+  // 确保程序在非等待模式下自动退出
+  if (!waitForInput) {
+    process.exit(0);
+  }
 }
 
 /**
@@ -540,15 +545,27 @@ async function testNewAgentSystem(agents: any[]): Promise<void> {
     if (testUserData) {
       const testAnpUser = new ANPUser(testUserData);
       
-      // 这应该失败，因为DID已被独占使用
-      const conflictAgent = AgentManager.createAgent(testAnpUser, {
-        name: "冲突测试Agent",
+      // 先创建一个Agent
+      logger.info(`创建第一个Agent: ${testUserDid}`);
+      const firstAgent = AgentManager.createAgent(testAnpUser, {
+        name: "第一个测试Agent",
         shared: false
       });
-      logger.error("❌ 冲突检测失败：应该阻止创建冲突Agent");
+      
+      // 尝试创建第二个Agent，这应该失败，因为DID已被独占使用
+      logger.info(`尝试创建冲突Agent: ${testUserDid}`);
+      try {
+        const conflictAgent = AgentManager.createAgent(testAnpUser, {
+          name: "冲突测试Agent",
+          shared: false
+        });
+        logger.error("❌ 冲突检测失败：应该阻止创建冲突Agent");
+      } catch (conflictError: any) {
+        logger.info(`✅ 冲突检测成功: ${conflictError.message}`);
+        conflictTestSuccess = true;
+      }
     } else {
-      logger.info(`✅ 冲突检测成功: 测试用户数据不存在，无法创建Agent`);
-      conflictTestSuccess = true;
+      logger.info(`❌ 冲突检测失败: 测试用户数据不存在，无法创建Agent`);
     }
     
   } catch (error: any) {

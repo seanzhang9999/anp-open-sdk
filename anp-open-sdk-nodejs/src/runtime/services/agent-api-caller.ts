@@ -58,7 +58,13 @@ export class AgentApiCaller {
       const method = options.method || 'POST';
       
       // 按照Python版本的格式构建URL: /agent/api/{target_agent_path}{api_path}?{url_params}
-      const targetAgentPath = encodeURIComponent(targetDid);
+      // 注意：不要对已经包含 %3A 的DID进行二次编码，这会导致服务器端解码问题
+      let targetAgentPath = targetDid;
+      if (!targetDid.includes('%3A')) {
+        // 只有当DID不包含 %3A 时才进行编码
+        targetAgentPath = encodeURIComponent(targetDid);
+      }
+      
       const urlParams = new URLSearchParams({
         req_did: this.callerDid,
         resp_did: targetDid
@@ -67,6 +73,7 @@ export class AgentApiCaller {
 
       logger.debug(`🔗 调用Agent API: ${method} ${url}`);
       logger.debug(`📍 URL构建详情: host=${host}, port=${port}, targetAgentPath=${targetAgentPath}, endpoint=${endpoint}`);
+      logger.debug(`🔍 原始DID: ${targetDid}, 处理后的DID路径: ${targetAgentPath}`);
       logger.debug(`📋 请求payload: ${JSON.stringify(payload, null, 2)}`);
 
       // 使用AuthInitiator发送认证请求

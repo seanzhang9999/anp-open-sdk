@@ -163,8 +163,16 @@ export function fixFlowAnpAgentRoutes(calcAgent: any, weatherAgent: any, assista
   
   // 修复助手Agent的API路由
   if (assistantAgent) {
-    // 直接注册路由，不使用registerApiRoutes函数，避免前缀问题
-    assistantAgent.apiRoutes.set('/assistant/help', async function helpApi(requestData: any) {
+    // 获取助手Agent的前缀
+    const prefix = assistantAgent.prefix || '';
+    logger.debug(`🔍 助手Agent前缀: "${prefix}"`);
+    
+    // 注册两个路由 - 一个是 /help，一个是 /assistant/help
+    // 这样无论是通过前缀路由还是直接路由都能找到
+    
+    // 1. 注册 /help 路由 (用于前缀路由)
+    const helpPath = '/help';
+    assistantAgent.apiRoutes.set(helpPath, async function helpApi(requestData: any) {
       const params = requestData.params || {};
       const topic = params.topic || 'general';
       
@@ -184,7 +192,36 @@ export function fixFlowAnpAgentRoutes(calcAgent: any, weatherAgent: any, assista
       return response;
     });
     
-    logger.debug(`✅ 助手Agent API路由注册成功: /assistant/help`);
+    // 2. 注册 /assistant/help 路由 (用于直接路由)
+    const fullHelpPath = '/assistant/help';
+    assistantAgent.apiRoutes.set(fullHelpPath, async function helpApi(requestData: any) {
+      const params = requestData.params || {};
+      const topic = params.topic || 'general';
+      
+      const helpInfo: Record<string, string> = {
+        "general": "我是代码生成助手，可以提供各种帮助信息",
+        "weather": "天气相关帮助：使用 /weather/current 查询当前天气",
+        "calc": "计算相关帮助：使用 /add 或 /multiply 进行计算"
+      };
+      
+      const response = {
+        topic,
+        help: helpInfo[topic] || helpInfo["general"],
+        available_topics: Object.keys(helpInfo)
+      };
+      
+      logger.debug(`❓ 提供帮助: ${topic}`);
+      return response;
+    });
+    
+    logger.debug(`✅ 助手Agent API路由注册成功: ${helpPath} (前缀: ${prefix})`);
+    logger.debug(`✅ 助手Agent API路由注册成功: ${fullHelpPath} (直接路由)`);
+    
+    // 打印当前所有路由
+    logger.debug(`📊 助手Agent '${assistantAgent.name}' 当前所有API路由:`);
+    for (const [path, handler] of assistantAgent.apiRoutes) {
+      logger.debug(`  - ${path}: ${handler.name || 'anonymous'}`);
+    }
   }
   
   logger.debug(`✅ API路由修复完成!`);

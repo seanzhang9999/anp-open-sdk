@@ -345,7 +345,29 @@ export class AnpServer {
         logger.debug(`🔍 已注册Agent DID: ${agent.anpUser.id}`);
       }
       
-      const agent = AgentManager.getAgentByDid(normalizedDid);
+      // 首先检查是否有多个Agent共享同一个DID
+      const agentInfo = AgentManager.getAgentInfo(normalizedDid) as Map<string, any> | null;
+      let agent = null;
+      
+      if (agentInfo && agentInfo instanceof Map && agentInfo.size > 1) {
+        // 如果有多个Agent共享同一个DID，根据路径前缀找到正确的Agent
+        logger.debug(`🔍 检测到共享DID: ${normalizedDid}，Agent数量: ${agentInfo.size}`);
+        logger.debug(`🔍 请求路径: ${fullPath}`);
+        
+        // 使用findAgentByPathPrefix方法根据路径找到正确的Agent
+        agent = AgentManager.findAgentByPathPrefix(fullPath);
+        
+        if (agent) {
+          logger.debug(`✅ 根据路径前缀找到匹配的Agent: ${agent.name}`);
+        } else {
+          // 如果没有找到匹配的Agent，使用默认的Agent（第一个）
+          agent = AgentManager.getAgentByDid(normalizedDid);
+          logger.debug(`⚠️ 未找到匹配路径的Agent，使用默认Agent: ${agent?.name || 'unknown'}`);
+        }
+      } else {
+        // 如果只有一个Agent，直接使用它
+        agent = AgentManager.getAgentByDid(normalizedDid);
+      }
       
       if (!agent) {
         logger.warn(`❌ Agent未找到: ${normalizedDid}`);
