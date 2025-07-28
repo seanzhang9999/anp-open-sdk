@@ -22,6 +22,7 @@ import { getUserDataManager } from '../src/foundation/user';
 import { AgentApiCaller } from '../src/runtime/services/agent-api-caller';
 import { agentMsgPost as agentMsgPostService } from '../src/runtime/services/agent-message-caller';
 import { AnpServer } from '../src/server/express/anp-server';
+import { fixFlowAnpAgentRoutes } from '../src/runtime/decorators/fix-api-routes';
 
 const logger = getLogger('FlowAnpAgent');
 
@@ -294,10 +295,24 @@ async function createAgentsWithCode(): Promise<any[]> {
 }
 
 /**
+ * 解析命令行参数
+ */
+function parseCommandLineArgs(): { waitForInput: boolean } {
+  const args = process.argv.slice(2);
+  return {
+    waitForInput: args.includes('--wait') || args.includes('-w')
+  };
+}
+
+/**
  * 主函数 - 演示Agent系统的使用
  */
 async function main() {
+  // 解析命令行参数
+  const { waitForInput } = parseCommandLineArgs();
+  
   logger.debug("🚀 Starting Agent System Demo...");
+  logger.debug(`🔧 等待用户输入模式: ${waitForInput ? '开启' : '关闭'}`);
   
   // 🔧 步骤1：初始化配置系统（参考Python版本）
   logger.debug("🔧 初始化配置系统...");
@@ -387,6 +402,13 @@ async function main() {
   // 注册所有Agent到服务器
   server.registerAgents(allAgents);
   
+  // 修复API路由注册问题
+  logger.debug("🔧 修复API路由注册问题...");
+  const calcAgent = allAgents.find(a => a.name.includes("计算器"));
+  const weatherAgent = allAgents.find(a => a.name.includes("天气"));
+  const assistantAgent = allAgents.find(a => a.name.includes("助手"));
+  fixFlowAnpAgentRoutes(calcAgent, weatherAgent, assistantAgent);
+  
   logger.debug("⏳ 等待服务器启动 localhost:9527 ...");
   await server.start();
   logger.debug("✅ 服务器就绪，开始执行任务。");
@@ -394,9 +416,13 @@ async function main() {
   // 测试新Agent系统功能
   await testNewAgentSystem(allAgents);
   
-  // 等待用户输入
-  logger.debug("\n🔥 Demo completed. Press Enter to stop server...");
-  await waitForUserInput();
+  // 根据命令行参数决定是否等待用户输入
+  if (waitForInput) {
+    logger.debug("\n🔥 Demo completed. Press Enter to stop server...");
+    await waitForUserInput();
+  } else {
+    logger.debug("\n🔥 Demo completed. Stopping server automatically...");
+  }
   
   // 停止服务器
   await server.stop();

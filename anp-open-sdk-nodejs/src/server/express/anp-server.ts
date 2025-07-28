@@ -17,6 +17,7 @@ import { getGlobalConfig } from '../../foundation/config';
 import { getLogger } from '../../foundation/utils';
 import { DIDServiceHandler } from '../../servicepoint/handlers/did-service-handler';
 import { DomainManager } from '../../foundation/domain';
+import { formatDidFromUrl } from '../../foundation/did/did-url-formatter';
 
 const logger = getLogger('AnpServer');
 
@@ -115,16 +116,11 @@ export class AnpServer {
     this.app.get('/agents/:did', (req: Request, res: Response) => {
       const { did } = req.params;
       
-      // 智能DID解码：解码一次后如果包含 %3A，就停止解码
-      let decodedDid = decodeURIComponent(did);
-      if (decodedDid.includes('%3A')) {
-        // 使用包含 %3A 的格式，这与Agent注册时的格式一致
-        logger.debug(`🔍 Agent详情 - 原始DID: ${did}, 解码后(包含%3A): ${decodedDid}`);
-      } else {
-        logger.debug(`🔍 Agent详情 - 原始DID: ${did}, 完全解码后: ${decodedDid}`);
-      }
+      // 使用统一的DID格式化函数
+      const normalizedDid = formatDidFromUrl(did, this.config.host, this.config.port);
+      logger.debug(`🔍 Agent详情 - 原始DID: ${did}, 格式化后: ${normalizedDid}`);
       
-      const agent = AgentManager.getAgentByDid(decodedDid);
+      const agent = AgentManager.getAgentByDid(normalizedDid);
       
       if (!agent) {
         return res.status(404).json({ error: 'Agent not found' });
@@ -138,16 +134,11 @@ export class AnpServer {
       const { did } = req.params;
       const path = '/' + req.params[0];
       
-      // 智能DID解码：解码一次后如果包含 %3A，就停止解码
-      let decodedDid = decodeURIComponent(did);
-      if (decodedDid.includes('%3A')) {
-        // 使用包含 %3A 的格式，这与Agent注册时的格式一致
-        logger.debug(`🔍 Agent API调用 - 原始DID: ${did}, 解码后(包含%3A): ${decodedDid}`);
-      } else {
-        logger.debug(`🔍 Agent API调用 - 原始DID: ${did}, 完全解码后: ${decodedDid}`);
-      }
+      // 使用统一的DID格式化函数
+      const normalizedDid = formatDidFromUrl(did, this.config.host, this.config.port);
+      logger.debug(`🔍 Agent API调用 - 原始DID: ${did}, 格式化后: ${normalizedDid}`);
       
-      const agent = AgentManager.getAgentByDid(decodedDid);
+      const agent = AgentManager.getAgentByDid(normalizedDid);
       
       if (!agent) {
         return res.status(404).json({ error: 'Agent not found' });
@@ -342,19 +333,10 @@ export class AnpServer {
       
       logger.debug(`🔄 处理Agent API请求: /agent/api/${did}${fullPath}`);
       
-      // 智能DID解码：解码一次后如果包含 %3A，就停止解码
-      let decodedDid = decodeURIComponent(did);
-      
-      // 如果解码后包含 %3A，说明这是正确的格式，不需要进一步解码
-      if (decodedDid.includes('%3A')) {
-        // 使用包含 %3A 的格式，这与Agent注册时的格式一致
-        logger.debug(`🔍 原始DID参数: ${did}`);
-        logger.debug(`🔍 解码后的DID (包含%3A): ${decodedDid}`);
-      } else {
-        // 如果解码后不包含 %3A，使用解码后的结果
-        logger.debug(`🔍 原始DID参数: ${did}`);
-        logger.debug(`🔍 完全解码后的DID: ${decodedDid}`);
-      }
+      // 使用统一的DID格式化函数，确保与Agent注册时的格式一致
+      const normalizedDid = formatDidFromUrl(did, this.config.host, this.config.port);
+      logger.debug(`🔍 原始DID参数: ${did}`);
+      logger.debug(`🔍 格式化后的DID: ${normalizedDid}`);
       
       // 调试：列出所有已注册的Agent DID
       const allAgents = AgentManager.getAllAgents();
@@ -363,13 +345,13 @@ export class AnpServer {
         logger.debug(`🔍 已注册Agent DID: ${agent.anpUser.id}`);
       }
       
-      const agent = AgentManager.getAgentByDid(decodedDid);
+      const agent = AgentManager.getAgentByDid(normalizedDid);
       
       if (!agent) {
-        logger.warn(`❌ Agent未找到: ${decodedDid}`);
+        logger.warn(`❌ Agent未找到: ${normalizedDid}`);
         return res.status(404).json({
           error: 'Agent not found',
-          did: decodedDid,
+          did: normalizedDid,
           originalDid: did
         });
       }
@@ -387,7 +369,7 @@ export class AnpServer {
           req_did: callerDid
         };
 
-        logger.debug(`📤 发送请求到Agent: ${decodedDid}, 路径: ${fullPath}, 调用者: ${callerDid}`);
+        logger.debug(`📤 发送请求到Agent: ${normalizedDid}, 路径: ${fullPath}, 调用者: ${callerDid}`);
         
         const response = await agent.handleRequest(callerDid, requestData, req);
         
@@ -403,10 +385,10 @@ export class AnpServer {
           res.json(response);
         }
 
-        logger.debug(`✅ Agent API请求处理成功: ${decodedDid}${fullPath}`);
+        logger.debug(`✅ Agent API请求处理成功: ${normalizedDid}${fullPath}`);
 
       } catch (error) {
-        logger.error(`❌ Agent API请求处理失败: ${decodedDid}${fullPath}:`, error);
+        logger.error(`❌ Agent API请求处理失败: ${normalizedDid}${fullPath}:`, error);
         res.status(500).json({
           error: 'Internal server error',
           message: error instanceof Error ? error.message : String(error)
@@ -420,31 +402,24 @@ export class AnpServer {
       
       logger.debug(`🔄 处理Agent连接添加请求: /agent/api/${did}/add`);
       
-      // 智能DID解码：解码一次后如果包含 %3A，就停止解码
-      let decodedDid = decodeURIComponent(did);
+      // 使用统一的DID格式化函数
+      const normalizedDid = formatDidFromUrl(did, this.config.host, this.config.port);
+      logger.debug(`🔍 Agent连接添加 - 原始DID: ${did}, 格式化后: ${normalizedDid}`);
       
-      // 如果解码后包含 %3A，说明这是正确的格式，不需要进一步解码
-      if (decodedDid.includes('%3A')) {
-        // 使用包含 %3A 的格式，这与Agent注册时的格式一致
-        logger.debug(`🔍 Agent连接添加 - 原始DID: ${did}, 解码后(包含%3A): ${decodedDid}`);
-      } else {
-        // 如果解码后不包含 %3A，使用解码后的结果
-        logger.debug(`🔍 Agent连接添加 - 原始DID: ${did}, 完全解码后: ${decodedDid}`);
-      }
-      const agent = AgentManager.getAgentByDid(decodedDid);
+      const agent = AgentManager.getAgentByDid(normalizedDid);
       
       if (!agent) {
-        logger.warn(`❌ Agent未找到 (add请求): ${decodedDid}`);
+        logger.warn(`❌ Agent未找到 (add请求): ${normalizedDid}`);
         return res.status(404).json({
           error: 'Agent not found for add request',
-          did: decodedDid,
+          did: normalizedDid,
           originalDid: did
         });
       }
 
       try {
         const callerDid = (req as any).auth?.callerDid || req.query.req_did || 'anonymous';
-        const respDid = req.query.resp_did || decodedDid;
+        const respDid = req.query.resp_did || normalizedDid;
         
         const requestData = {
           type: 'agent_connect',
@@ -457,7 +432,7 @@ export class AnpServer {
           resp_did: respDid
         };
 
-        logger.debug(`📤 发送连接添加请求到Agent: ${decodedDid}, 调用者: ${callerDid}, 响应者: ${respDid}`);
+        logger.debug(`📤 发送连接添加请求到Agent: ${normalizedDid}, 调用者: ${callerDid}, 响应者: ${respDid}`);
         
         const response = await agent.handleRequest(callerDid, requestData, req);
         
@@ -470,10 +445,10 @@ export class AnpServer {
           data: response
         });
 
-        logger.debug(`✅ Agent连接添加请求处理成功: ${decodedDid}`);
+        logger.debug(`✅ Agent连接添加请求处理成功: ${normalizedDid}`);
 
       } catch (error) {
-        logger.error(`❌ Agent连接添加请求处理失败: ${decodedDid}:`, error);
+        logger.error(`❌ Agent连接添加请求处理失败: ${normalizedDid}:`, error);
         res.status(500).json({
           error: 'Agent connect add failed',
           message: error instanceof Error ? error.message : String(error)

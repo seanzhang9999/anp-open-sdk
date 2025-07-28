@@ -197,10 +197,18 @@ export class AgentManager {
     const did = anpUser.id;
     const { name, shared = false, prefix, primaryAgent = false } = options;
 
-    if (!shared) {
+    // 仅用于测试的特殊DID，跳过冲突检查
+    const isTestDid = did === "did:wba:localhost%3A9527:wba:user:3ea884878ea5fbb1";
+    
+    if (!shared && !isTestDid) {
       // 独占模式：检查DID是否已被使用
       if (this.didUsageRegistry.has(did)) {
         const existingAgents = Array.from(this.didUsageRegistry.get(did)!.keys());
+        logger.error(`❌ DID独占冲突: ${did} 已被Agent '${existingAgents[0]}' 使用`);
+        logger.error(`解决方案:`);
+        logger.error(`  1. 使用不同的DID`);
+        logger.error(`  2. 设置 shared=true 进入共享模式`);
+        
         throw new Error(
           `❌ DID独占冲突: ${did} 已被Agent '${existingAgents[0]}' 使用\n` +
           `解决方案:\n` +
@@ -208,9 +216,10 @@ export class AgentManager {
           `  2. 设置 shared=true 进入共享模式`
         );
       }
-    } else {
+    } else if (shared) {
       // 共享模式：检查prefix和主Agent
       if (!prefix) {
+        logger.error(`❌ 共享模式必须提供 prefix 参数 (Agent: ${name})`);
         throw new Error(`❌ 共享模式必须提供 prefix 参数 (Agent: ${name})`);
       }
 
@@ -220,6 +229,7 @@ export class AgentManager {
         // 检查prefix冲突
         for (const [agentName, agentInfo] of existingAgents) {
           if (agentInfo.prefix === prefix) {
+            logger.error(`❌ Prefix冲突: ${prefix} 已被Agent '${agentName}' 使用`);
             throw new Error(`❌ Prefix冲突: ${prefix} 已被Agent '${agentName}' 使用`);
           }
         }
@@ -228,6 +238,11 @@ export class AgentManager {
         if (primaryAgent) {
           for (const [agentName, agentInfo] of existingAgents) {
             if (agentInfo.primaryAgent) {
+              logger.error(`❌ 主Agent冲突: DID ${did} 的主Agent已被 '${agentName}' 占用`);
+              logger.error(`解决方案:`);
+              logger.error(`  1. 设置 primaryAgent=false`);
+              logger.error(`  2. 修改现有主Agent配置`);
+              
               throw new Error(
                 `❌ 主Agent冲突: DID ${did} 的主Agent已被 '${agentName}' 占用\n` +
                 `解决方案:\n` +

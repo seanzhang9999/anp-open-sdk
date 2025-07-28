@@ -8,6 +8,7 @@ import { Router, Request, Response } from 'express';
 import { getAgentManager } from '../../runtime/core';
 import { AgentServiceHandler } from '../../servicepoint/handlers';
 import { getLogger } from '../../foundation/utils';
+import { formatDidFromUrl } from '../../foundation/did/did-url-formatter';
 
 const logger = getLogger('AnpRouters');
 
@@ -21,11 +22,11 @@ export function createAgentRoutes(): Router {
   router.get('/', (req: Request, res: Response) => {
     try {
       const agentManager = getAgentManager();
-      const agents = agentManager.getAllAgentInfo();
+      const agents = agentManager.listAgents();
       res.json({
         success: true,
         data: agents,
-        count: agents.length
+        count: Object.keys(agents).length
       });
     } catch (error) {
       logger.error('获取Agent列表失败:', error);
@@ -41,17 +42,12 @@ export function createAgentRoutes(): Router {
     try {
       const { did } = req.params;
       
-      // 智能DID解码：解码一次后如果包含 %3A，就停止解码
-      let decodedDid = decodeURIComponent(did);
-      if (decodedDid.includes('%3A')) {
-        // 使用包含 %3A 的格式，这与Agent注册时的格式一致
-        logger.debug(`🔍 [Router] 获取Agent信息 - 原始DID: ${did}, 解码后(包含%3A): ${decodedDid}`);
-      } else {
-        logger.debug(`🔍 [Router] 获取Agent信息 - 原始DID: ${did}, 完全解码后: ${decodedDid}`);
-      }
+      // 使用统一的DID格式化函数
+      const normalizedDid = formatDidFromUrl(did);
+      logger.debug(`🔍 [Router] 获取Agent信息 - 原始DID: ${did}, 格式化后: ${normalizedDid}`);
       
       const agentManager = getAgentManager();
-      const agent = agentManager.getAgentByDid(decodedDid);
+      const agent = agentManager.getAgentByDid(normalizedDid);
       
       if (!agent) {
         return res.status(404).json({
@@ -79,17 +75,12 @@ export function createAgentRoutes(): Router {
       const { did } = req.params;
       const endpoint = '/' + req.params[0];
       
-      // 智能DID解码：解码一次后如果包含 %3A，就停止解码
-      let decodedDid = decodeURIComponent(did);
-      if (decodedDid.includes('%3A')) {
-        // 使用包含 %3A 的格式，这与Agent注册时的格式一致
-        logger.debug(`🔍 [Router] Agent API调用 - 原始DID: ${did}, 解码后(包含%3A): ${decodedDid}`);
-      } else {
-        logger.debug(`🔍 [Router] Agent API调用 - 原始DID: ${did}, 完全解码后: ${decodedDid}`);
-      }
+      // 使用统一的DID格式化函数
+      const normalizedDid = formatDidFromUrl(did);
+      logger.debug(`🔍 [Router] Agent API调用 - 原始DID: ${did}, 格式化后: ${normalizedDid}`);
       
       const result = await AgentServiceHandler.processAgentRequest(
-        decodedDid,
+        normalizedDid,
         endpoint,
         req.body
       );
@@ -252,17 +243,12 @@ export function createDidRoutes(): Router {
     try {
       const { did } = req.params;
       
-      // 智能DID解码：解码一次后如果包含 %3A，就停止解码
-      let decodedDid = decodeURIComponent(did);
-      if (decodedDid.includes('%3A')) {
-        // 使用包含 %3A 的格式，这与Agent注册时的格式一致
-        logger.debug(`🔍 [Router] 获取DID文档 - 原始DID: ${did}, 解码后(包含%3A): ${decodedDid}`);
-      } else {
-        logger.debug(`🔍 [Router] 获取DID文档 - 原始DID: ${did}, 完全解码后: ${decodedDid}`);
-      }
+      // 使用统一的DID格式化函数
+      const normalizedDid = formatDidFromUrl(did);
+      logger.debug(`🔍 [Router] 获取DID文档 - 原始DID: ${did}, 格式化后: ${normalizedDid}`);
       
       const agentManager = getAgentManager();
-      const agent = agentManager.getAgentByDid(decodedDid);
+      const agent = agentManager.getAgentByDid(normalizedDid);
       
       if (!agent) {
         return res.status(404).json({
