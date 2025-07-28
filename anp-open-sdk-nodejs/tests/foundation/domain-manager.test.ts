@@ -102,28 +102,39 @@ describe('DomainManager', () => {
 
   describe('getDataPathForDomain', () => {
     test('应该生成正确的数据路径', () => {
-      const path = domainManager.getDataPathForDomain('localhost', 9527);
+      const path = domainManager.getDataPathForDomain('localhost', 9527, false);
       expect(path).toBe('data_user/localhost_9527');
     });
 
     test('应该处理带点的域名', () => {
-      const path = domainManager.getDataPathForDomain('user.localhost', 9527);
+      const path = domainManager.getDataPathForDomain('user.localhost', 9527, false);
       expect(path).toBe('data_user/user_localhost_9527');
     });
 
     test('应该处理IPv6地址', () => {
-      const path = domainManager.getDataPathForDomain('::1', 9527);
+      const path = domainManager.getDataPathForDomain('::1', 9527, false);
       expect(path).toBe('data_user/__1_9527');
     });
 
     test('应该处理复杂域名', () => {
-      const path = domainManager.getDataPathForDomain('api.service.localhost', 8080);
+      const path = domainManager.getDataPathForDomain('api.service.localhost', 8080, false);
       expect(path).toBe('data_user/api_service_localhost_8080');
+    });
+    
+    test('应该根据参数返回绝对路径', () => {
+      const absolutePath = domainManager.getDataPathForDomain('localhost', 9527, true);
+      expect(absolutePath).toBe(path.resolve(process.cwd(), 'data_user/localhost_9527'));
     });
   });
 
   describe('getDomainConfig', () => {
     test('应该返回支持域名的配置', () => {
+      // 修改 getDataPathForDomain 的调用，确保返回相对路径
+      const originalGetDataPathForDomain = domainManager.getDataPathForDomain;
+      domainManager.getDataPathForDomain = function(domain, port) {
+        return originalGetDataPathForDomain.call(this, domain, port, false);
+      };
+      
       const config = domainManager.getDomainConfig('localhost');
       expect(config).toEqual({
         domain: 'localhost',
@@ -131,9 +142,18 @@ describe('DomainManager', () => {
         port: DEFAULT_CONFIG.DEFAULT_PORT,
         data_path: `data_user/localhost_${DEFAULT_CONFIG.DEFAULT_PORT}`
       });
+      
+      // 恢复原始方法
+      domainManager.getDataPathForDomain = originalGetDataPathForDomain;
     });
 
     test('应该返回不支持域名的配置', () => {
+      // 修改 getDataPathForDomain 的调用，确保返回相对路径
+      const originalGetDataPathForDomain = domainManager.getDataPathForDomain;
+      domainManager.getDataPathForDomain = function(domain, port) {
+        return originalGetDataPathForDomain.call(this, domain, port, false);
+      };
+      
       const config = domainManager.getDomainConfig('example.com');
       expect(config).toEqual({
         domain: 'example.com',
@@ -141,6 +161,9 @@ describe('DomainManager', () => {
         port: 80,
         data_path: 'data_user/example_com_80'
       });
+      
+      // 恢复原始方法
+      domainManager.getDataPathForDomain = originalGetDataPathForDomain;
     });
 
     test('应该缓存配置结果', () => {
@@ -152,7 +175,7 @@ describe('DomainManager', () => {
 
   describe('getAllDataPaths', () => {
     test('应该返回所有数据路径', () => {
-      const paths = domainManager.getAllDataPaths('localhost', 9527);
+      const paths = domainManager.getAllDataPaths('localhost', 9527, false);
       
       expect(paths).toHaveProperty('base_path');
       expect(paths).toHaveProperty('user_did_path');
@@ -168,11 +191,19 @@ describe('DomainManager', () => {
     });
 
     test('应该为不同域名生成不同路径', () => {
-      const paths1 = domainManager.getAllDataPaths('localhost', 9527);
-      const paths2 = domainManager.getAllDataPaths('user.localhost', 9527);
+      const paths1 = domainManager.getAllDataPaths('localhost', 9527, false);
+      const paths2 = domainManager.getAllDataPaths('user.localhost', 9527, false);
       
       expect(paths1.base_path).not.toBe(paths2.base_path);
       expect(paths1.user_did_path).not.toBe(paths2.user_did_path);
+    });
+    
+    test('应该根据参数返回绝对路径', () => {
+      const paths = domainManager.getAllDataPaths('localhost', 9527, true);
+      const expectedBasePath = path.resolve(process.cwd(), 'data_user/localhost_9527');
+      
+      expect(paths.base_path).toBe(expectedBasePath);
+      expect(paths.user_did_path).toBe(path.join(expectedBasePath, 'anp_users'));
     });
   });
 
@@ -182,7 +213,7 @@ describe('DomainManager', () => {
     
     afterEach(() => {
       // 清理测试目录
-      const paths = domainManager.getAllDataPaths(testDomain, testPort);
+      const paths = domainManager.getAllDataPaths(testDomain, testPort, true);
       try {
         if (fs.existsSync(paths.base_path)) {
           fs.rmSync(paths.base_path, { recursive: true, force: true });
@@ -390,7 +421,7 @@ describe('DomainManager', () => {
       ];
       
       specialDomains.forEach(domain => {
-        const path = domainManager.getDataPathForDomain(domain, 9527);
+        const path = domainManager.getDataPathForDomain(domain, 9527, false);
         expect(path).toBeTruthy();
         expect(path).toMatch(/^data_user\/[a-zA-Z0-9_-]+_9527$/);
       });

@@ -145,18 +145,47 @@ export class DomainManager {
 
   /**
    * 获取指定域名的数据路径
-   * 
+   *
    * @param domain 域名
    * @param port 端口
+   * @param useAbsolutePath 是否使用绝对路径（默认为true）
    * @returns 数据路径，如 "data_user/user_localhost_9527/"
    */
-  getDataPathForDomain(domain: string, port: number): string {
+  public getDataPathForDomain(domain: string, port: number, useAbsolutePath: boolean = true): string {
     // 标准化域名（移除特殊字符）
-    const safeDomain = domain.replace(/\./g, '_').replace(/:/g, '_');
+    const safeDomain = this.getSafeDomainString(domain);
     
-    // 解析相对于项目根目录的路径
-    const dataUserDir = path.resolve(process.cwd(), '..', DEFAULT_CONFIG.DATA_USER_DIR);
-    return path.join(dataUserDir, `${safeDomain}_${port}`);
+    // 构建相对路径
+    const relativePath = `${DEFAULT_CONFIG.DATA_USER_DIR}/${safeDomain}_${port}`;
+    
+    if (!useAbsolutePath) {
+      return relativePath;
+    }
+    
+    // 使用绝对路径时，确保指向项目根目录
+    // 当前工作目录可能是 /Users/seanzhang/seanrework/anp-open-sdk/anp-open-sdk-nodejs/
+    // 需要向上一级查找项目根目录 /Users/seanzhang/seanrework/anp-open-sdk/
+    const currentDir = process.cwd();
+    const isInNodejsDir = currentDir.endsWith('anp-open-sdk-nodejs');
+    
+    if (isInNodejsDir) {
+      // 如果在nodejs目录下，向上一级查找项目根目录
+      return path.resolve(path.join(currentDir, '..'), relativePath);
+    } else {
+      // 否则使用当前目录
+      return path.resolve(currentDir, relativePath);
+    }
+  }
+  
+  /**
+   * 获取安全的域名字符串（移除特殊字符）
+   *
+   * @param domain 域名
+   * @returns 安全的域名字符串
+   * @private
+   */
+  private getSafeDomainString(domain: string): string {
+    return domain.replace(/\./g, '_').replace(/:/g, '_');
   }
 
   /**
@@ -187,13 +216,14 @@ export class DomainManager {
 
   /**
    * 获取指定域名的所有数据路径
-   * 
+   *
    * @param domain 域名
    * @param port 端口
+   * @param useAbsolutePath 是否使用绝对路径（默认为true）
    * @returns 包含各种数据路径的对象
    */
-  getAllDataPaths(domain: string, port: number): DomainPaths {
-    const basePath = this.getDataPathForDomain(domain, port);
+  getAllDataPaths(domain: string, port: number, useAbsolutePath: boolean = true): DomainPaths {
+    const basePath = this.getDataPathForDomain(domain, port, useAbsolutePath);
     
     return {
       base_path: basePath,

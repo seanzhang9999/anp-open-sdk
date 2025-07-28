@@ -1,10 +1,10 @@
 did: did:wba:test.example.com%3A9527:wba:hostuser:testuser123
 unique_id: testuser123
-name: hosted_测试用户_1753513396806_test.example.com_9527
+name: hosted_测试用户_1753710815729_test.example.com_9527
 type: hosted
 hosted_config:
   parent_did: did:wba:localhost%3A9527:wba:user:27c0b1d11180f973
   host: test.example.com
   port: 9527
-  created_at: 2025-07-27T13:49:34.209Z
+  created_at: 2025-07-28T14:25:12.999Z
   purpose: 对外托管服务 - test.example.com:9527
