@@ -5,11 +5,11 @@
  */
 
 import 'reflect-metadata';
-import { AnpServer } from './server';
-import { Agent, AgentManager } from './runtime';
-import { ANPUser, LocalUserData } from './foundation';
-import { api, messageHandler, groupEventHandler } from './runtime/decorators';
-import { loadGlobalConfig } from './foundation/config';
+import { AnpServer } from '../src/server';
+import { Agent, AgentManager } from '../src/runtime';
+import { ANPUser, LocalUserData } from '../src/foundation';
+import { api, messageHandler, groupEventHandler } from '../src/runtime/decorators';
+import { loadGlobalConfig } from '../src/foundation/config';
 
 // 示例Agent类 - 继承自Agent
 class ExampleAgent extends Agent {

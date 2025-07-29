@@ -140,3 +140,6 @@ yarn-error.log*
 /memory-bank/
 anp-open-sdk-nodejs/dev/debug/*
 anp-open-sdk-nodejs/dev/test-scripts/*
+/.vscode/
+/anp-open-sdk-nodejs/dev/test-scripts/
+/anp-open-sdk-nodejs/dev/debug/
