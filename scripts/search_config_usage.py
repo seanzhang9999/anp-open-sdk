@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Dict, List, Set, Tuple
 from collections import defaultdict
 
+
 class ConfigUsageAnalyzer:
     def __init__(self, root_path: str):
         self.root_path = Path(root_path)
@@ -124,7 +125,7 @@ class ConfigUsageAnalyzer:
         analysis = {
             'total_usages': len(self.config_usages),
             'files_count': len(self.files_with_config),
-            'config_keys_used': sorted(list(self.config_keys_used)),
+            'config_keys_used': sorted(list(self.config_keys_used)),  # 转换为 list
             'injection_opportunities': [],
             'refactor_suggestions': []
         }
@@ -148,7 +149,7 @@ class ConfigUsageAnalyzer:
                 analysis['injection_opportunities'].append({
                     'file': file_path,
                     'type': 'class_constructor_injection',
-                    'classes': list(classes_with_config),
+                    'classes': list(classes_with_config),  # 转换为 list
                     'usage_count': len(usages),
                     'suggestion': f"为 {', '.join(classes_with_config)} 类添加 config 参数到构造函数"
                 })
@@ -157,7 +158,7 @@ class ConfigUsageAnalyzer:
                 analysis['injection_opportunities'].append({
                     'file': file_path,
                     'type': 'function_parameter_injection',
-                    'functions': list(functions_with_config),
+                    'functions': list(functions_with_config),  # 转换为 list
                     'usage_count': len(usages),
                     'suggestion': f"为 {', '.join(functions_with_config)} 函数添加 config 参数"
                 })
@@ -175,8 +176,13 @@ class ConfigUsageAnalyzer:
             else:
                 config_sections['root'].add(key)
 
+        # 转换 set 为 list 以便 JSON 序列化
+        config_sections_serializable = {}
+        for section, keys in config_sections.items():
+            config_sections_serializable[section] = sorted(list(keys))
+
         return {
-            'used_sections': dict(config_sections),
+            'used_sections': config_sections_serializable,
             'unused_sections_suggestion': self._suggest_unused_sections(),
             'optimization_suggestions': self._generate_optimization_suggestions()
         }
@@ -198,7 +204,7 @@ class ConfigUsageAnalyzer:
                 used_sections.add(key)
 
         potentially_unused = known_sections - used_sections
-        return list(potentially_unused)
+        return sorted(list(potentially_unused))  # 转换为 list 并排序
 
     def _generate_optimization_suggestions(self) -> List[str]:
         """生成优化建议"""
@@ -294,9 +300,10 @@ def {func_name}(..., config: Optional[UnifiedConfig] = None):
 
         return recommendations
 
+
 def main():
     # 使用示例
-    analyzer = ConfigUsageAnalyzer("anp-open-sdk-python")
+    analyzer = ConfigUsageAnalyzer(".")  # 当前目录
 
     print("🔍 开始搜索配置使用...")
     analyzer.search_config_usage()
@@ -323,6 +330,7 @@ def main():
         print(f"  - {suggestion}")
 
     print(f"\n✅ 详细报告已保存到: config_usage_analysis.json")
+
 
 if __name__ == "__main__":
     main()
