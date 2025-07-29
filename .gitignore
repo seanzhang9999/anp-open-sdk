@@ -138,3 +138,5 @@ yarn-error.log*
 **/*/hosted_did_queue/*
 **/*/hosted_did_results/*
 /memory-bank/
+anp-open-sdk-nodejs/dev/debug/*
+anp-open-sdk-nodejs/dev/test-scripts/*

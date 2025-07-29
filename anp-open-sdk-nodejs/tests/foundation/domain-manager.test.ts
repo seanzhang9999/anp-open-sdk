@@ -123,7 +123,11 @@ describe('DomainManager', () => {
     
     test('应该根据参数返回绝对路径', () => {
       const absolutePath = domainManager.getDataPathForDomain('localhost', 9527, true);
-      expect(absolutePath).toBe(path.resolve(process.cwd(), 'data_user/localhost_9527'));
+      // 修复后的路径应该指向正确的上级目录中的data_user
+      const expectedPath = process.cwd().endsWith('anp-open-sdk-nodejs')
+        ? path.resolve(process.cwd(), '..', 'data_user/localhost_9527')
+        : path.resolve(process.cwd(), 'data_user/localhost_9527');
+      expect(absolutePath).toBe(expectedPath);
     });
   });
 
@@ -200,7 +204,10 @@ describe('DomainManager', () => {
     
     test('应该根据参数返回绝对路径', () => {
       const paths = domainManager.getAllDataPaths('localhost', 9527, true);
-      const expectedBasePath = path.resolve(process.cwd(), 'data_user/localhost_9527');
+      // 修复后的路径应该指向正确的上级目录中的data_user
+      const expectedBasePath = process.cwd().endsWith('anp-open-sdk-nodejs')
+        ? path.resolve(process.cwd(), '..', 'data_user/localhost_9527')
+        : path.resolve(process.cwd(), 'data_user/localhost_9527');
       
       expect(paths.base_path).toBe(expectedBasePath);
       expect(paths.user_did_path).toBe(path.join(expectedBasePath, 'anp_users'));

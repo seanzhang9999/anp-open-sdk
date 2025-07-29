@@ -180,6 +180,7 @@ export interface AuthenticationContext {
   json_data?: any;
   use_two_way_auth?: boolean;
   domain?: string;
+  timeout?: number;
 }
 
 export interface AuthResult {
@@ -228,6 +229,7 @@ export interface HttpRequestOptions {
   headers?: Record<string, string>;
   body?: any;
   json?: any;
+  timeout?: number;
 }
 
 export interface HttpResponse {

@@ -66,20 +66,15 @@ export async function agentApiCallPost(options: {
     // 创建API调用器
     const apiCaller = new AgentApiCaller(privateKeyPem, options.callerAgent);
     
-    // 构建正确的ANP协议URL格式
-    // 格式: /agent/api/{target_agent_encoded}{api_path}?req_did={caller_did}&resp_did={target_did}
-    const targetAgentEncoded = encodeURIComponent(options.targetAgent);
-    const urlParams = new URLSearchParams({
-      req_did: options.callerAgent,
-      resp_did: options.targetAgent
-    });
-    
-    const apiUrl = `/agent/api/${targetAgentEncoded}${options.apiPath}?${urlParams.toString()}`;
+    // 🔧 修复URL重复拼接问题：
+    // AgentApiCaller.callAgentApi 会自动构建完整的URL，
+    // 这里只需要传递endpoint路径，不需要包含 /agent/api/ 前缀
     
     // 调用API，使用POST方法并传递params作为请求体
+    // endpoint参数只需要是API路径，如 "/add"
     const result = await apiCaller.callAgentApi(
       options.targetAgent,
-      apiUrl,
+      options.apiPath,  // 直接传递API路径，不包含 /agent/api/ 前缀
       { params: options.params },
       { method: 'POST' }
     );
@@ -514,6 +509,9 @@ describe('Python Server Compatibility Tests', () => {
         const privateKeyPem = privateKey.export({ type: 'pkcs8', format: 'pem' }) as string;
         const apiCaller = new AgentApiCaller(privateKeyPem, TEST_CALLER_DID);
         
+        logger.info('🔍 开始网络超时测试，设置超时时间为1ms');
+        const startTime = Date.now();
+        
         const result = await apiCaller.callAgentApi(
           TEST_TARGET_DID,
           "/add",
@@ -521,8 +519,12 @@ describe('Python Server Compatibility Tests', () => {
           { timeout: 1 } // 1ms超时，几乎肯定会超时
         );
         
+        const duration = Date.now() - startTime;
+        logger.info(`🔍 超时测试完成，耗时: ${duration}ms, 结果: success=${result.success}, error=${result.error}`);
+        
         expect(result.success).toBe(false);
         expect(result.error).toBeDefined();
+        expect(result.error).toContain('timeout');
         logger.info('✅ 网络超时错误处理正常:', result.error);
       }
     });

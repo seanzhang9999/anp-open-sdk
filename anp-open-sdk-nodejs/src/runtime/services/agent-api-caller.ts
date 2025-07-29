@@ -83,7 +83,9 @@ export class AgentApiCaller {
         url,
         method,
         payload,
-        options.headers
+        options.headers,
+        true, // useTwoWayAuth
+        options.timeout // 传递超时参数
       );
 
       if (result.is_auth_pass) {

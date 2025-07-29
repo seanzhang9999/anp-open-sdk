@@ -40,7 +40,8 @@ export class AuthInitiator {
     method: string = 'GET',
     jsonData?: any,
     customHeaders?: Record<string, string>,
-    useTwoWayAuth: boolean = true
+    useTwoWayAuth: boolean = true,
+    timeout?: number
   ): Promise<AuthenticatedRequestResult> {
     try {
       // 暂时屏蔽token分支，直接使用DID认证
@@ -53,7 +54,8 @@ export class AuthInitiator {
         method,
         jsonData,
         customHeaders,
-        useTwoWayAuth
+        useTwoWayAuth,
+        timeout
       );
 
       logger.info(`Request: ${requestUrl}, Status: ${result.status}, Auth: ${result.is_auth_pass}, Info: ${result.info}`);
@@ -80,7 +82,8 @@ export class AuthInitiator {
     method: string = 'GET',
     jsonData?: any,
     customHeaders?: Record<string, string>,
-    useTwoWayAuth: boolean = true
+    useTwoWayAuth: boolean = true,
+    timeout?: number
   ): Promise<AuthenticatedRequestResult> {
     const context: AuthenticationContext = {
       caller_did: callerDid,
@@ -89,7 +92,8 @@ export class AuthInitiator {
       method,
       custom_headers: customHeaders || {},
       json_data: jsonData,
-      use_two_way_auth: useTwoWayAuth
+      use_two_way_auth: useTwoWayAuth,
+      timeout
     };
 
     try {
@@ -213,7 +217,8 @@ export class AuthInitiator {
         {
           method: context.method || 'GET',
           headers: mergedHeaders,
-          json: context.json_data
+          json: context.json_data,
+          timeout: context.timeout
         }
       );
 
@@ -539,8 +544,18 @@ export class AuthInitiator {
       });
 
       req.on('error', (error) => {
+        logger.error(`HTTP请求错误: ${error.message}`);
         reject(error);
       });
+
+      // 设置超时处理
+      if (options.timeout && options.timeout > 0) {
+        req.setTimeout(options.timeout, () => {
+          logger.error(`HTTP请求超时: ${url}, 超时时间: ${options.timeout}ms`);
+          req.destroy();
+          reject(new Error(`Request timeout after ${options.timeout}ms`));
+        });
+      }
 
       // 发送请求体
       if (options.json) {

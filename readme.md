@@ -1,3 +1,4 @@
+## python测试方法
 ### 1. 配置文件
 ```bash
 cp .env.example .env
@@ -24,4 +25,22 @@ poetry install
 
  PYTHONPATH=$PYTHONPATH:/Users/seanzhang/seanrework/anp-open-sdk/anp-open-sdk-python  python examples/flow_anp_agent/flow_anp_agent.py
 
+```
+
+
+## nodejs测试方法
+
+### 运行所有测试
+```bash
+# 进入项目目录
+cd anp-open-sdk-nodejs
+
+# 安装依赖
+npm install
+
+# 运行所有测试
+npm test
+
+# 运行样例代码
+npx ts-node examples/flow-anp-agent.ts
 ```

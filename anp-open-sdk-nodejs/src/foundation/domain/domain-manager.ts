@@ -162,19 +162,21 @@ export class DomainManager {
       return relativePath;
     }
     
-    // 使用绝对路径时，确保指向项目根目录
-    // 当前工作目录可能是 /Users/seanzhang/seanrework/anp-open-sdk/anp-open-sdk-nodejs/
-    // 需要向上一级查找项目根目录 /Users/seanzhang/seanrework/anp-open-sdk/
+    // 🔧 修复路径构建逻辑：
+    // 检查当前工作目录，如果在子目录中运行，需要向上查找正确的data_user目录
     const currentDir = process.cwd();
-    const isInNodejsDir = currentDir.endsWith('anp-open-sdk-nodejs');
     
-    if (isInNodejsDir) {
-      // 如果在nodejs目录下，向上一级查找项目根目录
-      return path.resolve(path.join(currentDir, '..'), relativePath);
+    // 检查是否在anp-open-sdk-nodejs子目录中运行
+    let basePath: string;
+    if (currentDir.endsWith('anp-open-sdk-nodejs')) {
+      // 在子目录中运行，需要向上一级查找data_user
+      basePath = path.resolve(currentDir, '..', relativePath);
     } else {
-      // 否则使用当前目录
-      return path.resolve(currentDir, relativePath);
+      // 在根目录中运行，直接使用当前目录
+      basePath = path.resolve(currentDir, relativePath);
     }
+    
+    return basePath;
   }
   
   /**
