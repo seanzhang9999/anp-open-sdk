@@ -912,7 +912,25 @@ class LocalAgentManager:
 
             # 使用装饰器方式注册API
             agent_api(anp_agent, api["path"], auto_wrap=True)(handler_func)
+            
+            # 新增：保存API配置到Agent实例
+            api_config = {
+                'params': api.get('params', {}),
+                'summary': api.get('summary', ''),
+                'result': api.get('result', {}),
+                'handler': api["handler"],
+                'method': api.get('method', 'POST'),
+                'openapi_version': api.get('openapi_version', '3.0.0'),
+                'title': api.get('title', ''),
+                'version': api.get('version', '1.0.0')
+            }
+            
+            # 计算完整路径（考虑共享DID的prefix）
+            full_path = f"{anp_agent.prefix}{api['path']}" if anp_agent.prefix else api["path"]
+            anp_agent.set_api_config(full_path, api_config)
+            
             logger.debug(f"  - config register agent: {cfg['name']}，api:{api}")
+            logger.debug(f"  - 保存API配置: {full_path} -> 参数数量: {len(api_config['params'])}")
 
         # 注册消息处理器（如果存在）
         LocalAgentManager._register_message_handlers_new(anp_agent, handlers_module, cfg, share_did_config)
@@ -966,6 +984,57 @@ class LocalAgentManager:
                     logger.warning(f"⚠️ 预期行为: {e}")
 
     @staticmethod
+    def _extract_api_params(agent_obj, path: str, handler) -> Dict:
+        """提取API参数，优先使用配置，回退到函数签名
+        
+        Args:
+            agent_obj: Agent实例
+            path: API路径
+            handler: 处理函数
+            
+        Returns:
+            Dict: 参数字典 {param_name: {type: str, description: str, default: any}}
+        """
+        params = {}
+        
+        # 优先使用保存的配置参数
+        if hasattr(agent_obj, 'api_configs') and path in agent_obj.api_configs:
+            config_params = agent_obj.api_configs[path].get('params', {})
+            for name, param_config in config_params.items():
+                params[name] = {
+                    "type": param_config.get('type', 'Any'),
+                    "description": param_config.get('description', ''),
+                }
+                # 如果有默认值，添加到参数中
+                if 'value' in param_config:
+                    params[name]['default'] = param_config['value']
+            
+            if params:
+                logger.debug(f"✅ 使用配置参数: {path} -> {len(params)} 个参数")
+                return params
+        
+        # 回退到函数签名分析
+        try:
+            sig = inspect.signature(handler)
+            for name, param in sig.parameters.items():
+                if name not in ["self", "request_data", "request"]:
+                    params[name] = {
+                        "type": param.annotation.__name__ if (
+                            param.annotation != inspect._empty and hasattr(param.annotation, "__name__")
+                        ) else "Any"
+                    }
+            
+            if params:
+                logger.debug(f"🔄 使用函数签名参数: {path} -> {len(params)} 个参数")
+            else:
+                logger.debug(f"⚠️ 未找到参数: {path} (函数签名中只有 request_data/request)")
+                
+        except Exception as e:
+            logger.warning(f"提取函数签名参数失败: {path} - {e}")
+        
+        return params
+
+    @staticmethod
     def generate_custom_openapi_from_router(agent: Agent) -> Dict:
         """根据 Agent 的路由生成自定义的 OpenAPI 规范"""
         did = agent.anp_user_did
@@ -998,9 +1067,9 @@ class LocalAgentManager:
                     # 避免重复添加路由
                     if path in openapi["paths"]:
                         continue
-                    sig = inspect.signature(handler)
-                    param_names = [p for p in sig.parameters if p not in ("request_data", "request")]
-                    properties = {name: {"type": "string"} for name in param_names}
+                    # 从处理函数获取参数信息 - 优先使用配置参数
+                    params = LocalAgentManager._extract_api_params(shared_agent, path, handler)
+                    properties = {name: {"type": param_info.get("type", "string")} for name, param_info in params.items()}
                     # 使用处理函数的文档字符串作为摘要
                     summary = handler.__doc__ or f"{shared_agent.name}的{path}接口"
                     openapi["paths"][path] = {
@@ -1032,9 +1101,9 @@ class LocalAgentManager:
         else:
             for path, handler in agent.api_routes.items():
                 # 非共享DID模式，保持原有逻辑
-                sig = inspect.signature(handler)
-                param_names = [p for p in sig.parameters if p not in ("request_data", "request")]
-                properties = {name: {"type": "string"} for name in param_names}
+                # 从处理函数获取参数信息 - 优先使用配置参数
+                params = LocalAgentManager._extract_api_params(agent, path, handler)
+                properties = {name: {"type": param_info.get("type", "string")} for name, param_info in params.items()}
                 # 使用处理函数的文档字符串作为摘要
                 summary = handler.__doc__ or f"{agent.name}的{path}接口"
                 openapi["paths"][path] = {
@@ -1140,14 +1209,8 @@ class LocalAgentManager:
                         # 从路径生成方法名
                         method_name = full_path.strip('/').replace('/', '.')
 
-                        # 从处理函数获取参数信息
-                        sig = inspect.signature(handler)
-                        params = {
-                            name: {"type": param.annotation.__name__ if (
-                                    param.annotation != inspect._empty and hasattr(param.annotation,
-                                                                                   "__name__")) else "Any"}
-                            for name, param in sig.parameters.items() if name not in ["self", "request_data", "request"]
-                        }
+                        # 从处理函数获取参数信息 - 优先使用配置参数
+                        params = LocalAgentManager._extract_api_params(agent_obj, full_path, handler)
 
                         # 获取处理函数的文档字符串作为摘要
                         summary = handler.__doc__ or f"{agent_obj.name}的{path}接口"
@@ -1239,10 +1302,9 @@ class LocalAgentManager:
                 # 路径已经是完整路径，不需要再添加prefix
                 full_path = path
 
-                # 从处理函数获取参数信息
-                sig = inspect.signature(handler)
-                param_names = [p for p in sig.parameters if p not in ("request_data", "request")]
-                properties = {name: {"type": "string"} for name in param_names}
+                # 从处理函数获取参数信息 - 优先使用配置参数
+                params = LocalAgentManager._extract_api_params(agent, full_path, handler)
+                properties = {name: {"type": param_info.get("type", "string")} for name, param_info in params.items()}
 
                 # 获取处理函数的文档字符串作为摘要
                 summary = handler.__doc__ or f"{agent.name}的{path}接口"

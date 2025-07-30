@@ -71,6 +71,36 @@ export class AuthExemptHandler {
       enabled: true
     },
     {
+      pattern: '/wba/*/api_interface_nj.yaml',
+      description: 'Node.js运行时API接口YAML文档',
+      enabled: true
+    },
+    {
+      pattern: '/wba/*/api_interface_nj.json',
+      description: 'Node.js运行时API接口JSON文档',
+      enabled: true
+    },
+    {
+      pattern: '/wba/*/api_interface_py.yaml',
+      description: 'Python运行时API接口YAML文档',
+      enabled: true
+    },
+    {
+      pattern: '/wba/*/api_interface_py.json',
+      description: 'Python运行时API接口JSON文档',
+      enabled: true
+    },
+    {
+      pattern: '/wba/*/ad_nj.json',
+      description: 'Node.js运行时Agent描述文档',
+      enabled: true
+    },
+    {
+      pattern: '/wba/*/ad_py.json',
+      description: 'Python运行时Agent描述文档',
+      enabled: true
+    },
+    {
       pattern: '/publisher/agents',
       method: 'GET',
       description: '公开的智能体列表',

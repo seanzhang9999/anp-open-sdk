@@ -6,8 +6,10 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import * as yaml from 'yaml';
 import { Agent, AgentOptions } from './agent';
 import { ANPUser } from '../../foundation/user';
+import { getUserDataManager } from '../../foundation/user';
 import { getLogger } from '../../foundation/utils';
 
 const logger = getLogger('AgentManager');
@@ -531,6 +533,469 @@ export class AgentManager {
       activeSessions: this.sessionManager.getActiveSessions().length,
       recentApiCalls: this.apiCallManager.getRecentCalls().length
     };
+  }
+
+  /**
+   * 为指定的Agent生成并保存接口文档
+   * 对标Python版本的generate_and_save_agent_interfaces方法
+   */
+  static async generateAndSaveAgentInterfaces(agent: Agent): Promise<void> {
+    logger.debug(`开始为Agent '${agent.name}' (${agent.anpUser.id}) 生成接口文档...`);
+
+    const did = agent.anpUser.id;
+    const userDataManager = getUserDataManager();
+    const userData = userDataManager.getUserData(did);
+    
+    if (!userData) {
+      logger.error(`无法找到DID '${did}' 的用户数据，无法保存接口文档`);
+      return;
+    }
+
+    const userFullPath = userData.userDir;
+
+    try {
+      // 1. 生成并保存OpenAPI YAML文件（Node.js版本）
+      await this.generateAndSaveOpenApiYaml(did, userFullPath);
+
+      // 2. 生成并保存JSON-RPC文件（Node.js版本）
+      await this.generateAndSaveJsonRpc(did, userFullPath);
+
+      // 3. 生成并保存Agent Description文件（Node.js版本）
+      await this.generateAndSaveAgentDescription(did, userFullPath);
+
+      logger.debug(`✅ 为DID '${did}' 生成接口文档完成`);
+    } catch (error) {
+      logger.error(`为DID '${did}' 生成接口文档失败: ${error}`);
+      throw error;
+    }
+  }
+
+  /**
+   * 生成并保存OpenAPI YAML文件
+   */
+  private static async generateAndSaveOpenApiYaml(did: string, userFullPath: string): Promise<void> {
+    try {
+      const openApiData = this.generateOpenApiByDid(did);
+      await this.saveInterfaceFile(
+        userFullPath,
+        openApiData,
+        'api_interface_nj.yaml', // Node.js版本使用_nj后缀
+        'YAML'
+      );
+      logger.debug(`✅ 为DID '${did}' 生成OpenAPI YAML文件成功`);
+    } catch (error) {
+      logger.error(`为DID '${did}' 生成OpenAPI YAML文件失败: ${error}`);
+      throw error;
+    }
+  }
+
+  /**
+   * 生成并保存JSON-RPC文件
+   */
+  private static async generateAndSaveJsonRpc(did: string, userFullPath: string): Promise<void> {
+    try {
+      const jsonRpcData = {
+        jsonrpc: '2.0',
+        info: {
+          title: `DID ${did} JSON-RPC Interface`,
+          version: '0.1.0',
+          description: `Methods offered by DID ${did}`,
+          runtime: 'nodejs' // 添加运行时标识
+        },
+        methods: [] as any[]
+      };
+
+      // 获取该DID关联的所有Agent信息
+      const agentsInfo = this.getAgentInfo(did) as Map<string, AgentInfo> | null;
+      if (!agentsInfo) {
+        logger.warn(`无法找到DID '${did}' 关联的Agent，生成空的JSON-RPC文件`);
+      } else {
+        // 遍历所有Agent，获取它们的API路由
+        for (const [agentName, agentInfo] of agentsInfo) {
+          const agent = agentInfo.agent;
+          const prefix = agentInfo.prefix;
+
+          // 收集所有其他Agent的prefix，用于独占模式判断
+          const otherPrefixes = Array.from(agentsInfo.values())
+            .filter(info => info !== agentInfo && info.prefix)
+            .map(info => info.prefix!);
+
+          // 获取该Agent的API路由
+          const apiRoutes = this.getAgentApiRoutes(agent, prefix, otherPrefixes);
+
+          for (const [path, handler] of Object.entries(apiRoutes)) {
+            const fullPath = path;
+            const methodName = fullPath.replace(/^\//, '').replace(/\//g, '.');
+
+            // 从处理函数获取参数信息
+            const params = this.extractHandlerParams(handler);
+
+            // 获取处理函数的文档字符串作为摘要
+            const summary = (handler as any).__doc__ || `${agent.name}的${path}接口`;
+
+            // 创建方法对象
+            const methodObj = {
+              name: methodName,
+              summary: summary,
+              description: `由 ${agent.name} 提供的服务`,
+              params: params,
+              tags: [agent.name],
+              meta: {
+                openapi: '3.0.0',
+                info: { title: `${agent.name} API`, version: '1.0.0' },
+                httpMethod: 'POST',
+                endpoint: fullPath,
+                runtime: 'nodejs'
+              }
+            };
+
+            jsonRpcData.methods.push(methodObj);
+            logger.debug(`  - 添加JSON-RPC方法: ${methodName} <- ${fullPath}`);
+          }
+        }
+      }
+
+      await this.saveInterfaceFile(
+        userFullPath,
+        jsonRpcData,
+        'api_interface_nj.json', // Node.js版本使用_nj后缀
+        'JSON'
+      );
+      logger.debug(`✅ 为DID '${did}' 生成JSON-RPC文件成功`);
+    } catch (error) {
+      logger.error(`为DID '${did}' 生成JSON-RPC文件失败: ${error}`);
+      throw error;
+    }
+  }
+
+  /**
+   * 生成并保存Agent Description文件
+   */
+  private static async generateAndSaveAgentDescription(did: string, userFullPath: string): Promise<void> {
+    try {
+      const agentsInfo = this.getAgentInfo(did) as Map<string, AgentInfo> | null;
+      if (!agentsInfo) {
+        logger.error(`无法找到DID '${did}' 关联的Agent，无法生成ad.json`);
+        return;
+      }
+
+      // 确定主Agent（如果有）
+      let primaryAgent = null;
+      for (const [agentName, agentInfo] of agentsInfo) {
+        if (agentInfo.primaryAgent) {
+          primaryAgent = agentInfo.agent;
+          break;
+        }
+      }
+
+      // 如果没有主Agent，使用第一个Agent
+      if (!primaryAgent && agentsInfo.size > 0) {
+        const firstAgentInfo = agentsInfo.values().next().value;
+        if (firstAgentInfo) {
+          primaryAgent = firstAgentInfo.agent;
+        }
+      }
+
+      // 从DID解析主机和端口
+      const { host, port } = this.parseDidHostPort(did);
+      const hostPort = port ? `${host}:${port}` : host;
+
+      // 基本ad.json结构
+      const adJson = {
+        '@context': {
+          '@vocab': 'https://schema.org/',
+          'did': 'https://w3id.org/did#',
+          'ad': 'https://agent-network-protocol.com/ad#'
+        },
+        '@type': 'ad:AgentDescription',
+        'name': `DID Services for ${did}`,
+        'owner': {
+          'name': `${did} 的拥有者`,
+          '@id': did
+        },
+        'description': `Services provided by DID ${did}`,
+        'version': '0.1.0',
+        'created_at': new Date().toISOString(),
+        'runtime': 'nodejs',
+        'security_definitions': {
+          'didwba_sc': {
+            'scheme': 'didwba',
+            'in': 'header',
+            'name': 'Authorization'
+          }
+        },
+        'ad:interfaces': [] as any[]
+      };
+
+      // 添加标准接口
+      const interfaces = [];
+      const encodedDid = encodeURIComponent(did);
+
+      interfaces.push(
+        {
+          '@type': 'ad:NaturalLanguageInterface',
+          'protocol': 'YAML',
+          'url': `http://${hostPort}/wba/user/${encodedDid}/nlp_interface_nj.yaml`,
+          'description': 'Node.js运行时的自然语言交互接口OpenAPI YAML文件'
+        },
+        {
+          '@type': 'ad:StructuredInterface',
+          'protocol': 'YAML',
+          'url': `http://${hostPort}/wba/user/${encodedDid}/api_interface_nj.yaml`,
+          'description': 'Node.js运行时的智能体YAML描述接口调用方法'
+        },
+        {
+          '@type': 'ad:StructuredInterface',
+          'protocol': 'JSON',
+          'url': `http://${hostPort}/wba/user/${encodedDid}/api_interface_nj.json`,
+          'description': 'Node.js运行时的智能体JSON-RPC描述接口调用方法'
+        }
+      );
+
+      // 聚合所有Agent的API路由
+      for (const [agentName, agentInfo] of agentsInfo) {
+        const agent = agentInfo.agent;
+        const prefix = agentInfo.prefix;
+
+        // 收集所有其他Agent的prefix，用于独占模式判断
+        const otherPrefixes = Array.from(agentsInfo.values())
+          .filter(info => info !== agentInfo && info.prefix)
+          .map(info => info.prefix!);
+
+        // 获取该Agent的API路由
+        const apiRoutes = this.getAgentApiRoutes(agent, prefix, otherPrefixes);
+
+        for (const [path, handler] of Object.entries(apiRoutes)) {
+          const fullPath = path;
+          const handlerName = (handler as any).name || 'unknown';
+          
+          interfaces.push({
+            '@type': 'ad:StructuredInterface',
+            'protocol': 'HTTP',
+            'name': fullPath.replace(/\//g, '_').replace(/^_/, ''),
+            'url': `/agent/api/${did}${fullPath}`,
+            'description': `${agent.name} API路径 ${fullPath} 的端点 (处理器: ${handlerName})`
+          });
+        }
+      }
+
+      // 去重逻辑
+      const seenUrls = new Set<string>();
+      const uniqueInterfaces = interfaces.filter(interfaceItem => {
+        const url = interfaceItem.url;
+        if (seenUrls.has(url)) {
+          return false;
+        }
+        seenUrls.add(url);
+        return true;
+      });
+
+      adJson['ad:interfaces'] = uniqueInterfaces;
+
+      await this.saveInterfaceFile(
+        userFullPath,
+        adJson,
+        'ad_nj.json', // Node.js版本使用_nj后缀
+        'JSON'
+      );
+      logger.debug(`✅ 为DID '${did}' 生成Agent Description文件成功`);
+    } catch (error) {
+      logger.error(`为DID '${did}' 生成Agent Description文件失败: ${error}`);
+      throw error;
+    }
+  }
+
+  /**
+   * 根据DID生成OpenAPI规范
+   */
+  private static generateOpenApiByDid(did: string): any {
+    const openApi = {
+      openapi: '3.0.0',
+      info: {
+        title: `DID ${did} API`,
+        version: '1.0.0',
+        description: `所有与DID ${did} 关联的服务接口`,
+        'x-runtime': 'nodejs'
+      },
+      paths: {} as any
+    };
+
+    // 获取与该DID关联的所有Agent
+    const agentsInfo = this.getAgentInfo(did) as Map<string, AgentInfo> | null;
+    if (!agentsInfo) {
+      logger.warn(`无法找到DID '${did}' 关联的Agent，生成空的OpenAPI规范`);
+      return openApi;
+    }
+
+    // 遍历所有Agent，获取它们的API路由
+    for (const [agentName, agentInfo] of agentsInfo) {
+      const agent = agentInfo.agent;
+      const prefix = agentInfo.prefix;
+
+      // 收集所有其他Agent的prefix，用于独占模式判断
+      const otherPrefixes = Array.from(agentsInfo.values())
+        .filter(info => info !== agentInfo && info.prefix)
+        .map(info => info.prefix!);
+
+      // 获取该Agent的API路由
+      const apiRoutes = this.getAgentApiRoutes(agent, prefix, otherPrefixes);
+
+      for (const [path, handler] of Object.entries(apiRoutes)) {
+        const fullPath = path;
+
+        // 从处理函数获取参数信息
+        const params = this.extractHandlerParams(handler);
+        const properties: Record<string, any> = {};
+        
+        for (const [name, info] of Object.entries(params)) {
+          properties[name] = { type: 'string' };
+        }
+
+        // 获取处理函数的文档字符串作为摘要
+        const summary = (handler as any).__doc__ || `${agent.name}的${path}接口`;
+
+        // 添加到OpenAPI规范
+        openApi.paths[fullPath] = {
+          post: {
+            summary: summary,
+            description: `由 ${agent.name} 提供的服务`,
+            tags: [agent.name],
+            requestBody: {
+              required: true,
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: properties
+                  }
+                }
+              }
+            },
+            responses: {
+              '200': {
+                description: '返回结果',
+                content: {
+                  'application/json': {
+                    schema: { type: 'object' }
+                  }
+                }
+              }
+            }
+          }
+        };
+      }
+    }
+
+    return openApi;
+  }
+
+  /**
+   * 获取Agent的API路由
+   */
+  private static getAgentApiRoutes(agent: Agent, prefix?: string, otherPrefixes: string[] = []): Record<string, Function> {
+    const apiRoutes: Record<string, Function> = {};
+
+    // 从agent.apiRoutes获取路由（如果存在）
+    if (agent.apiRoutes) {
+      for (const [path, handler] of Object.entries(agent.apiRoutes)) {
+        // 检查路径是否属于当前Agent（通过prefix匹配）
+        if (prefix && path.startsWith(prefix)) {
+          // 这才是属于当前Agent的路由
+          apiRoutes[path] = handler;
+        } else if (!prefix && !otherPrefixes.some(p => path.startsWith(p))) {
+          // 独占模式的路由，且不以其他Agent的prefix开头
+          apiRoutes[path] = handler;
+        }
+      }
+    }
+
+    return apiRoutes;
+  }
+
+  /**
+   * 从处理函数提取参数信息
+   */
+  private static extractHandlerParams(handler: Function): Record<string, any> {
+    const params: Record<string, any> = {};
+    
+    try {
+      // 获取函数字符串
+      const funcStr = handler.toString();
+      
+      // 匹配参数列表
+      const match = funcStr.match(/\(([^)]*)\)/);
+      if (match && match[1]) {
+        const paramStr = match[1];
+        const paramList = paramStr.split(',').map(p => p.trim());
+        
+        for (const param of paramList) {
+          if (param && !param.includes('request') && !param.includes('this')) {
+            const paramName = param.split(':')[0].trim();
+            if (paramName) {
+              params[paramName] = { type: 'Any' };
+            }
+          }
+        }
+      }
+    } catch (error) {
+      logger.debug(`提取函数参数失败: ${error}`);
+    }
+
+    return params;
+  }
+
+  /**
+   * 保存接口文件
+   */
+  private static async saveInterfaceFile(
+    userFullPath: string,
+    interfaceData: any,
+    filename: string,
+    fileType: 'JSON' | 'YAML'
+  ): Promise<void> {
+    const filePath = path.join(userFullPath, filename);
+    
+    // 确保目录存在
+    await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
+
+    let content: string;
+    if (fileType === 'JSON') {
+      content = JSON.stringify(interfaceData, null, 2);
+    } else {
+      content = yaml.stringify(interfaceData);
+    }
+
+    await fs.promises.writeFile(filePath, content, 'utf-8');
+    logger.debug(`接口文件${filename}已保存在: ${filePath}`);
+  }
+
+  /**
+   * 从DID中解析域名和端口
+   */
+  private static parseDidHostPort(did: string): { host: string; port: number | null } {
+    try {
+      // 解析格式: did:wba:localhost%3A9527:wba:user:27c0b1d11180f973
+      const parts = did.split(':');
+      if (parts.length >= 3 && parts[0] === 'did' && parts[1] === 'wba') {
+        const hostPart = parts[2];
+        
+        if (hostPart.includes('%3A')) {
+          // 包含端口的情况
+          const [encodedHost, portStr] = hostPart.split('%3A');
+          const host = decodeURIComponent(encodedHost);
+          const port = parseInt(portStr, 10);
+          return { host, port: isNaN(port) ? null : port };
+        } else {
+          // 不包含端口，使用默认端口
+          const host = decodeURIComponent(hostPart);
+          return { host, port: 80 };
+        }
+      }
+    } catch (error) {
+      logger.warn(`解析DID域名端口失败: ${did}, 错误: ${error}`);
+    }
+    
+    return { host: 'localhost', port: 9527 };
   }
 }
 

@@ -70,12 +70,36 @@ class Agent:
         self.group_event_handlers = {}  # (group_id, event_type) -> [handlers]
         self.group_global_handlers = []  # [(event_type, handler)] 全局handler
         
+        # API配置存储 - 用于保存从YAML配置文件中读取的API参数定义
+        self.api_configs = {}  # path -> config_dict，存储API的参数配置信息
+        
         logger.debug(f"✅ Agent创建成功: {name}")
         logger.debug(f"   DID: {self.anp_user_did} ({'共享' if shared else '独占'})")
         if prefix:
             logger.debug(f"   Prefix: {prefix}")
         if primary_agent:
             logger.debug(f"   主Agent: 是")
+
+    def set_api_config(self, path: str, config: dict):
+        """设置API配置信息
+        
+        Args:
+            path: API路径
+            config: API配置字典，包含params、summary等信息
+        """
+        self.api_configs[path] = config
+        logger.debug(f"保存API配置: {path} -> {config}")
+    
+    def get_api_config(self, path: str) -> dict:
+        """获取API配置信息
+        
+        Args:
+            path: API路径
+            
+        Returns:
+            dict: API配置字典，如果不存在则返回空字典
+        """
+        return self.api_configs.get(path, {})
 
 
 

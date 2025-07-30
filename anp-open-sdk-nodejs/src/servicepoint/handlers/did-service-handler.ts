@@ -100,6 +100,7 @@ export class DIDServiceHandler {
 
   /**
    * 获取智能体描述文档
+   * 支持智能文件选择：优先返回Node.js版本，回退到原始文件或Python版本
    */
   public static async getAgentDescription(userId: string, host: string, port: number): Promise<DIDServiceResponse> {
     try {
@@ -126,18 +127,32 @@ export class DIDServiceHandler {
       const paths = domainManager.getAllDataPaths(host, port);
       const userFullPath = path.join(paths.user_did_path, userResult.userDir);
 
-      // 从文件系统读取ad.json
-      const adJsonPath = path.join(userFullPath, "ad.json");
+      // 智能文件选择：优先Node.js版本，然后原始文件，最后Python版本
+      const adFileOptions = [
+        'ad_nj.json',    // Node.js版本优先
+        'ad.json',       // 原始文件作为回退
+        'ad_py.json'     // Python版本作为最后回退
+      ];
 
-      try {
-        await fs.access(adJsonPath);
-        const adJsonContent = await fs.readFile(adJsonPath, 'utf-8');
-        const adJson = JSON.parse(adJsonContent);
-        return { success: true, data: adJson };
-      } catch (error) {
-        logger.error(`读取ad.json失败: ${error}`);
-        return { success: false, error: `ad.json not found for DID ${respDid}` };
+      for (const filename of adFileOptions) {
+        const adFilePath = path.join(userFullPath, filename);
+        try {
+          await fs.access(adFilePath);
+          const adFileContent = await fs.readFile(adFilePath, 'utf-8');
+          const adData = JSON.parse(adFileContent);
+          
+          logger.debug(`成功读取Agent描述文档: ${filename} for DID ${respDid}`);
+          return { success: true, data: adData };
+        } catch (error) {
+          // 继续尝试下一个文件选项
+          logger.debug(`Agent描述文档 ${filename} 不存在，尝试下一个选项`);
+          continue;
+        }
       }
+
+      // 所有选项都失败
+      logger.error(`所有Agent描述文档选项都不存在 for DID ${respDid}`);
+      return { success: false, error: `Agent description not found for DID ${respDid}` };
 
     } catch (error) {
       logger.error(`获取智能体描述失败: ${error}`);
@@ -147,11 +162,12 @@ export class DIDServiceHandler {
 
   /**
    * 获取智能体YAML文件
+   * 支持智能文件选择：优先返回Node.js版本，回退到原始文件或Python版本
    */
   public static async getAgentYamlFile(
-    respDid: string, 
-    yamlFileName: string, 
-    host: string, 
+    respDid: string,
+    yamlFileName: string,
+    host: string,
     port: number
   ): Promise<DIDServiceResponse> {
     try {
@@ -176,15 +192,33 @@ export class DIDServiceHandler {
 
       // 使用动态路径
       const paths = domainManager.getAllDataPaths(host, port);
-      const yamlPath = path.join(paths.user_did_path, userResult.userDir, `${yamlFileName}.yaml`);
+      const userFullPath = path.join(paths.user_did_path, userResult.userDir);
 
-      try {
-        await fs.access(yamlPath);
-        const yamlContent = await fs.readFile(yamlPath, 'utf-8');
-        return { success: true, data: yamlContent };
-      } catch {
-        return { success: false, error: "OpenAPI YAML not found" };
+      // 智能文件选择：优先Node.js版本，然后原始文件，最后Python版本
+      const yamlFileOptions = [
+        `${yamlFileName}_nj.yaml`,    // Node.js版本优先
+        `${yamlFileName}.yaml`,       // 原始文件作为回退
+        `${yamlFileName}_py.yaml`     // Python版本作为最后回退
+      ];
+
+      for (const filename of yamlFileOptions) {
+        const yamlPath = path.join(userFullPath, filename);
+        try {
+          await fs.access(yamlPath);
+          const yamlContent = await fs.readFile(yamlPath, 'utf-8');
+          
+          logger.debug(`成功读取YAML文件: ${filename} for DID ${formattedDid}`);
+          return { success: true, data: yamlContent };
+        } catch (error) {
+          // 继续尝试下一个文件选项
+          logger.debug(`YAML文件 ${filename} 不存在，尝试下一个选项`);
+          continue;
+        }
       }
+
+      // 所有选项都失败
+      logger.error(`所有YAML文件选项都不存在: ${yamlFileName} for DID ${formattedDid}`);
+      return { success: false, error: `YAML file ${yamlFileName} not found` };
 
     } catch (error) {
       logger.error(`读取YAML文件失败: ${error}`);
@@ -194,11 +228,12 @@ export class DIDServiceHandler {
 
   /**
    * 获取智能体JSON文件
+   * 支持智能文件选择：优先返回Node.js版本，回退到原始文件或Python版本
    */
   public static async getAgentJsonFile(
-    respDid: string, 
-    jsonFileName: string, 
-    host: string, 
+    respDid: string,
+    jsonFileName: string,
+    host: string,
     port: number
   ): Promise<DIDServiceResponse> {
     try {
@@ -223,16 +258,34 @@ export class DIDServiceHandler {
 
       // 使用动态路径
       const paths = domainManager.getAllDataPaths(host, port);
-      const jsonPath = path.join(paths.user_did_path, userResult.userDir, `${jsonFileName}.json`);
+      const userFullPath = path.join(paths.user_did_path, userResult.userDir);
 
-      try {
-        await fs.access(jsonPath);
-        const jsonContent = await fs.readFile(jsonPath, 'utf-8');
-        const jsonData = JSON.parse(jsonContent);
-        return { success: true, data: jsonData };
-      } catch {
-        return { success: false, error: "JSON file not found" };
+      // 智能文件选择：优先Node.js版本，然后原始文件，最后Python版本
+      const jsonFileOptions = [
+        `${jsonFileName}_nj.json`,    // Node.js版本优先
+        `${jsonFileName}.json`,       // 原始文件作为回退
+        `${jsonFileName}_py.json`     // Python版本作为最后回退
+      ];
+
+      for (const filename of jsonFileOptions) {
+        const jsonPath = path.join(userFullPath, filename);
+        try {
+          await fs.access(jsonPath);
+          const jsonContent = await fs.readFile(jsonPath, 'utf-8');
+          const jsonData = JSON.parse(jsonContent);
+          
+          logger.debug(`成功读取JSON文件: ${filename} for DID ${formattedDid}`);
+          return { success: true, data: jsonData };
+        } catch (error) {
+          // 继续尝试下一个文件选项
+          logger.debug(`JSON文件 ${filename} 不存在，尝试下一个选项`);
+          continue;
+        }
       }
+
+      // 所有选项都失败
+      logger.error(`所有JSON文件选项都不存在: ${jsonFileName} for DID ${formattedDid}`);
+      return { success: false, error: `JSON file ${jsonFileName} not found` };
 
     } catch (error) {
       logger.error(`读取JSON文件失败: ${error}`);
