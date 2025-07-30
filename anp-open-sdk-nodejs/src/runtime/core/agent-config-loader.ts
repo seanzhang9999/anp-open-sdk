@@ -1,10 +1,10 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as yaml from 'js-yaml';
-import { createAgent, createSharedAgent } from '../runtime/decorators/type-safe-decorators';
-import { ANPUser } from '../foundation';
-import { getUserDataManager } from '../foundation/user';
-import { getLogger } from '../foundation';
+import { createAgent, createSharedAgent } from '../decorators/type-safe-decorators';
+import { ANPUser } from '@foundation/index';
+import { getUserDataManager } from '@foundation/user';
+import { getLogger } from '@foundation/index';
 
 const logger = getLogger('AgentConfigLoader');
 
@@ -32,7 +32,7 @@ interface AgentConfig {
 export class AgentConfigLoader {
     private configBasePath: string;
 
-    constructor(configBasePath: string = 'data_user/localhost_9527/agents_config_nodejs') {
+    constructor(configBasePath: string = '../data_user/localhost_9527/agents_config_nj') {
         this.configBasePath = configBasePath;
     }
 
@@ -112,8 +112,12 @@ export class AgentConfigLoader {
 
             agent = await createAgent({
                 name: config.name,
-                anpUser: anpUser,
-                shared: false
+                shared: false,
+                // 添加 did 属性来指定用户
+                did: anpUser.id, // 或者根据你的需求设置适当的 DID
+                // 如果需要的话，还可以添加其他选项：
+                // prefix: config.prefix,
+                // primaryAgent: config.primaryAgent
             });
         } else {
             throw new Error(`Agent ${config.name} 缺少 DID 配置`);

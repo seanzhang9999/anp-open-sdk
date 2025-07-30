@@ -219,7 +219,7 @@ class DomainManager:
                 'base_path': base_path,
                 'user_did_path': base_path / 'anp_users',
                 'user_hosted_path': base_path / 'anp_users_hosted', 
-                'agents_cfg_path': base_path / 'agents_config'
+                'agents_cfg_path': base_path / 'agents_config_py'
             }
             
             return paths
@@ -238,7 +238,7 @@ class DomainManager:
                 'base_path': base_path,
                 'user_did_path': base_path / 'anp_users',
                 'user_hosted_path': base_path / 'anp_users_hosted',
-                'agents_cfg_path': base_path / 'agents_config'
+                'agents_cfg_path': base_path / 'agents_config_py'
             }
     
     def ensure_domain_directories(self, domain: str, port: int) -> bool:

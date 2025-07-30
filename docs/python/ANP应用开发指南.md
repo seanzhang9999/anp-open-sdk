@@ -945,7 +945,7 @@ async def create_agents():
     created_agents = []
 
     # 1. 从配置文件加载Agent
-    agent_files = glob.glob("data_user/localhost_9527/agents_config/*/agent_mappings.yaml")
+    agent_files = glob.glob("data_user/localhost_9527/agents_config_py/*/agent_mappings.yaml")
     for agent_file in agent_files:
         try:
             anp_agent, handler_module, share_did_config = await LocalAgentManager.load_agent_from_module(agent_file)

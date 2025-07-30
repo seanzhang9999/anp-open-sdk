@@ -321,7 +321,9 @@ export function createSharedAgent(
  */
 export function agentApi(agent: Agent, path: string) {
   return function(handler: Function) {
-    agent.apiRoutes.set(path, handler);
+        // 计算完整路径，考虑 agent 的 prefix
+    const fullPath = agent.prefix ? `${agent.prefix}${path}` : path;
+    agent.apiRoutes.set(fullPath, handler);
     return handler;
   };
 }

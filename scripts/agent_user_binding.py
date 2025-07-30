@@ -4,7 +4,7 @@
 全目录 Agent 用户绑定检查和修复脚本
 
 功能：
-1. 自动搜索所有 agents_config/*/agent_mappings.yaml 文件
+1. 自动搜索所有 agents_config_py/*/agent_mappings.yaml 文件
 2. 检查每个 agent 的 DID 绑定状态
 3. 验证 DID 是否存在于对应的 anp_users 目录中
 4. 自动创建缺失的用户 DID
@@ -45,10 +45,10 @@ class AgentUserBindingManager:
         
     def discover_directories(self):
         """发现所有相关目录"""
-        print("🔍 搜索 agents_config 和 anp_users 目录...")
+        print("🔍 搜索 agents_config_py 和 anp_users 目录...")
         
-        # 搜索所有 agents_config 目录
-        for agents_config_dir in self.root_dir.glob("**/agents_config"):
+        # 搜索所有 agents_config_py 目录
+        for agents_config_dir in self.root_dir.glob("**/agents_config_py"):
             if agents_config_dir.is_dir():
                 self.agents_config_dirs.append(agents_config_dir)
                 
@@ -58,9 +58,9 @@ class AgentUserBindingManager:
                 if anp_users_dir.exists() and anp_users_dir.is_dir():
                     self.user_data_dirs.append((agents_config_dir, anp_users_dir))
                 else:
-                    print(f"⚠️  找到 agents_config 但缺少对应的 anp_users: {agents_config_dir}")
+                    print(f"⚠️  找到 agents_config_py 但缺少对应的 anp_users: {agents_config_dir}")
         
-        print(f"📂 找到 {len(self.agents_config_dirs)} 个 agents_config 目录")
+        print(f"📂 找到 {len(self.agents_config_dirs)} 个 agents_config_py 目录")
         print(f"📂 找到 {len(self.user_data_dirs)} 个配对的目录组")
         
     def load_agent_mappings(self):
@@ -68,7 +68,7 @@ class AgentUserBindingManager:
         print("\n📋 加载 agent_mappings.yaml 文件...")
         
         for agents_config_dir, anp_users_dir in self.user_data_dirs:
-            # 搜索该 agents_config 目录下的所有 agent_mappings.yaml
+            # 搜索该 agents_config_py 目录下的所有 agent_mappings.yaml
             mapping_files = list(agents_config_dir.glob("*/agent_mappings.yaml"))
             
             for mapping_file in mapping_files:
@@ -569,7 +569,7 @@ class AgentUserBindingManager:
                 else:
                     user_name = '未绑定'
             
-            config_file = str(agent_info['file_path']).split('agents_config/')[-1] if 'agents_config/' in str(agent_info['file_path']) else str(agent_info['file_path'])
+            config_file = str(agent_info['file_path']).split('agents_config_py/')[-1] if 'agents_config_py/' in str(agent_info['file_path']) else str(agent_info['file_path'])
             
             print(f"{agent_name:<25} {agent_type:<10} {did_info:<50} {user_name:<20} {config_file:<30}")
         
@@ -592,7 +592,7 @@ class AgentUserBindingManager:
         self.discover_directories()
         
         if not self.user_data_dirs:
-            print("❌ 未找到任何 agents_config 和 anp_users 配对目录")
+            print("❌ 未找到任何 agents_config_py 和 anp_users 配对目录")
             return False
         
         # 加载数据

@@ -381,17 +381,27 @@ export class AnpServer {
       try {
         const callerDid = (req as any).auth?.callerDid || req.query.req_did || 'anonymous';
         
+        // 检测消息处理请求
+        const isMessageRequest = fullPath === '/message/post';
+        
         const requestData = {
-          type: 'api_call',
+          type: isMessageRequest ? 'message' : 'api_call',
           path: fullPath,
           method: req.method,
           headers: req.headers,
           body: req.body,
           query: req.query,
-          req_did: callerDid
+          req_did: callerDid,
+          // 添加消息特定字段
+          ...(isMessageRequest ? {
+            content: req.body?.content || req.body?.message || '',
+            message_type: req.body?.message_type || 'text',
+            timestamp: req.body?.timestamp || new Date().toISOString()
+          } : {})
         };
 
         logger.debug(`📤 发送请求到Agent: ${normalizedDid}, 路径: ${fullPath}, 调用者: ${callerDid}`);
+        logger.debug(`🔍 请求类型: ${requestData.type}${isMessageRequest ? ' (消息处理)' : ' (API调用)'}`);
         
         const response = await agent.handleRequest(callerDid, requestData, req);
         

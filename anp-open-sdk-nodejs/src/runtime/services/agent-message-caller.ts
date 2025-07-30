@@ -76,8 +76,9 @@ export class AgentMessageCaller {
         content: content
       };
 
-      // 使用统一路由：/agent/api/{did}/message/post（与Python版本一致）
-      const url = `http://${host}:${port}/agent/api/${targetAgentPath}/message/post?${urlParams.toString()}`;
+      // 🔧 修复：根据目标Agent的前缀构建正确的消息API路径
+      const messageApiPath = await this.getMessageApiPath(targetDid);
+      const url = `http://${host}:${port}/agent/api/${targetAgentPath}${messageApiPath}?${urlParams.toString()}`;
 
       logger.debug(`📨 发送消息到Agent: ${url}`);
       logger.debug(`📨 消息内容: ${content}`);
@@ -127,6 +128,34 @@ export class AgentMessageCaller {
         statusCode: error.response?.status
       };
     }
+  }
+
+  /**
+   * 获取目标Agent的消息API路径
+   * 根据Python规则：每个DID只有一个agent可以作为message handler
+   * 因此消息处理器不应该有前缀，始终使用 /message/post
+   */
+  private async getMessageApiPath(targetDid: string): Promise<string> {
+    // 🔧 修复：根据Python规则，消息处理器是DID级别的，不使用Agent前缀
+    logger.debug(`🔧 消息处理器使用全局路径 /message/post (DID级别，无前缀)`);
+    return '/message/post';
+  }
+
+  /**
+   * 检查Agent是否有消息处理API (保留用于未来扩展)
+   */
+  private agentHasMessageApi(agent: any): boolean {
+    if (!agent || !agent.apiRoutes) {
+      return false;
+    }
+    
+    // 检查是否有以 /message/post 结尾的API路由
+    for (const [path] of agent.apiRoutes) {
+      if (path.endsWith('/message/post')) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**

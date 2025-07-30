@@ -1,4 +1,4 @@
-# anp_foundation/agents_config/orchestrator_agent/agent_handlers.py
+# anp_foundation/agents_config_py/orchestrator_agent/agent_handlers.py
 
 import httpx  # 需要安装 httpx: pip install httpx
 import json
@@ -248,8 +248,9 @@ async def run_agent_002_demo_new():
 
         # 方式2：通过方法键直接调用
         result2 = await caller.call_method_by_key(
-            "data_user.localhost_9527.agents_config.agent_002.agent_register::calculate_sum",
-            10.5, 20.3
+            "data_user.localhost_9527.agents_config_py.agent_002.agent_register::calculate_sum",
+            None, None, False,  # agent_did, session_id, show_memory_recommendations
+            10.5, 20.3  # 实际的方法参数
         )
         logger.info(f"直接调用结果: {result2}")
 

@@ -231,7 +231,7 @@ export class DomainManager {
       base_path: basePath,
       user_did_path: path.join(basePath, 'anp_users'),
       user_hosted_path: path.join(basePath, 'anp_users_hosted'),
-      agents_cfg_path: path.join(basePath, 'agents_config'),
+      agents_cfg_path: path.join(basePath, 'agents_config_py'),
       hosted_did_queue: path.join(basePath, 'hosted_did_queue'),
       hosted_did_results: path.join(basePath, 'hosted_did_results')
     };

@@ -143,3 +143,7 @@ anp-open-sdk-nodejs/dev/test-scripts/*
 /.vscode/
 /anp-open-sdk-nodejs/dev/test-scripts/
 /anp-open-sdk-nodejs/dev/debug/
+anp-open-sdk-nodejs/examples/*.d.ts
+anp-open-sdk-nodejs/examples/*.ts.map
+anp-open-sdk-nodejs/examples/*.js
+anp-open-sdk-nodejs/examples/*.js.map

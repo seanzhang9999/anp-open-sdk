@@ -172,34 +172,57 @@ export function agentClass<T extends new (...args: any[]) => any>(options: Agent
       }
 
       public registerMethods(): void {
-        // 查找所有标记了装饰器的方法
-        const prototype = Object.getPrototypeOf(this);
-        const propertyNames = Object.getOwnPropertyNames(prototype);
+        logger.debug(`🔍 开始注册 Agent '${options.name}' 的方法...`);
+        
+        // 查找所有标记了装饰器的方法 - 需要遍历整个原型链
+        let currentProto = Object.getPrototypeOf(this);
+        const allPropertyNames = new Set<string>();
+        
+        // 遍历原型链，收集所有方法名
+        while (currentProto && currentProto !== Object.prototype) {
+          const propertyNames = Object.getOwnPropertyNames(currentProto);
+          propertyNames.forEach(name => allPropertyNames.add(name));
+          currentProto = Object.getPrototypeOf(currentProto);
+        }
+        
+        logger.debug(`🔍 找到 ${allPropertyNames.size} 个属性/方法`);
 
-        for (const propertyName of propertyNames) {
+        for (const propertyName of allPropertyNames) {
           if (propertyName.startsWith('_') || propertyName === 'constructor') {
             continue;
           }
 
-          const descriptor = Object.getOwnPropertyDescriptor(prototype, propertyName);
-          if (!descriptor || typeof descriptor.value !== 'function') {
+          // 尝试从实例和原型链中查找方法
+          let method: any = null;
+          let currentObj: any = this;
+          
+          while (currentObj && !method) {
+            const descriptor = Object.getOwnPropertyDescriptor(currentObj, propertyName);
+            if (descriptor && typeof descriptor.value === 'function') {
+              method = descriptor.value;
+              break;
+            }
+            currentObj = Object.getPrototypeOf(currentObj);
+          }
+          
+          if (!method) {
             continue;
           }
-
-          const method = descriptor.value;
 
           // 检查API装饰器
           const apiPath = getApiPath(method);
           if (apiPath) {
-            logger.debug(`  - 注册 API: ${apiPath} -> ${propertyName}`);
+            // 计算完整路径 - 考虑Agent前缀
+            const fullPath = this._agent.prefix ? `${this._agent.prefix}${apiPath}` : apiPath;
+            logger.debug(`  ✅ 注册 API: ${fullPath} -> ${propertyName} (原始路径: ${apiPath})`);
             const boundHandler = method.bind(this);
-            this._agent.apiRoutes.set(apiPath, boundHandler);
+            this._agent.apiRoutes.set(fullPath, boundHandler);
           }
 
           // 检查消息处理器装饰器
           const messageType = getMessageType(method);
           if (messageType) {
-            logger.debug(`  - 注册消息处理器: ${messageType} -> ${propertyName}`);
+            logger.debug(`  ✅ 注册消息处理器: ${messageType} -> ${propertyName}`);
             const boundHandler = method.bind(this);
             this._agent.messageHandlers.set(messageType, boundHandler);
           }
@@ -208,7 +231,7 @@ export function agentClass<T extends new (...args: any[]) => any>(options: Agent
           const groupEventInfo = getGroupEventInfo(method);
           if (groupEventInfo) {
             const { groupId, eventType } = groupEventInfo;
-            logger.debug(`  - 注册群组事件处理器: ${groupId || 'all'}/${eventType || 'all'} -> ${propertyName}`);
+            logger.debug(`  ✅ 注册群组事件处理器: ${groupId || 'all'}/${eventType || 'all'} -> ${propertyName}`);
             
             const boundHandler = method.bind(this);
             const key = `${groupId || '*'}:${eventType || '*'}`;
@@ -218,6 +241,8 @@ export function agentClass<T extends new (...args: any[]) => any>(options: Agent
             this._agent.groupEventHandlers.get(key)!.push(boundHandler);
           }
         }
+        
+        logger.debug(`🔍 注册完成，Agent '${options.name}' 共有 ${this._agent.apiRoutes.size} 个API路由`);
       }
 
       get agent(): Agent {

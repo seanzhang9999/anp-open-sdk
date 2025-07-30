@@ -1,8 +1,8 @@
 {
   "summary": {
-    "total_config_usages": 167,
-    "files_with_config": 23,
-    "unique_config_keys": 40,
+    "total_config_usages": 166,
+    "files_with_config": 22,
+    "unique_config_keys": 39,
     "analysis_timestamp": "/Users/seanzhang/seanrework/anp-open-sdk",
     "excluded_files": [
       "search_config_usage.py",
@@ -11,7 +11,7 @@
   },
   "detailed_usages": [
     {
-      "file": "data_user/localhost_9527/agents_config/agent_llm/agent_handlers.py",
+      "file": "data_user/localhost_9527/agents_config_py/agent_llm/agent_handlers.py",
       "line": 34,
       "type": "get_global_config",
       "code": "config = get_global_config()",
@@ -29,7 +29,7 @@
       "pattern_matched": "config\\s*=\\s*get_global_config\\(\\)"
     },
     {
-      "file": "data_user/localhost_9527/agents_config/agent_llm/agent_handlers.py",
+      "file": "data_user/localhost_9527/agents_config_py/agent_llm/agent_handlers.py",
       "line": 34,
       "type": "get_global_config",
       "code": "config = get_global_config()",
@@ -47,7 +47,7 @@
       "pattern_matched": "get_global_config\\(\\)"
     },
     {
-      "file": "data_user/localhost_9527/agents_config/agent_llm/agent_handlers.py",
+      "file": "data_user/localhost_9527/agents_config_py/agent_llm/agent_handlers.py",
       "line": 5,
       "type": "get_global_config",
       "code": "from anp_foundation.config import get_global_config",
@@ -65,7 +65,7 @@
       "pattern_matched": "from\\s+.*\\s+import\\s+.*get_global_config"
     },
     {
-      "file": "data_user/localhost_9527/agents_config/agent_llm/agent_handlers.py",
+      "file": "data_user/localhost_9527/agents_config_py/agent_llm/agent_handlers.py",
       "line": 5,
       "type": "get_global_config",
       "code": "from anp_foundation.config import get_global_config",
@@ -83,7 +83,7 @@
       "pattern_matched": "import\\s+.*get_global_config"
     },
     {
-      "file": "data_user/localhost_9527/agents_config/agent_llm/agent_handlers.py",
+      "file": "data_user/localhost_9527/agents_config_py/agent_llm/agent_handlers.py",
       "line": 35,
       "type": "config_attribute_access",
       "config_key": "secrets.openai_api_key",
@@ -102,7 +102,7 @@
       "full_match": "config.secrets.openai_api_key"
     },
     {
-      "file": "data_user/localhost_9527/agents_config/agent_llm/agent_handlers.py",
+      "file": "data_user/localhost_9527/agents_config_py/agent_llm/agent_handlers.py",
       "line": 36,
       "type": "config_attribute_access",
       "config_key": "llm.api_url",
@@ -119,25 +119,6 @@
       "function": "initialize_agent",
       "class": "unknown",
       "full_match": "config.llm.api_url"
-    },
-    {
-      "file": "data_user/localhost_9527/agents_config/orchestrator_agent/agent_handlers.py",
-      "line": 251,
-      "type": "config_attribute_access",
-      "config_key": "agent_002.agent_register",
-      "code": "\"data_user.localhost_9527.agents_config.agent_002.agent_register::calculate_sum\",",
-      "context": [
-        "",
-        "        # 方式2：通过方法键直接调用",
-        "        result2 = await caller.call_method_by_key(",
-        "            \"data_user.localhost_9527.agents_config.agent_002.agent_register::calculate_sum\",",
-        "            10.5, 20.3",
-        "        )",
-        "        logger.info(f\"直接调用结果: {result2}\")"
-      ],
-      "function": "run_agent_002_demo_new",
-      "class": "unknown",
-      "full_match": "config.agent_002.agent_register"
     },
     {
       "file": "anp-open-sdk-python/anp_runtime/agent_manager.py",
@@ -3101,11 +3082,10 @@
     }
   ],
   "dependency_injection_analysis": {
-    "total_usages": 167,
-    "files_count": 23,
+    "total_usages": 166,
+    "files_count": 22,
     "config_keys_used": [
       "_data",
-      "agent_002.agent_register",
       "anp_sdk",
       "anp_sdk.debug_mode",
       "anp_sdk.host",
@@ -3147,12 +3127,12 @@
     ],
     "usage_types_summary": {
       "get_global_config": 82,
-      "config_attribute_access": 84,
+      "config_attribute_access": 83,
       "getattr_config_access": 1
     },
     "injection_opportunities": [
       {
-        "file": "data_user/localhost_9527/agents_config/agent_llm/agent_handlers.py",
+        "file": "data_user/localhost_9527/agents_config_py/agent_llm/agent_handlers.py",
         "type": "function_parameter_injection",
         "functions": [
           "initialize_agent"
@@ -3163,18 +3143,6 @@
           "config_attribute_access": 2
         },
         "suggestion": "为 initialize_agent 函数添加 config 参数"
-      },
-      {
-        "file": "data_user/localhost_9527/agents_config/orchestrator_agent/agent_handlers.py",
-        "type": "function_parameter_injection",
-        "functions": [
-          "run_agent_002_demo_new"
-        ],
-        "usage_count": 1,
-        "usage_types": {
-          "config_attribute_access": 1
-        },
-        "suggestion": "为 run_agent_002_demo_new 函数添加 config 参数"
       },
       {
         "file": "anp-open-sdk-python/anp_runtime/agent_manager.py",
@@ -3194,14 +3162,14 @@
         "type": "function_parameter_injection",
         "functions": [
           "_register_message_handlers_new",
-          "_resolve_shared_did",
-          "load_agent_from_module"
+          "load_agent_from_module",
+          "_resolve_shared_did"
         ],
         "usage_count": 8,
         "usage_types": {
           "config_attribute_access": 8
         },
-        "suggestion": "为 _register_message_handlers_new, _resolve_shared_did, load_agent_from_module 函数添加 config 参数"
+        "suggestion": "为 _register_message_handlers_new, load_agent_from_module, _resolve_shared_did 函数添加 config 参数"
       },
       {
         "file": "anp-open-sdk-python/anp_server/run_lite_server_template.py",
@@ -3287,8 +3255,8 @@
         "file": "anp-open-sdk-python/anp_servicepoint/core_service_handler/agent_service_handler.py",
         "type": "function_parameter_injection",
         "functions": [
-          "process_agent_api_request",
           "process_agent_message",
+          "process_agent_api_request",
           "process_group_request"
         ],
         "usage_count": 20,
@@ -3296,7 +3264,7 @@
           "get_global_config": 8,
           "config_attribute_access": 12
         },
-        "suggestion": "为 process_agent_api_request, process_agent_message, process_group_request 函数添加 config 参数"
+        "suggestion": "为 process_agent_message, process_agent_api_request, process_group_request 函数添加 config 参数"
       },
       {
         "file": "anp-open-sdk-python/anp_foundation/anp_user_local_data.py",
@@ -3315,17 +3283,17 @@
         "file": "anp-open-sdk-python/anp_foundation/anp_user_local_data.py",
         "type": "function_parameter_injection",
         "functions": [
+          "create_did_user",
           "load_all_users",
-          "load_single_user",
           "__init__",
-          "create_did_user"
+          "load_single_user"
         ],
         "usage_count": 12,
         "usage_types": {
           "get_global_config": 8,
           "config_attribute_access": 4
         },
-        "suggestion": "为 load_all_users, load_single_user, __init__, create_did_user 函数添加 config 参数"
+        "suggestion": "为 create_did_user, load_all_users, __init__, load_single_user 函数添加 config 参数"
       },
       {
         "file": "anp-open-sdk-python/anp_foundation/anp_user.py",
@@ -3397,19 +3365,19 @@
         "file": "anp-open-sdk-python/anp_foundation/did/did_format_manager.py",
         "type": "function_parameter_injection",
         "functions": [
-          "can_create_user_type",
-          "__init__",
-          "_get_format_template",
           "_get_method",
+          "_get_format_template",
           "get_supported_user_types",
-          "get_creatable_user_types"
+          "can_create_user_type",
+          "get_creatable_user_types",
+          "__init__"
         ],
         "usage_count": 9,
         "usage_types": {
           "get_global_config": 4,
           "config_attribute_access": 5
         },
-        "suggestion": "为 can_create_user_type, __init__, _get_format_template, _get_method, get_supported_user_types, get_creatable_user_types 函数添加 config 参数"
+        "suggestion": "为 _get_method, _get_format_template, get_supported_user_types, can_create_user_type, get_creatable_user_types, __init__ 函数添加 config 参数"
       },
       {
         "file": "anp-open-sdk-python/anp_foundation/config/unified_config.py",
@@ -3428,32 +3396,32 @@
         "file": "anp-open-sdk-python/anp_foundation/config/unified_config.py",
         "type": "function_parameter_injection",
         "functions": [
-          "_get_default_config",
+          "_process_path_list",
           "_resolve_config_file",
           "get_global_config",
-          "_process_path_list"
+          "_get_default_config"
         ],
         "usage_count": 4,
         "usage_types": {
           "get_global_config": 1,
           "config_attribute_access": 3
         },
-        "suggestion": "为 _get_default_config, _resolve_config_file, get_global_config, _process_path_list 函数添加 config 参数"
+        "suggestion": "为 _process_path_list, _resolve_config_file, get_global_config, _get_default_config 函数添加 config 参数"
       },
       {
         "file": "anp-open-sdk-python/anp_foundation/auth/auth_verifier.py",
         "type": "function_parameter_injection",
         "functions": [
           "_generate_wba_auth_response",
-          "is_valid_server_nonce",
-          "_verify_bearer_token"
+          "_verify_bearer_token",
+          "is_valid_server_nonce"
         ],
         "usage_count": 11,
         "usage_types": {
           "get_global_config": 8,
           "config_attribute_access": 3
         },
-        "suggestion": "为 _generate_wba_auth_response, is_valid_server_nonce, _verify_bearer_token 函数添加 config 参数"
+        "suggestion": "为 _generate_wba_auth_response, _verify_bearer_token, is_valid_server_nonce 函数添加 config 参数"
       },
       {
         "file": "anp-open-sdk-python/anp_foundation/utils/log_base.py",
@@ -3500,18 +3468,18 @@
         "file": "anp-open-sdk-python/anp_foundation/domain/domain_manager.py",
         "type": "function_parameter_injection",
         "functions": [
-          "__init__",
-          "supported_domains",
           "validate_domain_access",
+          "get_all_data_paths",
           "_get_default_host_port",
-          "get_all_data_paths"
+          "__init__",
+          "supported_domains"
         ],
         "usage_count": 12,
         "usage_types": {
           "get_global_config": 4,
           "config_attribute_access": 8
         },
-        "suggestion": "为 __init__, supported_domains, validate_domain_access, _get_default_host_port, get_all_data_paths 函数添加 config 参数"
+        "suggestion": "为 validate_domain_access, get_all_data_paths, _get_default_host_port, __init__, supported_domains 函数添加 config 参数"
       },
       {
         "file": "examples/flow_host_did/demo_complete_flow.py",
@@ -3646,19 +3614,8 @@
         "unified_config",
         "yaml"
       ],
-      "anp_sdk": [
-        "anp_sdk.debug_mode",
-        "anp_sdk.host",
-        "anp_sdk.jwt_algorithm",
-        "anp_sdk.nonce_expire_minutes",
-        "anp_sdk.port",
-        "anp_sdk.token_expire_time",
-        "anp_sdk.user_did_key_id",
-        "anp_sdk.user_did_path",
-        "anp_sdk.user_hosted_path"
-      ],
-      "llm": [
-        "llm.api_url"
+      "secrets": [
+        "secrets.openai_api_key"
       ],
       "did_config": [
         "did_config.creatable_user_types",
@@ -3671,24 +3628,32 @@
         "did_config.parsing.default_port",
         "did_config.user_types"
       ],
-      "auth_middleware": [
-        "auth_middleware.exempt_paths"
-      ],
-      "secrets": [
-        "secrets.openai_api_key"
-      ],
-      "anp_user_service": [
-        "anp_user_service.api_base",
-        "anp_user_service.model_name"
+      "anp_sdk": [
+        "anp_sdk.debug_mode",
+        "anp_sdk.host",
+        "anp_sdk.jwt_algorithm",
+        "anp_sdk.nonce_expire_minutes",
+        "anp_sdk.port",
+        "anp_sdk.token_expire_time",
+        "anp_sdk.user_did_key_id",
+        "anp_sdk.user_did_path",
+        "anp_sdk.user_hosted_path"
       ],
       "default": [
         "default.yaml"
       ],
-      "agent_002": [
-        "agent_002.agent_register"
-      ],
       "legacy": [
         "legacy.dynamic_config"
+      ],
+      "llm": [
+        "llm.api_url"
+      ],
+      "auth_middleware": [
+        "auth_middleware.exempt_paths"
+      ],
+      "anp_user_service": [
+        "anp_user_service.api_base",
+        "anp_user_service.model_name"
       ]
     },
     "unused_sections_suggestion": [
@@ -3699,7 +3664,7 @@
       "path_config"
     ],
     "optimization_suggestions": [
-      "高频使用配置的文件 (13 个) 建议优先进行依赖注入改造: data_user/localhost_9527/agents_config/agent_llm/agent_handlers.py, anp-open-sdk-python/anp_runtime/agent_manager.py, anp-open-sdk-python/anp_server/run_lite_server_template.py...",
+      "高频使用配置的文件 (13 个) 建议优先进行依赖注入改造: data_user/localhost_9527/agents_config_py/agent_llm/agent_handlers.py, anp-open-sdk-python/anp_runtime/agent_manager.py, anp-open-sdk-python/anp_server/run_lite_server_template.py...",
       "发现 1 处动态配置访问，建议转换为静态属性访问以提高代码可读性"
     ],
     "dynamic_access_analysis": {

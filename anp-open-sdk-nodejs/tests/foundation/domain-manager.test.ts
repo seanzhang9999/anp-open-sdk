@@ -191,7 +191,7 @@ describe('DomainManager', () => {
       expect(paths.base_path).toBe('data_user/localhost_9527');
       expect(paths.user_did_path).toBe(path.join('data_user/localhost_9527', 'anp_users'));
       expect(paths.user_hosted_path).toBe(path.join('data_user/localhost_9527', 'anp_users_hosted'));
-      expect(paths.agents_cfg_path).toBe(path.join('data_user/localhost_9527', 'agents_config'));
+      expect(paths.agents_cfg_path).toBe(path.join('data_user/localhost_9527', 'agents_config_py'));
     });
 
     test('应该为不同域名生成不同路径', () => {

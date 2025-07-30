@@ -25,7 +25,8 @@ did_config:
   path_templates:
     user_did_path: '{APP_ROOT}/data_user/{host}_{port}/anp_users'
     user_hosted_path: '{APP_ROOT}/data_user/{host}_{port}/anp_users_hosted'
-    agents_cfg_path: '{APP_ROOT}/data_user/{host}_{port}/agents_config'
+    agents_config_py: '{APP_ROOT}/data_user/{host}_{port}/agents_config_py'
+    agents_config_nj: '{APP_ROOT}/data_user/{host}_{port}/agents_config_nj'
   url_encoding:
     use_percent_encoding: false
     support_legacy_encoding: true
@@ -173,5 +174,5 @@ mail:
   hoster_mail_user: hoster@gmail.com
 
 multi_agent_mode:
-  agents_cfg_path: '{APP_ROOT}/data_user/localhost_9527/agents_config'
+  agents_cfg_path: '{APP_ROOT}/data_user/localhost_9527/agents_config_py'
 

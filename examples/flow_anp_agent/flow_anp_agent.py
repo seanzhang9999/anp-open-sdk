@@ -48,7 +48,7 @@ async def create_agents_with_cfg_path():
     shared_did_configs = {}
 
     # 1. 加载现有的Agent配置文件
-    agent_files = glob.glob("data_user/localhost_9527/agents_config/*/agent_mappings.yaml")
+    agent_files = glob.glob("data_user/localhost_9527/agents_config_py/*/agent_mappings.yaml")
     if not agent_files:
         logger.warning("未找到Agent配置文件，将创建代码生成的Agent")
     

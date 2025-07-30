@@ -1,0 +1,61 @@
+# 测试环境记忆功能配置
+enabled: true
+version: "1.0.0"
+
+storage:
+  storage_type: "memory"  # 使用内存存储，测试快速且不会影响文件系统
+  database_path: ":memory:"
+  cache_size: 100
+  enable_persistence: false
+  batch_write_size: 10
+  enable_compression: false
+
+recommendation:
+  algorithm: "hybrid"
+  max_recommendations: 5
+  similarity_threshold: 0.3
+  keyword_weight: 0.4
+  tag_weight: 0.3
+  time_weight: 0.2
+  access_weight: 0.1
+  enable_smart_recommendation: true
+
+cleanup:
+  enable_auto_cleanup: false  # 测试时禁用自动清理
+  cleanup_interval: 3600
+  max_memory_entries: 100
+  default_expiry_time: null
+  cleanup_strategy: "smart"
+  low_access_threshold: 1
+  retention_days: 7
+
+performance:
+  enable_async_operations: true
+  thread_pool_size: 2
+  search_index_type: "simple"
+  enable_search_cache: false  # 测试时禁用缓存以确保一致性
+  search_cache_size: 10
+  operation_timeout: 5
+
+collection:
+  enable_memory_collection: true
+  collection_mode: "auto"
+  auto_collect_methods: []
+  collection_filters:
+    include_patterns: []
+    exclude_patterns: []
+    agent_whitelist: []
+    agent_blacklist: []
+  collect_input_params: true
+  collect_output_results: true
+  collect_errors: true
+  max_param_length: 500
+
+security:
+  enable_encryption: false
+  encryption_key: null
+  sensitive_fields: ["password", "token", "secret", "key"]
+  enable_access_control: false
+  allowed_agents: []
+
+extensions: {}

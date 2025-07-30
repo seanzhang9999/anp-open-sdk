@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 
 export async function addHandler(requestData: any, request: Request): Promise<any> {
-    const params = requestData.params || {};
+    const params = requestData.body?.params || requestData.params || requestData.body || {};
     const a = params.a || 0;
     const b = params.b || 0;
     const result = a + b;
@@ -15,7 +15,7 @@ export async function addHandler(requestData: any, request: Request): Promise<an
 }
 
 export async function multiplyHandler(requestData: any, request: Request): Promise<any> {
-    const params = requestData.params || {};
+    const params = requestData.body?.params || requestData.params || requestData.body || {};
     const a = params.a || 1;
     const b = params.b || 1;
     const result = a * b;

@@ -23,6 +23,7 @@ import { AgentApiCaller } from '../src/runtime/services/agent-api-caller';
 import { agentMsgPost as agentMsgPostService } from '../src/runtime/services/agent-message-caller';
 import { AnpServer } from '../src/server/express/anp-server';
 import { fixFlowAnpAgentRoutes } from '../src/runtime/decorators/fix-api-routes';
+import { AgentConfigLoader } from '@runtime/core/agent-config-loader';
 
 const logger = getLogger('FlowAnpAgent');
 
@@ -126,12 +127,15 @@ async function createAgentsWithCode(): Promise<any[]> {
         description: "加法计算API"
       })
       async addApi(requestData: any, request: any): Promise<any> {
-        // 从params中获取参数
-        const params = requestData.params || {};
+        // 从params中获取参数 - 修复参数解析逻辑
+        logger.debug(`🔍 收到的requestData:`, JSON.stringify(requestData, null, 2));
+        
+        // 参数可能在body.params中
+        const params = requestData.body?.params || requestData.params || {};
         const a = params.a || 0;
         const b = params.b || 0;
         const result = a + b;
-        logger.debug(`🔢 计算: ${a} + ${b} = ${result}`);
+        logger.info(`🔢 计算: ${a} + ${b} = ${result}`);
         return { result, operation: "add", inputs: [a, b] };
       }
       
@@ -139,8 +143,11 @@ async function createAgentsWithCode(): Promise<any[]> {
         description: "乘法计算API"
       })
       async multiplyApi(requestData: any, request: any): Promise<any> {
-        // 从params中获取参数
-        const params = requestData.params || {};
+        // 从params中获取参数 - 修复参数解析逻辑
+        logger.debug(`🔍 收到的requestData:`, JSON.stringify(requestData, null, 2));
+        
+        // 参数可能在body.params中
+        const params = requestData.body?.params || requestData.params || {};
         const a = params.a || 1;
         const b = params.b || 1;
         const result = a * b;
@@ -310,7 +317,7 @@ function parseCommandLineArgs(): { waitForInput: boolean } {
 async function main() {
   // 解析命令行参数
   const { waitForInput } = parseCommandLineArgs();
-  
+  debugger;
   logger.debug("🚀 Starting Agent System Demo...");
   logger.debug(`🔧 等待用户输入模式: ${waitForInput ? '开启' : '关闭'}`);
   
@@ -342,8 +349,14 @@ async function main() {
   logger.debug("🧹 已清除之前的Agent注册记录");
   
   const allAgents: any[] = [];
-  
-  // 用代码直接生成Agent
+
+  // 1. 加载配置文件定义的 agents
+  const configLoader = new AgentConfigLoader();
+  const configAgents = await configLoader.loadAllAgents();
+  allAgents.push(...configAgents);
+  logger.debug(`✅ 从配置文件加载了 ${configAgents.length} 个 agents`);
+
+  // 2. 加载代码定义的 agents（保持现有功能）
   const codeGeneratedAgents = await createAgentsWithCode();
   allAgents.push(...codeGeneratedAgents);
   
@@ -402,12 +415,12 @@ async function main() {
   // 注册所有Agent到服务器
   server.registerAgents(allAgents);
   
-  // 修复API路由注册问题
-  logger.debug("🔧 修复API路由注册问题...");
-  const calcAgent = allAgents.find(a => a.name.includes("计算器"));
-  const weatherAgent = allAgents.find(a => a.name.includes("天气"));
-  const assistantAgent = allAgents.find(a => a.name.includes("助手"));
-  fixFlowAnpAgentRoutes(calcAgent, weatherAgent, assistantAgent);
+  // 注释掉API路由修复调用，让装饰器系统正常工作
+  // logger.debug("🔧 修复API路由注册问题...");
+  // const calcAgent = allAgents.find(a => a.name.includes("计算器"));
+  // const weatherAgent = allAgents.find(a => a.name.includes("天气"));
+  // const assistantAgent = allAgents.find(a => a.name.includes("助手"));
+  // fixFlowAnpAgentRoutes(calcAgent, weatherAgent, assistantAgent);
   
   logger.debug("⏳ 等待服务器启动 localhost:9527 ...");
   await server.start();
@@ -479,6 +492,35 @@ async function testNewAgentSystem(agents: any[]): Promise<void> {
     } catch (error) {
       logger.info(`❌ 计算器API调用失败: ${error}`);
     }
+  }
+
+  // 从allAgents数组中查找配置文件加载的Calculator Agent
+  // 从配置文件加载的agents中获取Calculator Agent
+  const allRegisteredAgents = AgentManager.getAllAgents();
+  const calcAgentFromPath = allRegisteredAgents.find(agent =>
+    agent && agent.name === "Calculator Agent JS"
+  );
+  if (calcAgentFromPath) {
+    calcApiSuccess = false;
+
+    logger.info("\n🔧 测试目录加载计算器Agent API调用...");
+    try {
+      const calcDid = calcAgentFromPath.anpUser.id;
+      logger.info(`📋 目录加载计算器Agent DID: ${calcDid}`);
+
+      const result = await agentApiCallPost(
+        "did:wba:localhost%3A9527:wba:user:e0959abab6fc3c3d", // 调用者DID
+        calcDid, // 目标Agent DID
+        "/calculator-js/add", // API路径
+        { a: 25, b: 25 } // 参数
+      );
+      logger.info(`✅ 目录加载计算器API调用成功: ${JSON.stringify(result)}`);
+      calcApiSuccess = true;
+    } catch (error) {
+      logger.info(`❌ 目录加载计算器API调用失败: ${error}`);
+    }
+  } else {
+    logger.info("❌ 未找到目录加载的Calculator Agent JS");
   }
   
   // 测试2: 消息发送

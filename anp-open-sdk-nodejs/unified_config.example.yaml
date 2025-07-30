@@ -1,7 +1,7 @@
 # ANP SDK Configuration Example
 
 multiAgentMode:
-  agentsCfgPath: "./data_user/localhost_9527/agents_config"
+  agentsCfgPath: "./data_user/localhost_9527/agents_config_py"
 
 logSettings:
   logLevel: "info"
@@ -89,7 +89,7 @@ didConfig:
   pathTemplates:
     userDidPath: "./data_user/{host}_{port}/anp_users"
     userHostedPath: "./data_user/{host}_{port}/anp_users_hosted"
-    agentsCfgPath: "./data_user/{host}_{port}/agents_config"
+    agentsCfgPath: "./data_user/{host}_{port}/agents_config_py"
   urlEncoding:
     usePercentEncoding: false
     supportLegacyEncoding: true

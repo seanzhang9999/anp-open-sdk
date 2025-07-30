@@ -66,3 +66,6 @@ export {
 
 // 导出核心模块
 export * from './core';
+
+// 导出本地方法装饰器系统
+export * from './local-service';

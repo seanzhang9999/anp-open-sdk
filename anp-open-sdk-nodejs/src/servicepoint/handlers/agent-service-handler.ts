@@ -112,22 +112,56 @@ export class AgentServiceHandler {
    * 处理单个Agent请求
    */
   public static async processAgentRequest(
-    targetDid: string, 
-    endpoint: string, 
+    targetDid: string,
+    endpoint: string,
     payload: Record<string, any>
   ): Promise<GroupResponse> {
     try {
       logger.debug(`🔄 处理Agent请求: ${targetDid}${endpoint}`);
+      logger.debug(`📦 请求payload:`, JSON.stringify(payload, null, 2));
       
-      // 这里应该实现Agent间的实际通信逻辑
+      // 导入AgentManager来获取Agent
+      const { getAgentManager } = await import('../../runtime/core');
+      const agentManager = getAgentManager();
+      
+      // 根据DID查找目标Agent
+      const targetAgent = agentManager.getAgentByDid(targetDid);
+      if (!targetAgent) {
+        logger.error(`❌ 未找到目标Agent: ${targetDid}`);
+        return {
+          success: false,
+          error: `Target agent not found: ${targetDid}`
+        };
+      }
+      
+      logger.debug(`✅ 找到目标Agent: ${targetAgent.name}`);
+      
+      // 查找API路由处理器
+      const apiHandler = targetAgent.apiRoutes.get(endpoint);
+      if (!apiHandler) {
+        logger.error(`❌ 未找到API路由: ${endpoint}`);
+        logger.debug(`可用的API路由:`, Array.from(targetAgent.apiRoutes.keys()));
+        return {
+          success: false,
+          error: `API endpoint not found: ${endpoint}`
+        };
+      }
+      
+      logger.debug(`✅ 找到API处理器: ${apiHandler.name}`);
+      
+      // 调用API处理器
+      // 注意：这里的payload就是完整的请求数据，包含params等信息
+      const result = await apiHandler.call(targetAgent, payload, {
+        endpoint,
+        targetDid,
+        timestamp: new Date().toISOString()
+      });
+      
+      logger.debug(`✅ API调用成功，结果:`, JSON.stringify(result, null, 2));
+      
       return {
         success: true,
-        data: { 
-          targetDid, 
-          endpoint, 
-          response: 'Agent request processed',
-          timestamp: new Date().toISOString()
-        }
+        data: result
       };
     } catch (error) {
       logger.error('Agent请求处理失败:', error);

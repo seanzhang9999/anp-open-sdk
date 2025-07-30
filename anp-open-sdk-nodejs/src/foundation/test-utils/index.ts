@@ -94,7 +94,7 @@ export class TestDataHelper {
     domain: keyof typeof TestDataHelper.TEST_DOMAINS,
     agent: keyof typeof TestDataHelper.TEST_AGENTS
   ): string {
-    return path.join(this.getDomainPath(domain), 'agents_config', this.TEST_AGENTS[agent]);
+    return path.join(this.getDomainPath(domain), 'agents_config_py', this.TEST_AGENTS[agent]);
   }
 
   /**
@@ -326,7 +326,7 @@ export class TestDataHelper {
     domain: keyof typeof TestDataHelper.TEST_DOMAINS
   ): Promise<string[]> {
     const domainPath = this.getDomainPath(domain);
-    const agentsPath = path.join(domainPath, 'agents_config');
+    const agentsPath = path.join(domainPath, 'agents_config_py');
     
     try {
       const entries = await fs.readdir(agentsPath, { withFileTypes: true });

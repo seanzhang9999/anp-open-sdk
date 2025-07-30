@@ -1,7 +1,7 @@
 name: "Calculator Agent JS"
 share_did:
   enabled: true
-  shared_did: "did:wba:localhost%3A9527:wba:user:nodejs001"
+  shared_did: "did:wba:localhost%3A9527:wba:user:3ea884878ea5fbb1"
   path_prefix: "/calculator-js"
   primary_agent: false
 api:

@@ -2,7 +2,7 @@
   "generated_at": "/Users/seanzhang/seanrework/anp-open-sdk",
   "total_methods": 3,
   "methods": {
-    "data_user.localhost_9527.agents_config.agent_002.agent_register::demo_method": {
+    "data_user.localhost_9527.agents_config_py.agent_002.agent_register::demo_method": {
       "name": "demo_method",
       "description": "演示方法，返回agent信息",
       "tags": [
@@ -13,10 +13,20 @@
       "parameters": {},
       "agent_did": "did:wba:localhost%3A9527:wba:user:3ea884878ea5fbb1",
       "agent_name": "我的小铃木",
-      "module": "data_user.localhost_9527.agents_config.agent_002.agent_register",
-      "is_async": false
+      "module": "data_user.localhost_9527.agents_config_py.agent_002.agent_register",
+      "is_async": false,
+      "memory_config": {
+        "enabled": true,
+        "tags": [],
+        "keywords": [],
+        "collect_input": true,
+        "collect_output": true,
+        "collect_errors": true,
+        "session_id": null,
+        "extra": {}
+      }
     },
-    "data_user.localhost_9527.agents_config.agent_002.agent_register::calculate_sum": {
+    "data_user.localhost_9527.agents_config_py.agent_002.agent_register::calculate_sum": {
       "name": "calculate_sum",
       "description": "计算两个数的和",
       "tags": [
@@ -38,10 +48,20 @@
       },
       "agent_did": "did:wba:localhost%3A9527:wba:user:3ea884878ea5fbb1",
       "agent_name": "我的小铃木",
-      "module": "data_user.localhost_9527.agents_config.agent_002.agent_register",
-      "is_async": false
+      "module": "data_user.localhost_9527.agents_config_py.agent_002.agent_register",
+      "is_async": false,
+      "memory_config": {
+        "enabled": true,
+        "tags": [],
+        "keywords": [],
+        "collect_input": true,
+        "collect_output": true,
+        "collect_errors": true,
+        "session_id": null,
+        "extra": {}
+      }
     },
-    "data_user.localhost_9527.agents_config.agent_002.agent_register::async_demo": {
+    "data_user.localhost_9527.agents_config_py.agent_002.agent_register::async_demo": {
       "name": "async_demo",
       "description": "异步演示方法",
       "tags": [
@@ -52,8 +72,18 @@
       "parameters": {},
       "agent_did": "did:wba:localhost%3A9527:wba:user:3ea884878ea5fbb1",
       "agent_name": "我的小铃木",
-      "module": "data_user.localhost_9527.agents_config.agent_002.agent_register",
-      "is_async": true
+      "module": "data_user.localhost_9527.agents_config_py.agent_002.agent_register",
+      "is_async": true,
+      "memory_config": {
+        "enabled": true,
+        "tags": [],
+        "keywords": [],
+        "collect_input": true,
+        "collect_output": true,
+        "collect_errors": true,
+        "session_id": null,
+        "extra": {}
+      }
     }
   }
 }

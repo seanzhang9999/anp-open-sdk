@@ -1,0 +1,52 @@
+cleanup:
+  cleanup_interval: 3600
+  cleanup_strategy: smart
+  default_expiry_time: null
+  enable_auto_cleanup: true
+  low_access_threshold: 2
+  max_memory_entries: 10000
+  retention_days: 30
+collection:
+  auto_collect_methods: []
+  collect_errors: true
+  collect_input_params: true
+  collect_output_results: true
+  collection_filters: {}
+  collection_mode: selective
+  enable_memory_collection: false
+  max_param_length: 1000
+enabled: false
+extensions: {}
+performance:
+  enable_async_operations: true
+  enable_search_cache: true
+  operation_timeout: 30
+  search_cache_size: 100
+  search_index_type: simple
+  thread_pool_size: 4
+recommendation:
+  access_weight: 0.1
+  algorithm: hybrid
+  enable_smart_recommendation: true
+  keyword_weight: 0.4
+  max_recommendations: 10
+  similarity_threshold: 0.5
+  tag_weight: 0.3
+  time_weight: 0.2
+security:
+  allowed_agents: []
+  enable_access_control: true
+  enable_encryption: false
+  encryption_key: null
+  sensitive_fields:
+  - password
+  - token
+  - secret
+storage:
+  batch_write_size: 100
+  cache_size: 1000
+  database_path: ./data/memory.db
+  enable_compression: false
+  enable_persistence: true
+  storage_type: sqlite
+version: 1.0.0

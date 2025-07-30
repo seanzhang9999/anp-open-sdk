@@ -92,7 +92,8 @@ did_config:
   path_templates:
     user_did_path: "{APP_ROOT}/data_user/{host}_{port}/anp_users"
     user_hosted_path: "{APP_ROOT}/data_user/{host}_{port}/anp_users_hosted"
-    agents_cfg_path: "{APP_ROOT}/data_user/{host}_{port}/agents_config"
+    agents_config_py: "{APP_ROOT}/data_user/{host}_{port}/agents_config_py"
+    agents_config_nj: "{APP_ROOT}/data_user/{host}_{port}/agents_config_nj"
   
   # URL 编码配置
   url_encoding:
