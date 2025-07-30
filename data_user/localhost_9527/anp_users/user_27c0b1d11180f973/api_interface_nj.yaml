@@ -1,0 +1,47 @@
+openapi: 3.0.0
+info:
+  title: DID did:wba:localhost%3A9527:wba:user:27c0b1d11180f973 API
+  version: 1.0.0
+  description: 所有与DID did:wba:localhost%3A9527:wba:user:27c0b1d11180f973 关联的服务接口
+  x-runtime: nodejs
+paths:
+  /add:
+    post:
+      summary: 代码生成计算器的/add接口
+      description: 由 代码生成计算器 提供的服务
+      tags:
+        - 代码生成计算器
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: {}
+      responses:
+        "200":
+          description: 返回结果
+          content:
+            application/json:
+              schema:
+                type: object
+  /multiply:
+    post:
+      summary: 代码生成计算器的/multiply接口
+      description: 由 代码生成计算器 提供的服务
+      tags:
+        - 代码生成计算器
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: {}
+      responses:
+        "200":
+          description: 返回结果
+          content:
+            application/json:
+              schema:
+                type: object

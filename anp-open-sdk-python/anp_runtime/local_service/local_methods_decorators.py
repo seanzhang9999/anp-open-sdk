@@ -315,8 +315,8 @@ async def _execute_async_with_memory(
                 input_kwargs=kwargs if memory_config.get('collect_input', True) else {},
                 output=result,
                 execution_time=execution_time,
-                source_agent_did=method_info.get('agent_did', 'unknown'),
-                source_agent_name=method_info.get('agent_name', 'unknown'),
+                source_agent_did=method_info.get('agent_did') or 'unknown',
+                source_agent_name=method_info.get('agent_name') or 'unknown',
                 session_id=None
             ))
         
@@ -335,8 +335,8 @@ async def _execute_async_with_memory(
                 input_kwargs=kwargs if memory_config.get('collect_input', True) else {},
                 output=None,
                 execution_time=execution_time,
-                source_agent_did=method_info.get('agent_did', 'unknown'),
-                source_agent_name=method_info.get('agent_name', 'unknown'),
+                source_agent_did=method_info.get('agent_did') or 'unknown',
+                source_agent_name=method_info.get('agent_name') or 'unknown',
                 session_id=None,
                 error=error
             ))
@@ -372,8 +372,8 @@ def _execute_sync_with_memory(
                     input_kwargs=kwargs if memory_config.get('collect_input', True) else {},
                     output=result,
                     execution_time=execution_time,
-                    source_agent_did=method_info.get('agent_did', 'unknown'),
-                    source_agent_name=method_info.get('agent_name', 'unknown'),
+                    source_agent_did=method_info.get('agent_did') or 'unknown',
+                    source_agent_name=method_info.get('agent_name') or 'unknown',
                     session_id=None
                 ))
             except RuntimeError:
@@ -396,8 +396,8 @@ def _execute_sync_with_memory(
                     input_kwargs=kwargs if memory_config.get('collect_input', True) else {},
                     output=None,
                     execution_time=execution_time,
-                    source_agent_did=method_info.get('agent_did', 'unknown'),
-                    source_agent_name=method_info.get('agent_name', 'unknown'),
+                    source_agent_did=method_info.get('agent_did') or 'unknown',
+                    source_agent_name=method_info.get('agent_name') or 'unknown',
                     session_id=None,
                     error=error
                 ))

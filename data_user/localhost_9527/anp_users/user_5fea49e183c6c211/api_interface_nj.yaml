@@ -1,0 +1,69 @@
+openapi: 3.0.0
+info:
+  title: DID did:wba:localhost%3A9527:wba:user:5fea49e183c6c211 API
+  version: 1.0.0
+  description: 所有与DID did:wba:localhost%3A9527:wba:user:5fea49e183c6c211 关联的服务接口
+  x-runtime: nodejs
+paths:
+  /weather/current:
+    post:
+      summary: 代码生成天气的/weather/current接口
+      description: 由 代码生成天气 提供的服务
+      tags:
+        - 代码生成天气
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: {}
+      responses:
+        "200":
+          description: 返回结果
+          content:
+            application/json:
+              schema:
+                type: object
+  /weather/forecast:
+    post:
+      summary: 代码生成天气的/weather/forecast接口
+      description: 由 代码生成天气 提供的服务
+      tags:
+        - 代码生成天气
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: {}
+      responses:
+        "200":
+          description: 返回结果
+          content:
+            application/json:
+              schema:
+                type: object
+  /assistant/help:
+    post:
+      summary: 代码生成助手的/assistant/help接口
+      description: 由 代码生成助手 提供的服务
+      tags:
+        - 代码生成助手
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                topic:
+                  type: string
+      responses:
+        "200":
+          description: 返回结果
+          content:
+            application/json:
+              schema:
+                type: object

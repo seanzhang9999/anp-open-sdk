@@ -896,8 +896,8 @@ export class AgentManager {
     const apiRoutes: Record<string, Function> = {};
 
     // 从agent.apiRoutes获取路由（如果存在）
-    if (agent.apiRoutes) {
-      for (const [path, handler] of Object.entries(agent.apiRoutes)) {
+    if (agent.apiRoutes && agent.apiRoutes instanceof Map) {
+      for (const [path, handler] of agent.apiRoutes.entries()) {
         // 检查路径是否属于当前Agent（通过prefix匹配）
         if (prefix && path.startsWith(prefix)) {
           // 这才是属于当前Agent的路由
@@ -907,8 +907,20 @@ export class AgentManager {
           apiRoutes[path] = handler;
         }
       }
+    } else if (agent.apiRoutes && typeof agent.apiRoutes === 'object') {
+      // 兼容普通对象格式
+      for (const [path, handler] of Object.entries(agent.apiRoutes)) {
+        if (typeof handler === 'function') {
+          if (prefix && path.startsWith(prefix)) {
+            apiRoutes[path] = handler;
+          } else if (!prefix && !otherPrefixes.some(p => path.startsWith(p))) {
+            apiRoutes[path] = handler;
+          }
+        }
+      }
     }
 
+    logger.debug(`🔍 Agent '${agent.name}' API路由: ${Object.keys(apiRoutes).join(', ')}`);
     return apiRoutes;
   }
 
@@ -919,7 +931,7 @@ export class AgentManager {
     const params: Record<string, any> = {};
     
     try {
-      // 获取函数字符串
+      // 首先尝试从函数签名提取参数
       const funcStr = handler.toString();
       
       // 匹配参数列表
@@ -937,10 +949,139 @@ export class AgentManager {
           }
         }
       }
+      
+      // 如果函数签名没有找到参数，尝试从函数体中分析
+      if (Object.keys(params).length === 0) {
+        const sourceParams = this.extractParamsFromSource(funcStr);
+        Object.assign(params, sourceParams);
+        
+        if (Object.keys(sourceParams).length > 0) {
+          logger.debug(`📝 从源码分析提取参数: ${Object.keys(sourceParams).join(', ')}`);
+        }
+      }
     } catch (error) {
       logger.debug(`提取函数参数失败: ${error}`);
     }
 
+    return params;
+  }
+
+  /**
+   * 从函数源码中提取参数使用情况
+   */
+  private static extractParamsFromSource(funcStr: string): Record<string, any> {
+    const params: Record<string, any> = {};
+    
+    try {
+      // 查找 params.get() 或 params[key] 或 params?.key 模式
+      const patterns = [
+        // params.get('param_name', default_value)
+        /params\.get\(\s*['"`]([^'"`]+)['"`]\s*,\s*([^)]+)\s*\)/g,
+        // params.get('param_name')
+        /params\.get\(\s*['"`]([^'"`]+)['"`]\s*\)/g,
+        // params['param_name'] || default_value
+        /params\[['"`]([^'"`]+)['"`]\]\s*\|\|\s*([^;,\n}]+)/g,
+        // params.param_name || default_value
+        /params\.([a-zA-Z_][a-zA-Z0-9_]*)\s*\|\|\s*([^;,\n}]+)/g,
+        // params?.param_name || default_value
+        /params\?\.([a-zA-Z_][a-zA-Z0-9_]*)\s*\|\|\s*([^;,\n}]+)/g,
+        // requestData.body?.params || requestData.params 模式下的参数提取
+        /(?:requestData\.body\?\.|requestData\.)params\s*\|\|\s*[^;,\n}]*[;}][\s\S]*?(?:const|let|var)\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*params\.([a-zA-Z_][a-zA-Z0-9_]*)\s*\|\|\s*([^;,\n}]+)/g
+      ];
+      
+      for (const pattern of patterns) {
+        let match;
+        while ((match = pattern.exec(funcStr)) !== null) {
+          const paramName = match[1] || match[2];
+          let defaultValue = match[2] || match[3];
+          
+          if (paramName && paramName !== 'params' && !paramName.includes('request')) {
+            // 清理默认值
+            if (defaultValue) {
+              defaultValue = defaultValue.trim().replace(/[;,\n}].*$/, '');
+            }
+            
+            // 推断参数类型
+            let paramType = 'any';
+            if (defaultValue) {
+              if (/^\d+$/.test(defaultValue)) {
+                paramType = 'number';
+              } else if (/^true|false$/.test(defaultValue)) {
+                paramType = 'boolean';
+              } else if (/^['"`]/.test(defaultValue)) {
+                paramType = 'string';
+              }
+            }
+            
+            params[paramName] = {
+              type: paramType,
+              description: `Parameter ${paramName}`
+            };
+            
+            if (defaultValue && defaultValue !== 'undefined') {
+              // 解析默认值
+              try {
+                if (paramType === 'number') {
+                  params[paramName].default = parseInt(defaultValue, 10);
+                } else if (paramType === 'boolean') {
+                  params[paramName].default = defaultValue === 'true';
+                } else if (paramType === 'string') {
+                  params[paramName].default = defaultValue.replace(/^['"`]|['"`]$/g, '');
+                } else {
+                  params[paramName].default = defaultValue;
+                }
+              } catch (e) {
+                // 忽略默认值解析错误
+              }
+            }
+          }
+        }
+      }
+      
+      // 特殊处理：直接查找变量赋值模式
+      // const a = params.a || 0;
+      const assignmentPattern = /(?:const|let|var)\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*params\.([a-zA-Z_][a-zA-Z0-9_]*)\s*\|\|\s*([^;,\n}]+)/g;
+      let assignmentMatch;
+      while ((assignmentMatch = assignmentPattern.exec(funcStr)) !== null) {
+        const varName = assignmentMatch[1];
+        const paramName = assignmentMatch[2];
+        const defaultValue = assignmentMatch[3];
+        
+        if (varName === paramName && !params[paramName]) {
+          let paramType = 'any';
+          let parsedDefault;
+          
+          if (defaultValue) {
+            const cleanDefault = defaultValue.trim();
+            if (/^\d+$/.test(cleanDefault)) {
+              paramType = 'number';
+              parsedDefault = parseInt(cleanDefault, 10);
+            } else if (/^true|false$/.test(cleanDefault)) {
+              paramType = 'boolean';
+              parsedDefault = cleanDefault === 'true';
+            } else if (/^['"`]/.test(cleanDefault)) {
+              paramType = 'string';
+              parsedDefault = cleanDefault.replace(/^['"`]|['"`]$/g, '');
+            } else {
+              parsedDefault = cleanDefault;
+            }
+          }
+          
+          params[paramName] = {
+            type: paramType,
+            description: `Parameter ${paramName}`
+          };
+          
+          if (parsedDefault !== undefined) {
+            params[paramName].default = parsedDefault;
+          }
+        }
+      }
+      
+    } catch (error) {
+      logger.debug(`源码分析失败: ${error}`);
+    }
+    
     return params;
   }
 

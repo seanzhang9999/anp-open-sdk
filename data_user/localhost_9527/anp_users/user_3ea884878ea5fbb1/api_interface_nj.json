@@ -1,0 +1,71 @@
+{
+  "jsonrpc": "2.0",
+  "info": {
+    "title": "DID did:wba:localhost%3A9527:wba:user:3ea884878ea5fbb1 JSON-RPC Interface",
+    "version": "0.1.0",
+    "description": "Methods offered by DID did:wba:localhost%3A9527:wba:user:3ea884878ea5fbb1",
+    "runtime": "nodejs"
+  },
+  "methods": [
+    {
+      "name": "calculator-js.add",
+      "summary": "Calculator Agent JS的/calculator-js/add接口",
+      "description": "由 Calculator Agent JS 提供的服务",
+      "params": {
+        "a": {
+          "type": "number",
+          "description": "Parameter a",
+          "default": 0
+        },
+        "b": {
+          "type": "number",
+          "description": "Parameter b",
+          "default": 0
+        }
+      },
+      "tags": [
+        "Calculator Agent JS"
+      ],
+      "meta": {
+        "openapi": "3.0.0",
+        "info": {
+          "title": "Calculator Agent JS API",
+          "version": "1.0.0"
+        },
+        "httpMethod": "POST",
+        "endpoint": "/calculator-js/add",
+        "runtime": "nodejs"
+      }
+    },
+    {
+      "name": "calculator-js.multiply",
+      "summary": "Calculator Agent JS的/calculator-js/multiply接口",
+      "description": "由 Calculator Agent JS 提供的服务",
+      "params": {
+        "a": {
+          "type": "number",
+          "description": "Parameter a",
+          "default": 1
+        },
+        "b": {
+          "type": "number",
+          "description": "Parameter b",
+          "default": 1
+        }
+      },
+      "tags": [
+        "Calculator Agent JS"
+      ],
+      "meta": {
+        "openapi": "3.0.0",
+        "info": {
+          "title": "Calculator Agent JS API",
+          "version": "1.0.0"
+        },
+        "httpMethod": "POST",
+        "endpoint": "/calculator-js/multiply",
+        "runtime": "nodejs"
+      }
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "jsonrpc": "2.0",
+  "info": {
+    "title": "DID did:wba:localhost%3A9527:wba:user:27c0b1d11180f973 JSON-RPC Interface",
+    "version": "0.1.0",
+    "description": "Methods offered by DID did:wba:localhost%3A9527:wba:user:27c0b1d11180f973",
+    "runtime": "nodejs"
+  },
+  "methods": [
+    {
+      "name": "add",
+      "summary": "代码生成计算器的/add接口",
+      "description": "由 代码生成计算器 提供的服务",
+      "params": {},
+      "tags": [
+        "代码生成计算器"
+      ],
+      "meta": {
+        "openapi": "3.0.0",
+        "info": {
+          "title": "代码生成计算器 API",
+          "version": "1.0.0"
+        },
+        "httpMethod": "POST",
+        "endpoint": "/add",
+        "runtime": "nodejs"
+      }
+    },
+    {
+      "name": "multiply",
+      "summary": "代码生成计算器的/multiply接口",
+      "description": "由 代码生成计算器 提供的服务",
+      "params": {},
+      "tags": [
+        "代码生成计算器"
+      ],
+      "meta": {
+        "openapi": "3.0.0",
+        "info": {
+          "title": "代码生成计算器 API",
+          "version": "1.0.0"
+        },
+        "httpMethod": "POST",
+        "endpoint": "/multiply",
+        "runtime": "nodejs"
+      }
+    }
+  ]
+}

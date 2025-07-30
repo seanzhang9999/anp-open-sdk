@@ -360,6 +360,27 @@ async function main() {
   const codeGeneratedAgents = await createAgentsWithCode();
   allAgents.push(...codeGeneratedAgents);
   
+  // 3. 生成接口文档 - 仿照Python版本的实现
+  const processedDids = new Set<string>();
+  for (const agent of allAgents) {
+    // Node.js版本使用anpUser而不是anp_user_did
+    if (agent && agent.anpUser && agent.anpUser.id) {
+      const did = agent.anpUser.id;
+      // 移除去重限制，让每个DID都有机会重新生成接口文档
+      // 这样可以确保共享DID的所有Agent都被考虑在内
+      if (!processedDids.has(did)) {
+        logger.info(`🔄 开始为 DID '${did}' 生成完整接口文档...`);
+        try {
+          await AgentManager.generateAndSaveAgentInterfaces(agent);
+          processedDids.add(did);
+          logger.info(`✅ 已为 DID '${did}' 生成接口文档`);
+        } catch (error) {
+          logger.error(`❌ 为 DID '${did}' 生成接口文档失败: ${error}`);
+        }
+      }
+    }
+  }
+  
   if (!allAgents.length) {
     logger.debug("No agents were created. Exiting.");
     return;

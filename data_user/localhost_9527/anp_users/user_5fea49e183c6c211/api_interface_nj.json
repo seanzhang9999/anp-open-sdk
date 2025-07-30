@@ -1,0 +1,74 @@
+{
+  "jsonrpc": "2.0",
+  "info": {
+    "title": "DID did:wba:localhost%3A9527:wba:user:5fea49e183c6c211 JSON-RPC Interface",
+    "version": "0.1.0",
+    "description": "Methods offered by DID did:wba:localhost%3A9527:wba:user:5fea49e183c6c211",
+    "runtime": "nodejs"
+  },
+  "methods": [
+    {
+      "name": "weather.current",
+      "summary": "代码生成天气的/weather/current接口",
+      "description": "由 代码生成天气 提供的服务",
+      "params": {},
+      "tags": [
+        "代码生成天气"
+      ],
+      "meta": {
+        "openapi": "3.0.0",
+        "info": {
+          "title": "代码生成天气 API",
+          "version": "1.0.0"
+        },
+        "httpMethod": "POST",
+        "endpoint": "/weather/current",
+        "runtime": "nodejs"
+      }
+    },
+    {
+      "name": "weather.forecast",
+      "summary": "代码生成天气的/weather/forecast接口",
+      "description": "由 代码生成天气 提供的服务",
+      "params": {},
+      "tags": [
+        "代码生成天气"
+      ],
+      "meta": {
+        "openapi": "3.0.0",
+        "info": {
+          "title": "代码生成天气 API",
+          "version": "1.0.0"
+        },
+        "httpMethod": "POST",
+        "endpoint": "/weather/forecast",
+        "runtime": "nodejs"
+      }
+    },
+    {
+      "name": "assistant.help",
+      "summary": "代码生成助手的/assistant/help接口",
+      "description": "由 代码生成助手 提供的服务",
+      "params": {
+        "topic": {
+          "type": "any",
+          "description": "Parameter topic",
+          "default": "topic"
+        }
+      },
+      "tags": [
+        "代码生成助手"
+      ],
+      "meta": {
+        "openapi": "3.0.0",
+        "info": {
+          "title": "代码生成助手 API",
+          "version": "1.0.0"
+        },
+        "httpMethod": "POST",
+        "endpoint": "/assistant/help",
+        "runtime": "nodejs"
+      }
+    }
+  ]
+}
