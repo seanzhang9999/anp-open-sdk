@@ -279,15 +279,19 @@ async def main():
     # 用代码直接生成Agent
     code_generated_agents = await create_agents_with_code()
     all_agents.extend(code_generated_agents)
-    # 生成接口文档
-    processed_dids = set()  # 用于跟踪已处理的 DID
+    # 生成接口文档 - 修复: 确保每个DID都重新生成完整的接口文档
+    processed_dids = set()
     for agent in all_agents:
-        if hasattr(agent, 'anp_user'):
+        # 修复：新Agent系统使用anp_user_did而不是anp_user
+        if hasattr(agent, 'anp_user_did'):
             did = agent.anp_user_did
+            # 移除去重限制，让每个DID都有机会重新生成接口文档
+            # 这样可以确保共享DID的所有Agent都被考虑在内
             if did not in processed_dids:
+                logger.info(f"🔄 开始为 DID '{did}' 生成完整接口文档...")
                 await LocalAgentManager.generate_and_save_agent_interfaces(agent)
                 processed_dids.add(did)
-                logger.debug(f"✅ 为 DID '{did}' 生成接口文档")
+                logger.info(f"✅ 已为 DID '{did}' 生成接口文档")
     if not all_agents:
         logger.debug("No agents were created. Exiting.")
         return
@@ -334,7 +338,8 @@ async def main():
     # 调试：检查API路由
     logger.debug("\n🔍 调试：检查Agent的API路由注册情况...")
     for agent in all_agents:
-        if hasattr(agent, 'anp_user'):
+        # 修复：新Agent系统使用anp_user_did而不是anp_user
+        if hasattr(agent, 'anp_user_did'):
             logger.debug(f"Agent: {agent.name}")
             logger.debug(f"  DID: {agent.anp_user_did}")
             logger.debug(f"  API路由数量: {len(agent.api_routes)}")

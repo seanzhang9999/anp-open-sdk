@@ -12,7 +12,8 @@
       "description": "由 我的小铃木 提供的服务",
       "params": {
         "message": {
-          "type": "Any"
+          "type": "Any",
+          "description": "Parameter message"
         }
       },
       "tags": [

@@ -82,7 +82,13 @@
       "name": "assistant.help",
       "summary": "帮助信息API",
       "description": "由 代码生成助手 提供的服务",
-      "params": {},
+      "params": {
+        "topic": {
+          "type": "str",
+          "description": "Parameter topic",
+          "default": "general"
+        }
+      },
       "tags": [
         "代码生成助手"
       ],

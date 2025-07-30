@@ -11,7 +11,9 @@ paths:
         content:
           application/json:
             schema:
-              properties: {}
+              properties:
+                topic:
+                  type: str
               type: object
         required: true
       responses:

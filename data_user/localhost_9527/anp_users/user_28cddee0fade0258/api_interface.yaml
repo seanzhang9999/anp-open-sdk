@@ -11,7 +11,11 @@ paths:
         content:
           application/json:
             schema:
-              properties: {}
+              properties:
+                a:
+                  type: int
+                b:
+                  type: int
               type: object
         required: true
       responses:

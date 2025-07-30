@@ -13,7 +13,7 @@ paths:
             schema:
               properties:
                 message:
-                  type: string
+                  type: Any
               type: object
         required: true
       responses:

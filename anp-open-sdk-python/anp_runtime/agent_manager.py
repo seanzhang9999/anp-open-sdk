@@ -997,40 +997,194 @@ class LocalAgentManager:
         """
         params = {}
         
-        # 优先使用保存的配置参数
-        if hasattr(agent_obj, 'api_configs') and path in agent_obj.api_configs:
-            config_params = agent_obj.api_configs[path].get('params', {})
-            for name, param_config in config_params.items():
-                params[name] = {
-                    "type": param_config.get('type', 'Any'),
-                    "description": param_config.get('description', ''),
-                }
-                # 如果有默认值，添加到参数中
-                if 'value' in param_config:
-                    params[name]['default'] = param_config['value']
+        # 优先使用保存的配置参数 - 修复：支持多种路径匹配策略
+        if hasattr(agent_obj, 'api_configs'):
+            config_params = None
             
-            if params:
-                logger.debug(f"✅ 使用配置参数: {path} -> {len(params)} 个参数")
-                return params
+            # 1. 直接匹配原始路径
+            if path in agent_obj.api_configs:
+                config_params = agent_obj.api_configs[path].get('params', {})
+                logger.info(f"✅ 直接路径匹配: {path}")
+            
+            # 2. 如果是共享DID，尝试匹配完整路径（包含prefix）
+            elif hasattr(agent_obj, 'prefix') and agent_obj.prefix:
+                full_path_with_prefix = f"{agent_obj.prefix}{path}"
+                if full_path_with_prefix in agent_obj.api_configs:
+                    config_params = agent_obj.api_configs[full_path_with_prefix].get('params', {})
+                    logger.info(f"✅ 完整路径匹配: {full_path_with_prefix} -> {path}")
+            
+            # 3. 反向匹配：如果path包含prefix，尝试移除prefix后查找
+            elif hasattr(agent_obj, 'prefix') and agent_obj.prefix and path.startswith(agent_obj.prefix):
+                original_path = path[len(agent_obj.prefix):]
+                if original_path in agent_obj.api_configs:
+                    config_params = agent_obj.api_configs[original_path].get('params', {})
+                    logger.info(f"✅ 反向路径匹配: {path} -> {original_path}")
+            
+            # 处理找到的配置参数
+            if config_params:
+                for name, param_config in config_params.items():
+                    params[name] = {
+                        "type": param_config.get('type', 'Any'),
+                        "description": param_config.get('description', ''),
+                    }
+                    # 如果有默认值，添加到参数中
+                    if 'value' in param_config:
+                        params[name]['default'] = param_config['value']
+                
+                if params:
+                    logger.info(f"✅ 使用配置参数: {path} -> {len(params)} 个参数")
+                    return params
         
-        # 回退到函数签名分析
+        # 回退到函数签名分析 - 增强处理wrap_business_handler包装的函数
         try:
             sig = inspect.signature(handler)
+            param_names = list(sig.parameters.keys())
+            
+            # 检查是否是wrap_business_handler包装的函数
+            is_wrapped = hasattr(handler, '_original_func') or hasattr(handler, '__wrapped__')
+            
+            if is_wrapped:
+                # 对于包装的函数，尝试获取原始函数签名
+                original_func = getattr(handler, '_original_func', None) or getattr(handler, '__wrapped__', None)
+                if original_func:
+                    try:
+                        original_sig = inspect.signature(original_func)
+                        for name, param in original_sig.parameters.items():
+                            # 跳过框架参数和self参数
+                            if name not in ["self", "request_data", "request"]:
+                                param_type = "Any"
+                                if param.annotation != inspect._empty and hasattr(param.annotation, "__name__"):
+                                    param_type = param.annotation.__name__
+                                elif param.annotation != inspect._empty:
+                                    param_type = str(param.annotation)
+                                
+                                params[name] = {
+                                    "type": param_type,
+                                    "description": f"Parameter {name}"
+                                }
+                                
+                                # 如果有默认值，添加到参数中
+                                if param.default != inspect._empty:
+                                    params[name]['default'] = param.default
+                        
+                        if params:
+                            logger.info(f"✅ 从包装函数提取参数: {path} -> {len(params)} 个参数")
+                            return params
+                    except Exception as e:
+                        logger.warning(f"提取包装函数原始签名失败: {path} - {e}")
+            
+            # 对于非包装函数，从当前函数签名提取
             for name, param in sig.parameters.items():
+                # 跳过框架参数和self参数
                 if name not in ["self", "request_data", "request"]:
+                    param_type = "Any"
+                    if param.annotation != inspect._empty and hasattr(param.annotation, "__name__"):
+                        param_type = param.annotation.__name__
+                    elif param.annotation != inspect._empty:
+                        param_type = str(param.annotation)
+                        
                     params[name] = {
-                        "type": param.annotation.__name__ if (
-                            param.annotation != inspect._empty and hasattr(param.annotation, "__name__")
-                        ) else "Any"
+                        "type": param_type,
+                        "description": f"Parameter {name}"
                     }
+                    
+                    # 如果有默认值，添加到参数中
+                    if param.default != inspect._empty:
+                        params[name]['default'] = param.default
+            
+            # 如果函数签名没有找到参数，尝试从函数源码中提取参数使用情况
+            if not params:
+                try:
+                    source_params = LocalAgentManager._extract_params_from_source(handler)
+                    if source_params:
+                        params.update(source_params)
+                        logger.info(f"📝 从源码分析提取参数: {path} -> {len(params)} 个参数")
+                        return params
+                except Exception as e:
+                    logger.debug(f"从源码提取参数失败: {path} - {e}")
             
             if params:
-                logger.debug(f"🔄 使用函数签名参数: {path} -> {len(params)} 个参数")
+                logger.info(f"🔄 使用函数签名参数: {path} -> {len(params)} 个参数")
             else:
-                logger.debug(f"⚠️ 未找到参数: {path} (函数签名中只有 request_data/request)")
+                logger.info(f"⚠️ 未找到参数: {path} (函数签名中只有 request_data/request)")
                 
         except Exception as e:
             logger.warning(f"提取函数签名参数失败: {path} - {e}")
+        
+        return params
+
+    @staticmethod
+    def _extract_params_from_source(handler) -> Dict:
+        """从函数源码中提取参数使用情况
+        
+        Args:
+            handler: 处理函数
+            
+        Returns:
+            Dict: 参数字典 {param_name: {type: str, description: str, default: any}}
+        """
+        params = {}
+        
+        try:
+            import ast
+            import textwrap
+            
+            # 获取函数源码
+            source = inspect.getsource(handler)
+            # 去除缩进
+            source = textwrap.dedent(source)
+            
+            # 解析AST
+            tree = ast.parse(source)
+            
+            # 查找params.get()调用
+            class ParamVisitor(ast.NodeVisitor):
+                def __init__(self):
+                    self.found_params = {}
+                
+                def visit_Call(self, node):
+                    # 查找 params.get('param_name', default_value) 模式
+                    if (isinstance(node.func, ast.Attribute) and
+                        isinstance(node.func.value, ast.Name) and
+                        node.func.value.id == 'params' and
+                        node.func.attr == 'get' and
+                        len(node.args) >= 1):
+                        
+                        # 获取参数名
+                        if isinstance(node.args[0], ast.Constant):
+                            param_name = node.args[0].value
+                            default_value = None
+                            
+                            # 获取默认值
+                            if len(node.args) >= 2:
+                                if isinstance(node.args[1], ast.Constant):
+                                    default_value = node.args[1].value
+                                elif isinstance(node.args[1], ast.Num):  # Python < 3.8 兼容
+                                    default_value = node.args[1].n
+                                elif isinstance(node.args[1], ast.Str):  # Python < 3.8 兼容
+                                    default_value = node.args[1].s
+                            
+                            # 推断类型
+                            param_type = "Any"
+                            if default_value is not None:
+                                param_type = type(default_value).__name__
+                            
+                            self.found_params[param_name] = {
+                                "type": param_type,
+                                "description": f"Parameter {param_name}",
+                            }
+                            
+                            if default_value is not None:
+                                self.found_params[param_name]['default'] = default_value
+                    
+                    self.generic_visit(node)
+            
+            visitor = ParamVisitor()
+            visitor.visit(tree)
+            params = visitor.found_params
+            
+        except Exception as e:
+            logger.debug(f"源码分析失败: {e}")
         
         return params
 
