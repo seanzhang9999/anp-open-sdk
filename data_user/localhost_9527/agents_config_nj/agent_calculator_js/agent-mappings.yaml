@@ -1,0 +1,18 @@
+name: "Calculator Agent JS"
+share_did:
+  enabled: true
+  shared_did: "did:wba:localhost%3A9527:wba:user:nodejs001"
+  path_prefix: "/calculator-js"
+  primary_agent: false
+api:
+  - path: "/add"
+    method: "POST"
+    handler: "addHandler"
+    description: "加法计算API"
+  - path: "/multiply"
+    method: "POST"
+    handler: "multiplyHandler"
+    description: "乘法计算API"
+message_handlers:
+  - type: "text"
+    handler: "handleTextMessage"
