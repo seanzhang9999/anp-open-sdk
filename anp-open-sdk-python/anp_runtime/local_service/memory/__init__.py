@@ -6,6 +6,7 @@ LocalMethod公共记忆功能模块
 - 存储管理
 - 上下文会话管理
 - 记忆收集和推荐
+- 自定义记忆管理（新增）
 """
 
 from .memory_models import (
@@ -30,7 +31,29 @@ from .memory_recommender import (
     set_memory_recommender
 )
 
+# 自定义记忆功能
+from .custom_memory_models import (
+    CustomMemoryType,
+    CustomMemorySchema,
+    CustomMemoryTemplate,
+    CustomMemoryBuilder,
+    TemplateFactory
+)
+
+from .custom_memory_manager import (
+    CustomMemoryManager,
+    get_custom_memory_manager,
+    set_custom_memory_manager
+)
+
+from .custom_memory_mcp_tools import (
+    CustomMemoryMCPTools,
+    get_custom_memory_mcp_tools,
+    set_custom_memory_mcp_tools
+)
+
 __all__ = [
+    # 基础记忆功能
     'MemoryEntry',
     'ContextSession',
     'MemoryType',
@@ -46,5 +69,18 @@ __all__ = [
     'MemoryRecommender',
     'RecommendationContext',
     'get_memory_recommender',
-    'set_memory_recommender'
+    'set_memory_recommender',
+    
+    # 自定义记忆功能
+    'CustomMemoryType',
+    'CustomMemorySchema',
+    'CustomMemoryTemplate',
+    'CustomMemoryBuilder',
+    'TemplateFactory',
+    'CustomMemoryManager',
+    'get_custom_memory_manager',
+    'set_custom_memory_manager',
+    'CustomMemoryMCPTools',
+    'get_custom_memory_mcp_tools',
+    'set_custom_memory_mcp_tools'
 ]

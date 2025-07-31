@@ -9,10 +9,11 @@
 5. [Agent间通信](#agent间通信)
 6. [共享DID模式](#共享did模式)
 7. [配置管理](#配置管理)
-8. [数据存储](#数据存储)
-9. [部署运行](#部署运行)
-10. [最佳实践](#最佳实践)
-11. [API参考](#api参考)
+8. [自定义Memory管理](#自定义memory管理)
+9. [数据存储](#数据存储)
+10. [部署运行](#部署运行)
+11. [最佳实践](#最佳实践)
+12. [API参考](#api参考)
 
 ---
 
@@ -844,6 +845,541 @@ config = get_global_config()
 host = config.anp_sdk.host
 port = config.anp_sdk.port
 debug_mode = config.anp_sdk.debug_mode
+```
+
+---
+
+## 自定义Memory管理
+
+ANP SDK提供了强大的自定义Memory管理系统，允许开发者创建、管理和查询自定义记忆数据，同时提供MCP工具接口支持。
+
+### 🧠 Memory系统概述
+
+自定义Memory管理系统基于模板化设计，支持：
+
+- **模板化创建**: 使用预定义模板确保数据一致性
+- **Schema验证**: 强类型数据验证和约束检查
+- **多维搜索**: 支持按模板、会话、内容等多维度搜索
+- **MCP标准化**: 提供标准化的MCP工具接口
+- **CRUD操作**: 完整的创建、读取、更新、删除功能
+
+### 📋 核心组件
+
+#### 1. CustomMemoryType - 自定义记忆类型
+
+```python
+from anp_runtime.local_service.memory.custom_memory_models import CustomMemoryType
+from datetime import datetime
+
+# 创建自定义记忆
+memory = CustomMemoryType(
+    template_name="task_template",
+    session_id="project_001",
+    content={
+        "title": "完成API文档",
+        "description": "为新功能编写API文档",
+        "priority": "high",
+        "due_date": "2024-02-01"
+    },
+    metadata={
+        "project": "ANP SDK",
+        "assignee": "developer_001"
+    }
+)
+```
+
+#### 2. CustomMemorySchema - 数据验证模式
+
+```python
+from anp_runtime.local_service.memory.custom_memory_models import CustomMemorySchema
+
+# 定义数据验证规则
+schema = CustomMemorySchema(
+    required_fields=["title", "priority"],
+    field_types={
+        "title": str,
+        "priority": str,
+        "due_date": str
+    },
+    field_constraints={
+        "priority": ["low", "medium", "high", "urgent"],
+        "title": {"min_length": 1, "max_length": 200}
+    }
+)
+```
+
+#### 3. CustomMemoryTemplate - 记忆模板
+
+```python
+from anp_runtime.local_service.memory.custom_memory_models import CustomMemoryTemplate
+
+# 创建自定义模板
+template = CustomMemoryTemplate(
+    name="meeting_template",
+    description="会议记录模板",
+    schema=schema,
+    default_content={
+        "attendees": [],
+        "agenda": [],
+        "action_items": []
+    }
+)
+```
+
+### 🔧 使用自定义Memory管理器
+
+#### 基础CRUD操作
+
+```python
+from anp_runtime.local_service.memory.custom_memory_manager import get_custom_memory_manager
+import asyncio
+
+async def memory_operations():
+    manager = get_custom_memory_manager()
+    
+    # 1. 创建记忆
+    memory_id = await manager.create_custom_memory(
+        template_name="task_template",
+        session_id="project_001",
+        content={
+            "title": "实现自定义功能",
+            "priority": "high",
+            "status": "in_progress"
+        }
+    )
+    print(f"创建记忆: {memory_id}")
+    
+    # 2. 读取记忆
+    memory = await manager.get_custom_memory(memory_id)
+    print(f"读取记忆: {memory.content}")
+    
+    # 3. 更新记忆
+    await manager.update_custom_memory(
+        memory_id,
+        content={"status": "completed"}
+    )
+    
+    # 4. 搜索记忆
+    results = await manager.search_custom_memories(
+        template_name="task_template",
+        session_id="project_001"
+    )
+    print(f"搜索结果: {len(results)} 条记录")
+    
+    # 5. 删除记忆
+    await manager.delete_custom_memory(memory_id)
+    print("记忆已删除")
+
+# 运行示例
+asyncio.run(memory_operations())
+```
+
+#### 模板管理
+
+```python
+from anp_runtime.local_service.memory.custom_memory_models import TemplateFactory
+
+async def template_operations():
+    manager = get_custom_memory_manager()
+    
+    # 1. 使用预定义模板
+    factory = TemplateFactory()
+    
+    # 获取任务模板
+    task_template = factory.get_task_template()
+    await manager.register_template(task_template)
+    
+    # 获取笔记模板
+    note_template = factory.get_note_template()
+    await manager.register_template(note_template)
+    
+    # 获取联系人模板
+    contact_template = factory.get_contact_template()
+    await manager.register_template(contact_template)
+    
+    # 2. 创建自定义模板
+    custom_schema = CustomMemorySchema(
+        required_fields=["name", "type"],
+        field_types={"name": str, "type": str}
+    )
+    
+    custom_template = CustomMemoryTemplate(
+        name="custom_template",
+        description="自定义模板",
+        schema=custom_schema
+    )
+    
+    await manager.register_template(custom_template)
+    
+    # 3. 列出所有模板
+    templates = await manager.list_templates()
+    print(f"可用模板: {list(templates.keys())}")
+```
+
+### 🛠️ MCP工具接口
+
+ANP SDK提供标准化的MCP工具接口，方便集成到各种应用中：
+
+```python
+from anp_runtime.local_service.memory.custom_memory_mcp_tools import CustomMemoryMCPTools
+
+async def mcp_tools_example():
+    tools = CustomMemoryMCPTools()
+    
+    # 1. 创建记忆 (MCP工具)
+    result = await tools.create_custom_memory_tool(
+        template_name="task_template",
+        session_id="session_001",
+        content={
+            "title": "MCP测试任务",
+            "priority": "medium"
+        }
+    )
+    print(f"MCP创建结果: {result}")
+    
+    # 2. 搜索记忆 (MCP工具)
+    search_result = await tools.search_custom_memories_tool(
+        template_name="task_template"
+    )
+    print(f"MCP搜索结果: {search_result}")
+    
+    # 3. 批量操作 (MCP工具)
+    batch_result = await tools.batch_create_memories_tool(
+        memories=[
+            {
+                "template_name": "note_template",
+                "content": {"title": "笔记1", "content": "内容1"}
+            },
+            {
+                "template_name": "note_template",
+                "content": {"title": "笔记2", "content": "内容2"}
+            }
+        ]
+    )
+    print(f"MCP批量创建: {batch_result}")
+```
+
+### 🏗️ 在Agent中使用自定义Memory
+
+#### 装饰器模式集成
+
+```python
+from anp_runtime.agent_decorator import agent_class, class_api
+from anp_runtime.local_service.memory.custom_memory_manager import get_custom_memory_manager
+
+@agent_class(
+    name="智能任务管理Agent",
+    description="基于自定义Memory的任务管理Agent",
+    did="did:wba:localhost%3A9527:wba:user:27c0b1d11180f973"
+)
+class TaskManagerAgent:
+    def __init__(self):
+        self.memory_manager = get_custom_memory_manager()
+    
+    @class_api("/create_task", auto_wrap=True)
+    async def create_task(self, title: str, priority: str = "medium",
+                         project: str = "default"):
+        """创建新任务"""
+        try:
+            task_id = await self.memory_manager.create_custom_memory(
+                template_name="task_template",
+                session_id=project,
+                content={
+                    "title": title,
+                    "priority": priority,
+                    "status": "todo",
+                    "created_at": datetime.now().isoformat()
+                }
+            )
+            
+            return {
+                "success": True,
+                "task_id": task_id,
+                "message": f"任务 '{title}' 创建成功"
+            }
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+    
+    @class_api("/list_tasks", auto_wrap=True)
+    async def list_tasks(self, project: str = "default",
+                        status: Optional[str] = None):
+        """列出任务"""
+        try:
+            # 搜索任务
+            tasks = await self.memory_manager.search_custom_memories(
+                template_name="task_template",
+                session_id=project
+            )
+            
+            # 按状态过滤
+            if status:
+                tasks = [t for t in tasks if t.content.get("status") == status]
+            
+            return {
+                "success": True,
+                "project": project,
+                "total_tasks": len(tasks),
+                "tasks": [
+                    {
+                        "id": task.id,
+                        "title": task.content.get("title"),
+                        "priority": task.content.get("priority"),
+                        "status": task.content.get("status")
+                    }
+                    for task in tasks
+                ]
+            }
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+    
+    @class_api("/update_task_status", auto_wrap=True)
+    async def update_task_status(self, task_id: str, status: str):
+        """更新任务状态"""
+        try:
+            await self.memory_manager.update_custom_memory(
+                task_id,
+                content={"status": status}
+            )
+            
+            return {
+                "success": True,
+                "message": f"任务状态更新为: {status}"
+            }
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+    
+    @class_api("/get_project_report", auto_wrap=True)
+    async def get_project_report(self, project: str = "default"):
+        """获取项目报告"""
+        try:
+            tasks = await self.memory_manager.search_custom_memories(
+                template_name="task_template",
+                session_id=project
+            )
+            
+            # 统计任务状态
+            status_count = {}
+            for task in tasks:
+                status = task.content.get("status", "unknown")
+                status_count[status] = status_count.get(status, 0) + 1
+            
+            return {
+                "success": True,
+                "project": project,
+                "total_tasks": len(tasks),
+                "status_breakdown": status_count,
+                "completion_rate": round(
+                    status_count.get("completed", 0) / max(len(tasks), 1) * 100, 2
+                )
+            }
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+```
+
+### 📊 高级功能
+
+#### 1. 复杂搜索查询
+
+```python
+async def advanced_search():
+    manager = get_custom_memory_manager()
+    
+    # 多条件搜索
+    results = await manager.search_custom_memories(
+        template_name="task_template",
+        session_id="project_001",
+        content_query={"priority": "high", "status": "in_progress"},
+        created_after=datetime(2024, 1, 1),
+        limit=10
+    )
+    
+    return results
+
+# 自定义查询函数
+async def find_overdue_tasks():
+    manager = get_custom_memory_manager()
+    all_tasks = await manager.search_custom_memories(
+        template_name="task_template"
+    )
+    
+    overdue_tasks = []
+    current_date = datetime.now()
+    
+    for task in all_tasks:
+        due_date_str = task.content.get("due_date")
+        if due_date_str:
+            due_date = datetime.fromisoformat(due_date_str)
+            if due_date < current_date and task.content.get("status") != "completed":
+                overdue_tasks.append(task)
+    
+    return overdue_tasks
+```
+
+#### 2. 内存数据导入导出
+
+```python
+async def export_import_memories():
+    manager = get_custom_memory_manager()
+    
+    # 导出数据
+    all_memories = await manager.search_custom_memories()
+    export_data = [
+        {
+            "id": memory.id,
+            "template_name": memory.template_name,
+            "session_id": memory.session_id,
+            "content": memory.content,
+            "metadata": memory.metadata,
+            "created_at": memory.created_at.isoformat()
+        }
+        for memory in all_memories
+    ]
+    
+    # 保存到文件
+    import json
+    with open("memory_export.json", "w", encoding="utf-8") as f:
+        json.dump(export_data, f, ensure_ascii=False, indent=2)
+    
+    # 导入数据
+    with open("memory_export.json", "r", encoding="utf-8") as f:
+        import_data = json.load(f)
+    
+    for item in import_data:
+        await manager.create_custom_memory(
+            template_name=item["template_name"],
+            session_id=item.get("session_id"),
+            content=item["content"],
+            metadata=item.get("metadata")
+        )
+```
+
+### 🔗 与本地方法集成
+
+```python
+from anp_runtime.local_service.local_methods_decorators import local_method
+
+@local_method("memory.create_task")
+async def create_task_local(title: str, priority: str = "medium"):
+    """本地方法：创建任务"""
+    manager = get_custom_memory_manager()
+    
+    task_id = await manager.create_custom_memory(
+        template_name="task_template",
+        content={
+            "title": title,
+            "priority": priority,
+            "status": "todo"
+        }
+    )
+    
+    return {"task_id": task_id, "status": "created"}
+
+@local_method("memory.search_notes")
+async def search_notes_local(keyword: str):
+    """本地方法：搜索笔记"""
+    manager = get_custom_memory_manager()
+    
+    notes = await manager.search_custom_memories(
+        template_name="note_template"
+    )
+    
+    # 简单关键词搜索
+    filtered_notes = [
+        note for note in notes
+        if keyword.lower() in note.content.get("content", "").lower()
+        or keyword.lower() in note.content.get("title", "").lower()
+    ]
+    
+    return {
+        "keyword": keyword,
+        "found": len(filtered_notes),
+        "notes": [
+            {
+                "id": note.id,
+                "title": note.content.get("title"),
+                "content": note.content.get("content")[:100] + "..."
+            }
+            for note in filtered_notes
+        ]
+    }
+```
+
+### 🛡️ 最佳实践
+
+#### 1. 错误处理
+
+```python
+async def robust_memory_operation():
+    manager = get_custom_memory_manager()
+    
+    try:
+        # 创建记忆时的错误处理
+        memory_id = await manager.create_custom_memory(
+            template_name="task_template",
+            content={"title": "测试任务"}
+        )
+        
+    except ValidationError as e:
+        print(f"数据验证错误: {e}")
+        return {"error": "数据格式不正确"}
+    
+    except TemplateNotFoundError as e:
+        print(f"模板不存在: {e}")
+        return {"error": "指定的模板不存在"}
+    
+    except Exception as e:
+        print(f"未知错误: {e}")
+        return {"error": "操作失败"}
+    
+    return {"success": True, "memory_id": memory_id}
+```
+
+#### 2. 性能优化
+
+```python
+async def optimized_batch_operations():
+    manager = get_custom_memory_manager()
+    
+    # 批量创建 - 比逐个创建更高效
+    memories_data = [
+        {
+            "template_name": "note_template",
+            "content": {"title": f"笔记{i}", "content": f"内容{i}"}
+        }
+        for i in range(100)
+    ]
+    
+    # 使用批量创建
+    created_ids = await manager.batch_create_memories(memories_data)
+    print(f"批量创建了 {len(created_ids)} 条记忆")
+    
+    # 批量删除
+    await manager.batch_delete_memories(created_ids[:50])
+    print("删除了前50条记忆")
+```
+
+#### 3. 数据一致性
+
+```python
+async def ensure_data_consistency():
+    manager = get_custom_memory_manager()
+    
+    # 使用事务确保数据一致性
+    async with manager.transaction():
+        # 创建相关记忆
+        project_id = await manager.create_custom_memory(
+            template_name="project_template",
+            content={"name": "新项目", "status": "active"}
+        )
+        
+        # 创建项目任务
+        task_id = await manager.create_custom_memory(
+            template_name="task_template",
+            session_id=project_id,
+            content={"title": "项目任务", "project_id": project_id}
+        )
+        
+        # 如果任何操作失败，所有操作都会回滚
 ```
 
 ---
