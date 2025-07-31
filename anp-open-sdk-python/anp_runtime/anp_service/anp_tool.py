@@ -821,15 +821,25 @@ class ANPToolCrawler:
                 body = {"message": message_value}
         logger.info(f"根据模型要求组装请求:\n{url}:{method}\nheaders:{headers}params:{params}body:{body}")
         try:
+            # 🔧 修复：将body包装成ANP标准格式
+            if body and method.upper() == "POST":
+                # 如果是Agent API调用，需要将参数包装在params字段中
+                if "/agent/api/" in url:
+                    formatted_body = {"params": body}
+                else:
+                    formatted_body = body
+            else:
+                formatted_body = body
+            
             if use_two_way_auth:
                 result = await anp_tool.execute_with_two_way_auth(
-                    url=url, method=method, headers=headers, params=params, body=body,
+                    url=url, method=method, headers=headers, params=params, body=formatted_body,
                     anpsdk=anpsdk, caller_agent=caller_agent,
                     target_agent=target_agent, use_two_way_auth=use_two_way_auth
                 )
             else:
                 result = await anp_tool.execute(
-                    url=url, method=method, headers=headers, params=params, body=body
+                    url=url, method=method, headers=headers, params=params, body=formatted_body
                 )
 
             logger.debug(f"ANPTool 响应 [url: {url}]")
@@ -892,17 +902,22 @@ def wrap_business_handler(func):
             request_data = args[0] if args else kwargs.get('request_data', {})
             request = args[1] if len(args) > 1 else kwargs.get('request', None)
             
-            # 从 request_data.params 中提取参数
+            # 🔧 修复参数提取逻辑：支持从多个来源提取参数
             func_kwargs = {}
             params = request_data.get('params', {}) if isinstance(request_data, dict) else {}
+            body = request_data.get('body', {}) if isinstance(request_data, dict) else {}
+            
             for param_name in param_names:
-                # 优先级1：从 params 中获取（业务参数）
+                # 优先级1：从 params 中获取（URL参数或显式params字段）
                 if param_name in params:
                     func_kwargs[param_name] = params[param_name]
-                # 优先级2：从 request_data 顶层获取
+                # 优先级2：从 body 中获取（POST请求体参数）
+                elif param_name in body:
+                    func_kwargs[param_name] = body[param_name]
+                # 优先级3：从 request_data 顶层获取
                 elif param_name in request_data:
                     func_kwargs[param_name] = request_data[param_name]
-                # 优先级3：特殊对象处理
+                # 优先级4：特殊对象处理
                 elif param_name == 'request_data':
                     func_kwargs[param_name] = request_data
                 elif param_name == 'request':
@@ -940,15 +955,22 @@ def wrap_business_handler(func):
                 if not instance:
                     raise ValueError("缺少 self 参数")
                 
-                # 从request_data中提取其他参数
+                # 🔧 修复参数提取逻辑：支持从多个来源提取参数
                 func_kwargs = {}
+                params = request_data.get('params', {}) if isinstance(request_data, dict) else {}
+                body = request_data.get('body', {}) if isinstance(request_data, dict) else {}
+                
                 for param_name in param_names[1:]:  # 跳过 self
                     if param_name in ['request_data', 'request']:
                         continue
-                        
-                    params = request_data.get('params', {}) if isinstance(request_data, dict) else {}
+                    
+                    # 优先级1：从 params 中获取
                     if param_name in params:
                         func_kwargs[param_name] = params[param_name]
+                    # 优先级2：从 body 中获取
+                    elif param_name in body:
+                        func_kwargs[param_name] = body[param_name]
+                    # 优先级3：从 request_data 顶层获取
                     elif param_name in request_data:
                         func_kwargs[param_name] = request_data[param_name]
 
@@ -960,13 +982,20 @@ def wrap_business_handler(func):
             else:
                 # 不需要 self 的函数
                 func_kwargs = {}
+                params = request_data.get('params', {}) if isinstance(request_data, dict) else {}
+                body = request_data.get('body', {}) if isinstance(request_data, dict) else {}
+                
                 for param_name in param_names:
                     if param_name in ['request_data', 'request']:
                         continue
-                        
-                    params = request_data.get('params', {}) if isinstance(request_data, dict) else {}
+                    
+                    # 优先级1：从 params 中获取
                     if param_name in params:
                         func_kwargs[param_name] = params[param_name]
+                    # 优先级2：从 body 中获取
+                    elif param_name in body:
+                        func_kwargs[param_name] = body[param_name]
+                    # 优先级3：从 request_data 顶层获取
                     elif param_name in request_data:
                         func_kwargs[param_name] = request_data[param_name]
                 # 调用函数

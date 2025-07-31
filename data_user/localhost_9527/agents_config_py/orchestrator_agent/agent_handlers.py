@@ -200,7 +200,7 @@ async def run_ai_root_crawler_demo():
     host,port = get_did_host_port_from_did(target_did)
     try:
         result = await crawler.run_crawler_demo(
-            req_did=my_agent_instance.id,
+            req_did=my_agent_instance.anp_user_did,
             resp_did=target_did,
             task_input=task_description,
             initial_url="http://localhost:9527/publisher/agents",

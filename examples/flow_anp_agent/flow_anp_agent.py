@@ -377,7 +377,7 @@ async def test_discovery_agent(all_agents,svr):
         # agent中的AI联网爬取函数，从一个did地址开始爬取
         # result = await discovery_agent.run_ai_crawler_demo()
         # agent中的AI联网爬取函数，从多个did汇总地址开始爬取
-        # result = await discovery_agent.run_ai_root_crawler_demo()
+        result = await discovery_agent.run_ai_root_crawler_demo()
         # agent中的本地api去调用另一个agent的本地api
         result = await discovery_agent.run_agent_002_demo()
         # agent中的本地api通过搜索本地api注册表去调用另一个agent的本地api
