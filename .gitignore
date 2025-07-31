@@ -147,3 +147,12 @@ anp-open-sdk-nodejs/examples/*.d.ts
 anp-open-sdk-nodejs/examples/*.ts.map
 anp-open-sdk-nodejs/examples/*.js
 anp-open-sdk-nodejs/examples/*.js.map
+examples/flow_anp_agent/local_methods_doc.json
+.claude/settings.local.json
+.clinerules/cline-memory-bank-rule.md
+.continue/rules/new-rule-1.yaml
+.continue/rules/new-rule-2.yaml
+.continue/rules/new-rule-3.yaml
+.continue/rules/new-rule.yaml
+.claude/settings.local.json
+examples/flow_anp_agent/local_methods_doc.json
