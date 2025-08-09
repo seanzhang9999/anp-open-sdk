@@ -156,3 +156,4 @@ examples/flow_anp_agent/local_methods_doc.json
 .continue/rules/new-rule.yaml
 .claude/settings.local.json
 examples/flow_anp_agent/local_methods_doc.json
+anp-proxy
